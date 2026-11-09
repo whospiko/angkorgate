@@ -153,6 +153,10 @@ export class UsersService {
             .getOne();
     }
 
+    async setFailedAttempts(id: string, failed: number, lockedUntil: Date | null): Promise<void> {
+        await this.userRepo.update(id, { failedAttempts: failed, lockedUntil });
+    }
+
     private async assertUnique(
         email?: string,
         phone?: string,

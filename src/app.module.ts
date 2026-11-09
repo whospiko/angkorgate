@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { UsersModule } from './users/users.module';
 import { CommonModule } from './common/common.module';
 import { RbacModule } from './rbac/rbac.module';
+import { AuthModule } from './auth/auth.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -26,6 +27,7 @@ import configuration from './config/configuration';
     UsersModule,
     CommonModule,
     RbacModule,
+    AuthModule,
   ],
   controllers: [AppController],
 })
