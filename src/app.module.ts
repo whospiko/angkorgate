@@ -10,6 +10,7 @@ import { AuditModule } from './audit/audit.module';
 import configuration from './config/configuration';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AuditInterceptor } from './audit/interceptor/audit.interceptor';
+import { EmployeesModule } from './employees/employees.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { AuditInterceptor } from './audit/interceptor/audit.interceptor';
     RbacModule,
     AuthModule,
     AuditModule,
+    EmployeesModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
