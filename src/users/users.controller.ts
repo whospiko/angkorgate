@@ -7,6 +7,7 @@ import { PermissionsGuard } from "../rbac/guards/permissions.guard";
 import { Permissions } from '../rbac/decorators/permissions.decorator';
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import { Audit } from "../audit/decorators/audit.decorator";
 
 @ApiTags('Users')
 @ApiBearerAuth('bearerAuth') // <-- Add this to tell Swagger to use the token
@@ -20,6 +21,7 @@ export class UsersController {
     @Post()
     @HttpCode(HttpStatus.CREATED)
     @Permissions('user:write')
+    @Audit('user.create')
     create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
         return this.userService.create(dto);
     }

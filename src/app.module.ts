@@ -6,7 +6,10 @@ import { UsersModule } from './users/users.module';
 import { CommonModule } from './common/common.module';
 import { RbacModule } from './rbac/rbac.module';
 import { AuthModule } from './auth/auth.module';
+import { AuditModule } from './audit/audit.module';
 import configuration from './config/configuration';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { AuditInterceptor } from './audit/interceptor/audit.interceptor';
 
 @Module({
   imports: [
@@ -28,6 +31,10 @@ import configuration from './config/configuration';
     CommonModule,
     RbacModule,
     AuthModule,
+    AuditModule,
+  ],
+  providers: [
+    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
   controllers: [AppController],
 })

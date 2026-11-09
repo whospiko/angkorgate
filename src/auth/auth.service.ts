@@ -18,6 +18,7 @@ import { LoginAttempt } from './entities/login-attempt.entity';
 import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { AuditService } from '../audit/audit.service';
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_MINUTES = 15;
@@ -34,6 +35,7 @@ export class AuthService {
         private readonly refreshRepo: Repository<RefreshToken>,
         @InjectRepository(LoginAttempt)
         private readonly attemptRepo: Repository<LoginAttempt>,
+        private readonly audit: AuditService,
     ) { }
 
     // ══════════════════════════════════════════════════════════════════
@@ -109,7 +111,17 @@ export class AuthService {
 
         // 5. Build tokens
         const roles = await this.rbac.getUserRoleCodes(record.id);
+
+        void this.audit.log({
+            actorId: record.id,
+            action: 'auth.login',
+            entity: 'user',
+            entityId: record.id,
+            ipAddress: ctx.ip ?? null,
+        });
+
         return this.issueTokens(record.id, record.email, record.phone, roles, ctx);
+
     }
 
     // ══════════════════════════════════════════════════════════════════

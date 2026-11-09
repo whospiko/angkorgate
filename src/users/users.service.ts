@@ -9,12 +9,15 @@ import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class UsersService {
     constructor(
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
+        private readonly audit: AuditService, // 👈 injected, no module import
+
     ) { }
 
     async create(dto: CreateUserDto): Promise<UserResponseDto> {
@@ -99,8 +102,19 @@ export class UsersService {
     }
 
     async setActive(id: string, isActive: boolean): Promise<void> {
+        const before = await this.findByIdOrFail(id);
+
         const result = await this.userRepo.update(id, { isActive });
+
         if (result.affected === 0) throw new NotFoundException(`User ${id} not found`);
+
+        void this.audit.log({
+            action: isActive ? 'user.activate' : 'user.deactivate',
+            entity: 'user',
+            entityId: id,
+            oldValue: { isActive: before.isActive },
+            newValue: { isActive },
+        });
     }
 
     async remove(id: string): Promise<void> {
