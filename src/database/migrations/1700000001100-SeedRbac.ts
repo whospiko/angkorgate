@@ -18,8 +18,8 @@ const PERMISSIONS: Array<{ code: string; resource: string; action: string }> = [
     { code: 'permission:write', resource: 'permission', action: 'write' },
     { code: 'employee:read', resource: 'employee', action: 'read' },
     { code: 'employee:write', resource: 'employee', action: 'write' },
-    { code: 'patient:read', resource: 'patient', action: 'read' },
-    { code: 'patient:write', resource: 'patient', action: 'write' },
+    { code: 'customer:read', resource: 'customer', action: 'read' },
+    { code: 'customer:write', resource: 'customer', action: 'write' },
     { code: 'appointment:read', resource: 'appointment', action: 'read' },
     { code: 'appointment:write', resource: 'appointment', action: 'write' },
     { code: 'invoice:read', resource: 'invoice', action: 'read' },
@@ -32,22 +32,22 @@ const PERMISSIONS: Array<{ code: string; resource: string; action: string }> = [
 const ROLE_PERMISSIONS: Record<string, string[]> = {
     ADMIN: PERMISSIONS.map((p) => p.code), // all
     DOCTOR: [
-        'patient:read', 'patient:write',
+        'customer:read', 'customer:write',
         'appointment:read', 'appointment:write',
         'employee:read', 'report:read',
     ],
     RECEPTIONIST: [
-        'patient:read', 'patient:write',
+        'customer:read', 'customer:write',
         'appointment:read', 'appointment:write',
         'employee:read',
     ],
     ACCOUNTANT: [
-        'patient:read',
+        'customer:read',
         'invoice:read', 'invoice:write',
         'report:read',
     ],
     ASSISTANT: [
-        'patient:read',
+        'customer:read',
         'appointment:read', 'appointment:write',
     ],
 };

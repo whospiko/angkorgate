@@ -11,6 +11,7 @@ import configuration from './config/configuration';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AuditInterceptor } from './audit/interceptor/audit.interceptor';
 import { EmployeesModule } from './employees/employees.module';
+import { CustomersModule } from './customers/customers.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { EmployeesModule } from './employees/employees.module';
     AuthModule,
     AuditModule,
     EmployeesModule,
+    CustomersModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
