@@ -220,14 +220,17 @@ export class CustomersService {
     private async nextCode(type: CustomerType): Promise<string> {
         return this.repo.manager.transaction(async (em: EntityManager) => {
             const prefix = TYPE_PREFIX[type];
-            const row = await em
-                .createQueryBuilder(Customer, 'c')
-                .select('MAX(CAST(SUBSTRING(c.customerCode FROM 5) AS INT))', 'max')
-                .where('c.customerCode LIKE :p', { p: `${prefix}-%` })
-                .setLock('pessimistic_write') // serialise concurrent creations of same type
-                .getRawOne<{ max: string | null }>();
 
-            const next = (row?.max ? parseInt(row.max, 10) : 0) + 1;
+            const lastCustomer = await em
+                .createQueryBuilder(Customer, 'c')
+                .where('c.customerCode LIKE :p', { p: `${prefix}-%` })
+                .orderBy('CAST(SUBSTRING(c.customerCode FROM 5) AS INT)', 'DESC')
+                .setLock('pessimistic_write') // serialize concurrent creations of same type
+                .getOne();
+
+            const currentMax = lastCustomer ? parseInt(lastCustomer.customerCode.substring(4), 10) : 0;
+            const next = currentMax + 1;
+
             return `${prefix}-${String(next).padStart(4, '0')}`;
         });
     }

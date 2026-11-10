@@ -195,4 +195,12 @@ export class UsersService {
             }
         }
     }
+    async setEmailVerified(id: string, verified: boolean): Promise<void> {
+        await this.userRepo.update(id, { isEmailVerified: verified });
+    }
+
+    async setPhoneVerified(id: string, verified: boolean): Promise<void> {
+        await this.userRepo.update(id, { isPhoneVerified: verified });
+    }
+
 }

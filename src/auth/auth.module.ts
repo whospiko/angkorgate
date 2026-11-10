@@ -11,6 +11,9 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { EmailVerificationToken } from './entities/email-verification-token.entity';
+import { PasswordResetToken } from './entities/password-reset-token.entity';
+import { CustomersModule } from '../customers/customers.module';
 
 @Module({
     imports: [
@@ -24,9 +27,15 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
                 }
             }),
         }),
-        TypeOrmModule.forFeature([RefreshToken, LoginAttempt]),
+        TypeOrmModule.forFeature([
+            RefreshToken,
+            LoginAttempt,
+            EmailVerificationToken,
+            PasswordResetToken,
+        ]),
         UsersModule,
         RbacModule,
+        CustomersModule
     ],
     controllers: [AuthController],
     providers: [AuthService, JwtStrategy, JwtAuthGuard],

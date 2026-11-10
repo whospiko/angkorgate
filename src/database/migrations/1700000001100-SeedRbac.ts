@@ -6,6 +6,7 @@ const ROLES: Array<{ code: string; name: string; description: string }> = [
     { code: 'RECEPTIONIST', name: 'Receptionist', description: 'Front-desk access' },
     { code: 'ACCOUNTANT', name: 'Accountant', description: 'Billing access' },
     { code: 'ASSISTANT', name: 'Assistant', description: 'Assist doctors' },
+    { code: 'CUSTOMER', name: 'Customer', description: 'Self-service customer/patient/guest' },
 ];
 
 const PERMISSIONS: Array<{ code: string; resource: string; action: string }> = [
@@ -50,6 +51,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
         'customer:read',
         'appointment:read', 'appointment:write',
     ],
+    CUSTOMER: [], // no admin permissions — gets access only to portal endpoints
 };
 
 export class SeedRbac1700000001100 implements MigrationInterface {

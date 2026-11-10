@@ -1,9 +1,12 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     HttpCode,
     HttpStatus,
+    Param,
+    ParseUUIDPipe,
     Post,
     Req,
     UseGuards,
@@ -24,6 +27,12 @@ import { AuthResponseDto } from './dto/auth-response.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { AuthenticatedUser } from './interfaces/jwt-payload.interface';
+import { RegisterCustomerDto } from './dto/register-customer.dto';
+import { Throttle } from '@nestjs/throttler';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -31,6 +40,7 @@ export class AuthController {
     constructor(private readonly auth: AuthService) { }
 
     @Post('login')
+    @Throttle({ default: { limit: 5, ttl: 60_000 } }) // brute-force protection
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Authenticate user and return tokens' })
     @ApiResponse({ status: 200, description: 'Login successful', type: AuthResponseDto })
@@ -40,6 +50,13 @@ export class AuthController {
         @Req() req: Request,
     ): Promise<AuthResponseDto> {
         return this.auth.login(dto, this.ctxFrom(req));
+    }
+
+    @Post('register')
+    @Throttle({ default: { limit: 3, ttl: 60_000 } }) // 3 attempts / min / IP
+    @HttpCode(HttpStatus.CREATED)
+    register(@Body() dto: RegisterCustomerDto, @Req() req: Request) {
+        return this.auth.registerCustomer(dto, this.ctxFrom(req));
     }
 
     @Post('refresh')
@@ -96,6 +113,56 @@ export class AuthController {
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     me(@CurrentUser() user: AuthenticatedUser): AuthenticatedUser {
         return user;
+    }
+
+    @Post('verify-email')
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @HttpCode(HttpStatus.OK)
+    verifyEmail(@Body() dto: VerifyEmailDto, @Req() req: Request) {
+        return this.auth.verifyEmail(dto.token, this.ctxFrom(req));
+    }
+
+    @Post('resend-verification')
+    @Throttle({ default: { limit: 2, ttl: 60_000 } })
+    @HttpCode(HttpStatus.OK)
+    resendVerification(@Body() dto: ResendVerificationDto, @Req() req: Request) {
+        return this.auth.resendVerification(
+            { email: dto.email, phone: dto.phone },
+            this.ctxFrom(req),
+        );
+    }
+
+    @Post('forgot-password')
+    @Throttle({ default: { limit: 3, ttl: 60_000 } })
+    @HttpCode(HttpStatus.OK)
+    forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: Request) {
+        return this.auth.forgotPassword(dto.email, this.ctxFrom(req));
+    }
+
+    @Post('reset-password')
+    @Throttle({ default: { limit: 5, ttl: 60_000 } })
+    @HttpCode(HttpStatus.OK)
+    resetPassword(@Body() dto: ResetPasswordDto, @Req() req: Request) {
+        return this.auth.resetPassword(dto.token, dto.newPassword, this.ctxFrom(req));
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Get('sessions')
+    listSessions(
+        @CurrentUser('id') userId: string,
+        @Body() body?: { currentRefreshToken?: string },
+    ) {
+        return this.auth.listSessions(userId, body?.currentRefreshToken);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Delete('sessions/:id')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    revokeSession(
+        @CurrentUser('id') userId: string,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        return this.auth.revokeSession(userId, id);
     }
 
     private ctxFrom(req: Request): LoginContext {
