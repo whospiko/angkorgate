@@ -21,12 +21,11 @@ const PERMISSIONS: Array<{ code: string; resource: string; action: string }> = [
     { code: 'employee:write', resource: 'employee', action: 'write' },
     { code: 'customer:read', resource: 'customer', action: 'read' },
     { code: 'customer:write', resource: 'customer', action: 'write' },
-    { code: 'appointment:read', resource: 'appointment', action: 'read' },
-    { code: 'appointment:write', resource: 'appointment', action: 'write' },
-    { code: 'invoice:read', resource: 'invoice', action: 'read' },
-    { code: 'invoice:write', resource: 'invoice', action: 'write' },
-    { code: 'report:read', resource: 'report', action: 'read' },
     { code: 'audit:read', resource: 'audit', action: 'read' },
+    { code: 'app:read', resource: 'app', action: 'read' },
+    { code: 'app:write', resource: 'app', action: 'write' },
+    { code: 'oauth:read', resource: 'oauth', action: 'read' },
+    { code: 'oauth:write', resource: 'oauth', action: 'write' },
 ];
 
 // Which permissions each role gets by default
@@ -34,8 +33,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     ADMIN: PERMISSIONS.map((p) => p.code), // all
     DOCTOR: [
         'customer:read', 'customer:write',
-        'appointment:read', 'appointment:write',
-        'employee:read', 'report:read',
+        'employee:read',
     ],
     RECEPTIONIST: [
         'customer:read', 'customer:write',
@@ -44,12 +42,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     ],
     ACCOUNTANT: [
         'customer:read',
-        'invoice:read', 'invoice:write',
-        'report:read',
     ],
     ASSISTANT: [
         'customer:read',
-        'appointment:read', 'appointment:write',
     ],
     CUSTOMER: [], // no admin permissions — gets access only to portal endpoints
 };

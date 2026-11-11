@@ -565,6 +565,17 @@ export class AuthService {
             throw new NotFoundException('Session not found');
         }
     }
+
+    // src/auth/auth.service.ts — make this public
+    async issueTokensForUser(
+        userId: string,
+        email: string | null,
+        phone: string | null,
+        ctx: LoginContext,
+    ): Promise<AuthResponseDto> {
+        const roles = await this.rbac.getUserRoleCodes(userId);
+        return this.issueTokens(userId, email, phone, roles, ctx);
+    }
 }
 
 export interface LoginContext {

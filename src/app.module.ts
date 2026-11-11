@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule, OnApplicationBootstrap } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppController } from './app.controller';
@@ -14,6 +14,10 @@ import { EmployeesModule } from './employees/employees.module';
 import { CustomersModule } from './customers/customers.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { OauthModule } from './oauth/oauth.module';
+import { AppsModule } from './apps/apps.module';
+import { AppContextMiddleware } from './apps/middleware/app-context.middleware';
+import { OauthConfigService } from './oauth/oauth-config.service';
 
 @Module({
   imports: [
@@ -42,6 +46,8 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
     EmployeesModule,
     CustomersModule,
     NotificationsModule,
+    OauthModule,
+    AppsModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
@@ -50,4 +56,14 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
   ],
   controllers: [AppController],
 })
-export class AppModule { }
+export class AppModule implements NestModule, OnApplicationBootstrap {
+  constructor(private readonly oauthConfig: OauthConfigService) { }
+
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(AppContextMiddleware).forRoutes('*');
+  }
+
+  async onApplicationBootstrap() {
+    await this.oauthConfig.seedFromEnv();
+  }
+}

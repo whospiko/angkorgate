@@ -1,0 +1,62 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { PassportStrategy } from '@nestjs/passport';
+import { Strategy, VerifyCallback, Profile } from 'passport-google-oauth20';
+import { OauthProfile } from '../interfaces/oauth-profile.interface';
+
+export const GOOGLE_STRATEGY = 'google';
+
+@Injectable()
+export class GoogleStrategy extends PassportStrategy(Strategy, GOOGLE_STRATEGY) {
+    private readonly logger = new Logger(GoogleStrategy.name);
+
+    constructor(config: ConfigService) {
+        const clientId = config.get<string>('oauth.google.clientId') ?? '';
+        const clientSecret = config.get<string>('oauth.google.clientSecret') ?? '';
+        const callbackUrl =
+            config.get<string>('oauth.google.callbackUrl') ??
+            `${config.get<string>('oauth.callbackBaseUrl')}/auth/oauth/google/callback`;
+
+        // Passport requires non-empty strings — this only registers the strategy
+        // when we actually call new GoogleStrategy(). The module handles the gate.
+        super({
+            clientID: clientId,
+            clientSecret,
+            callbackURL: callbackUrl,
+            scope: ['email', 'profile'],
+            state: false,  // 👈 REQUIRED for /link flow to preserve state through Google
+        });
+    }
+
+    // authorizationParams(): { [key: string]: string } {
+    //     return {
+    //         access_type: 'offline', // gets refresh_token (not needed for login-only)
+    //         prompt: 'consent',      // forces consent screen (only for refresh_token)
+    //     };
+    // }
+
+    async validate(
+        accessToken: string,
+        refreshToken: string,
+        profile: Profile,
+        done: VerifyCallback,
+    ): Promise<void> {
+        try {
+            const email = profile.emails?.[0];
+            const oauthProfile: OauthProfile = {
+                provider: 'google',
+                providerUserId: profile.id,
+                email: email?.value ?? null,
+                emailVerified: email?.verified ?? false,
+                firstName: profile.name?.givenName,
+                lastName: profile.name?.familyName,
+                fullName: profile.displayName,
+                avatarUrl: profile.photos?.[0]?.value,
+                raw: profile as unknown as Record<string, unknown>,
+            };
+            done(null, oauthProfile);
+        } catch (err) {
+            done(err as Error, undefined);
+        }
+    }
+}
