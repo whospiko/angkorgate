@@ -1,10 +1,10 @@
 {
-  "name": "easy-auth",
+  "name": "angkorgate-core",
   "version": "0.0.1",
-  "description": "",
+  "description": "Open-source Identity and Access Management (IAM).",
   "author": "Heng Kakada",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "LICENSED",
   "scripts": {
     "build": "nest build",
     "deploy": "nest deploy",
