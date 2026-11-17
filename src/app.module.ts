@@ -17,7 +17,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { OauthModule } from './oauth/oauth.module';
 import { AppsModule } from './apps/apps.module';
 import { AppContextMiddleware } from './apps/middleware/app-context.middleware';
-import { OauthConfigService } from './oauth/oauth-config.service';
+import { OauthConfigService } from './oauth/services/oauth-config.service';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';

@@ -13,7 +13,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { Permissions } from '../../rbac/decorators/permissions.decorator';
-import { OauthProvidersService } from '../oauth-providers.service';
+import { OauthProvidersService } from '../services/oauth-providers.service';
 import { CreateProviderDto } from '../dto/create-provider.dto';
 import { UpdateProviderDto } from '../dto/update-provider.dto';
 

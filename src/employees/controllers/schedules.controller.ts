@@ -13,7 +13,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { Permissions } from '../../rbac/decorators/permissions.decorator';
-import { SchedulesService } from '../schedules.service';
+import { SchedulesService } from '../services/schedules.service';
 import { CreateScheduleDto } from '../dto/create-schedule.dto';
 
 @UseGuards(AuthGuard('jwt'), PermissionsGuard)

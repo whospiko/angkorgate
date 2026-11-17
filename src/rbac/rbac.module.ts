@@ -6,11 +6,11 @@ import { RolePermission } from './entities/role-permission.entity';
 import { UserRole } from './entities/user-role.entity';
 import { UserPermissionOverride } from './entities/user-permission-override.entity';
 import { User } from '../users/entities/user.entity';
-import { RolesController } from './roles.controller';
-import { PermissionsController } from './permissions.controller';
-import { RbacService } from './rbac.service';
+import { RbacService } from './services/rbac.service';
 import { RolesGuard } from './guards/roles.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
+import { PermissionsController } from './controllers/permissions.controller';
+import { RolesController } from './controllers/roles.controller';
 
 @Module({
     imports: [

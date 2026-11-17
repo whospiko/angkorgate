@@ -17,7 +17,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { Permissions } from '../../rbac/decorators/permissions.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
-import { CustomersService } from '../customers.service';
+import { CustomersService } from '../services/customers.service';
 import { CreateCustomerDto } from '../dto/create-customer.dto';
 import { UpdateCustomerDto } from '../dto/update-customer.dto';
 import { SetAttributeDto } from '../dto/set-attribute.dto';

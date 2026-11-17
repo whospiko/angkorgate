@@ -14,11 +14,11 @@ import { JobTitlesController } from "./controllers/job-titles.controller";
 import { EmployeesController } from "./controllers/employees.controller";
 import { PositionsController } from "./controllers/positions.controller";
 import { SchedulesController } from "./controllers/schedules.controller";
-import { DepartmentsService } from "./departments.service";
-import { JobTitlesService } from "./job-titles.service";
-import { EmployeesService } from "./employees.service";
-import { PositionsService } from "./positions.service";
-import { SchedulesService } from "./schedules.service";
+import { DepartmentsService } from "./services/departments.service";
+import { JobTitlesService } from "./services/job-titles.service";
+import { EmployeesService } from "./services/employees.service";
+import { PositionsService } from "./services/positions.service";
+import { SchedulesService } from "./services/schedules.service";
 
 @Module({
     imports: [

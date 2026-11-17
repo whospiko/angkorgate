@@ -1,5 +1,5 @@
 import { config } from 'dotenv';
-import { AuditService } from '../src/audit/audit.service';
+import { AuditService } from '../src/audit/services/audit.service';
 
 config({ path: '.env.test', quiet: true });
 

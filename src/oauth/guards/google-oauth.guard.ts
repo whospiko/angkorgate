@@ -5,8 +5,8 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { OauthConfigService } from '../oauth-config.service';
-import { OauthRedirectService } from '../oauth-redirect.service';
+import { OauthConfigService } from '../services/oauth-config.service';
+import { OauthRedirectService } from '../services/oauth-redirect.service';
 
 /**
  * Wraps Passport's google guard:

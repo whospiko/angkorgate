@@ -5,7 +5,7 @@ import {
     Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { RbacService } from '../rbac.service';
+import { RbacService } from '../services/rbac.service';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 
 @Injectable()

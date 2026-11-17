@@ -12,10 +12,10 @@ import {
 } from '@nestjs/common';
 import { type Request, type Response } from 'express';
 import { IsString, MinLength } from 'class-validator';
-import { OauthConfigService } from '../oauth-config.service';
-import { OauthLoginService } from '../oauth-login.service';
-import { OauthTicketService } from '../oauth-ticket.service';
-import { OauthRedirectService } from '../oauth-redirect.service';
+import { OauthConfigService } from '../services/oauth-config.service';
+import { OauthLoginService } from '../services/oauth-login.service';
+import { OauthTicketService } from '../services/oauth-ticket.service';
+import { OauthRedirectService } from '../services/oauth-redirect.service';
 import { GoogleOauthGuard } from '../guards/google-oauth.guard';
 import { OauthProfile } from '../interfaces/oauth-profile.interface';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';

@@ -7,8 +7,8 @@ import { ContactAttribute } from './entities/contact-attribute.entity';
 import { User } from '../users/entities/user.entity';
 import { UsersModule } from '../users/users.module';
 import { RbacModule } from '../rbac/rbac.module';
-import { CustomersService } from './customers.service';
-import { ContactsService } from './contacts.service';
+import { CustomersService } from './services/customers.service';
+import { ContactsService } from './services/contacts.service';
 import { CustomersController } from './controllers/customers.controller';
 import { ContactsController } from './controllers/contacts.controller';
 

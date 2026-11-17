@@ -3,8 +3,8 @@ import { Test } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
-import { AuditService } from '../src/audit/audit.service';
 import request from 'supertest';
+import { AuditService } from '../src/audit/services/audit.service';
 
 export async function createTestApp(): Promise<{
     app: INestApplication;

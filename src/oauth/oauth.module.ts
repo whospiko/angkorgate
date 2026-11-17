@@ -3,9 +3,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { OauthProvider } from './entities/oauth-provider.entity';
 import { OauthAccount } from './entities/oauth-account.entity';
 import { User } from '../users/entities/user.entity';
-import { OauthConfigService } from './oauth-config.service';
-import { OauthProvidersService } from './oauth-providers.service';
-import { OauthLoginService } from './oauth-login.service';
+import { OauthConfigService } from './services/oauth-config.service';
+import { OauthProvidersService } from './services/oauth-providers.service';
+import { OauthLoginService } from './services/oauth-login.service';
 import { GoogleStrategyProvider } from './strategies/google.strategy.factory';
 import { GoogleOauthGuard } from './guards/google-oauth.guard';
 import { OauthAuthController } from './controllers/oauth-auth.controller';
@@ -14,9 +14,9 @@ import { UsersModule } from '../users/users.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { CustomersModule } from '../customers/customers.module';
 import { AuthModule } from '../auth/auth.module';
-import { OauthAccountsService } from './oauth-accounts.service';
-import { OauthRedirectService } from './oauth-redirect.service';
-import { OauthTicketService } from './oauth-ticket.service';
+import { OauthAccountsService } from './services/oauth-accounts.service';
+import { OauthRedirectService } from './services/oauth-redirect.service';
+import { OauthTicketService } from './services/oauth-ticket.service';
 import { OauthTicket } from './entities/oauth-ticket.entity';
 
 @Module({

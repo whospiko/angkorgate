@@ -1,7 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MailService } from './mail.service';
-import { SmsService } from './sms.service';
+import { MailService } from './services/mail.service';
+import { SmsService } from './services/sms.service';
 import { MAIL_PROVIDER } from './interfaces/mail-provider.interface';
 import { ConsoleMailProvider } from './providers/console-mail.provider';
 import { SmtpMailProvider } from './providers/smtp-mail.provider';

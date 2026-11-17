@@ -2,8 +2,8 @@ import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditLog } from './entities/audit-log.entity';
 import { RbacModule } from '../rbac/rbac.module';
-import { AuditController } from './audit.controller';
-import { AuditService } from './audit.service';
+import { AuditController } from './controllers/audit.controller';
+import { AuditService } from './services/audit.service';
 
 @Global()
 @Module({

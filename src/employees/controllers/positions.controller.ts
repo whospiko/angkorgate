@@ -14,7 +14,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { Permissions } from '../../rbac/decorators/permissions.decorator';
-import { PositionsService } from '../positions.service';
+import { PositionsService } from '../services/positions.service';
 import { AssignPositionDto } from '../dto/assign-position.dto';
 import { SetAttributeDto } from '../dto/set-attribute.dto';
 
