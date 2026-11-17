@@ -58,7 +58,9 @@ export class RbacService {
         const set = new Set(rolePerms.map((r) => r.code));
         for (const ov of overrides) {
             if (ov.effect === 'GRANT') set.add(ov.code);
-            else set.delete(ov.code); // REVOKE
+        }
+        for (const ov of overrides) {
+            if (ov.effect === 'REVOKE') set.delete(ov.code);
         }
         return Array.from(set);
     }

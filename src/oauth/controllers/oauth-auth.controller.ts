@@ -20,6 +20,7 @@ import { GoogleOauthGuard } from '../guards/google-oauth.guard';
 import { OauthProfile } from '../interfaces/oauth-profile.interface';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { SkipTransform } from '../../common/decorators/skip-transform.decorator';
 
 class RedeemTicketDto {
     @IsString()
@@ -52,6 +53,7 @@ export class OauthAuthController {
     /** Start Google flow — 302 to Google. */
     @Get('google')
     @UseGuards(GoogleOauthGuard)
+    @SkipTransform()
     googleStart() {
         // Passport redirects; nothing to return.
     }
@@ -67,6 +69,7 @@ export class OauthAuthController {
      */
     @Get('google/callback')
     @UseGuards(GoogleOauthGuard)
+    @SkipTransform()
     async googleCallback(
         @Req() req: Request,
         @Res() res: Response,

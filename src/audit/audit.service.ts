@@ -20,6 +20,7 @@ export interface AuditEvent {
 @Injectable()
 export class AuditService {
     private readonly logger = new Logger(AuditService.name);
+    private static readonly pendingWrites = new Set<Promise<unknown>>();
 
     constructor(
         @InjectRepository(AuditLog)
@@ -27,28 +28,70 @@ export class AuditService {
     ) { }
 
     /**
+     * Flush all pending in-flight audit writes.
+     */
+    static async flush(): Promise<void> {
+        if (AuditService.pendingWrites.size > 0) {
+            await Promise.allSettled(Array.from(AuditService.pendingWrites));
+        }
+    }
+
+    async flush(): Promise<void> {
+        return AuditService.flush();
+    }
+
+    /**
      * Write an audit row. Fire-and-forget — never blocks business logic.
      * Errors are logged but never thrown — auditing must not break the app.
      */
     async log(event: AuditEvent): Promise<void> {
-        try {
-            await this.logRepo.save(
-                this.logRepo.create({
-                    actorId: event.actorId ?? null,
-                    action: event.action,
-                    entity: event.entity,
-                    entityId: event.entityId ?? null,
-                    oldValue: event.oldValue ?? null,
-                    newValue: event.newValue ?? null,
-                    ipAddress: event.ipAddress ?? null,
-                }),
-            );
-        } catch (err) {
-            // Never propagate — audit failures must not break business flows
-            this.logger.error(
-                `Failed to write audit log: ${event.action} on ${event.entity}`,
-                err instanceof Error ? err.stack : String(err),
-            );
+        const writePromise = (async () => {
+            try {
+                await this.logRepo.save(
+                    this.logRepo.create({
+                        actorId: event.actorId ?? null,
+                        action: event.action,
+                        entity: event.entity,
+                        entityId: event.entityId ?? null,
+                        oldValue: event.oldValue ?? null,
+                        newValue: event.newValue ?? null,
+                        ipAddress: event.ipAddress ?? null,
+                    }),
+                );
+            } catch (err: any) {
+                // If actorId violates foreign key constraint (e.g. user deleted or truncated),
+                // fall back to saving without actorId to preserve audit record.
+                if (err?.code === '23503' && event.actorId) {
+                    try {
+                        await this.logRepo.save(
+                            this.logRepo.create({
+                                actorId: null,
+                                action: event.action,
+                                entity: event.entity,
+                                entityId: event.entityId ?? null,
+                                oldValue: event.oldValue ?? null,
+                                newValue: event.newValue ?? null,
+                                ipAddress: event.ipAddress ?? null,
+                            }),
+                        );
+                        return;
+                    } catch {
+                        // ignore secondary error
+                    }
+                }
+                // Never propagate — audit failures must not break business flows
+                this.logger.error(
+                    `Failed to write audit log: ${event.action} on ${event.entity}`,
+                    err instanceof Error ? err.stack : String(err),
+                );
+            }
+        })();
+
+        AuditService.pendingWrites.add(writePromise);
+        writePromise.finally(() => AuditService.pendingWrites.delete(writePromise));
+
+        if (process.env.NODE_ENV === 'test') {
+            await writePromise;
         }
     }
 

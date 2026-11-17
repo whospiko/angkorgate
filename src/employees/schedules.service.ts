@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WorkSchedule } from './entities/work-schedule.entity';
@@ -27,7 +27,7 @@ export class SchedulesService {
             })
             .getExists();
         if (overlap) {
-            throw new NotFoundException('Overlapping schedule exists for this day');
+            throw new BadRequestException('Overlapping schedule exists for this day');
         }
 
         return this.repo.save(this.repo.create(dto));

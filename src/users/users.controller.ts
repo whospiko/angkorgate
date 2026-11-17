@@ -8,6 +8,7 @@ import { Permissions } from '../rbac/decorators/permissions.decorator';
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { Audit } from "../audit/decorators/audit.decorator";
+import { ApiOkEnvelope } from "../common/dto/api-ok-response.decorator";
 
 @ApiTags('Users')
 @ApiBearerAuth('bearerAuth') // <-- Add this to tell Swagger to use the token
@@ -40,6 +41,7 @@ export class UsersController {
 
     @Get(':id')
     @Permissions('user:read')
+    @ApiOkEnvelope(UserResponseDto) // Swagger 
     findOne(
         @Param('id', ParseUUIDPipe) id: string
     ): Promise<UserResponseDto> {
