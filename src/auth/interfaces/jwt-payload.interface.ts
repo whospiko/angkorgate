@@ -13,3 +13,10 @@ export interface AuthenticatedUser {
     phone: string | null;
     roles: string[];
 }
+
+export interface MfaPendingPayload {
+    sub: string;
+    mfaPending: true;
+    iat?: number;
+    exp?: number;
+}

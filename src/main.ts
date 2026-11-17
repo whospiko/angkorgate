@@ -8,8 +8,8 @@ async function bootstrap() {
 
   // 1. Add Bearer Auth to your DocumentBuilder config
   const config = new DocumentBuilder()
-    .setTitle('Dental Clinic API')
-    .setDescription('API for dental clinic management')
+    .setTitle('Easy Auth API')
+    .setDescription('provide auth with rbac strategy.')
     .setVersion('1.0')
     .addBearerAuth(
       {

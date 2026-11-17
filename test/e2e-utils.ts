@@ -51,6 +51,8 @@ export async function truncateAll(ds: DataSource): Promise<void> {
       refresh_tokens,
       login_attempts,
       audit_logs,
+      user_mfa,
+      mfa_backup_codes,
       contact_attributes,
       customer_attributes,
       customer_contacts,

@@ -76,7 +76,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
                     statusCode: status,
                     message: messages.length === 1 ? messages[0] : 'Validation failed',
                     error: r.error ?? exception.name,
-                    details: messages.length > 1 ? messages : r.details ?? null,
+                    details: Array.isArray(r.message) ? messages : r.details ?? null,
                 };
             }
             return {

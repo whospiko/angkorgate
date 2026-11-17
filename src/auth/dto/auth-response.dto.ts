@@ -1,8 +1,9 @@
+// src/auth/dto/auth-response.dto.ts
 export class AuthResponseDto {
     accessToken: string;
     refreshToken: string;
-    accessTokenExpiresIn: number;  // seconds
-    refreshTokenExpiresIn: number; // seconds
+    accessTokenExpiresIn: number;
+    refreshTokenExpiresIn: number;
     user: {
         id: string;
         email: string | null;
@@ -11,3 +12,11 @@ export class AuthResponseDto {
         mustChangePassword: boolean;
     };
 }
+
+export class MfaChallengeDto {
+    mfaRequired: true;
+    mfaToken: string;
+    backupCodesRemaining: number;
+}
+
+export type LoginResponseDto = AuthResponseDto | MfaChallengeDto;

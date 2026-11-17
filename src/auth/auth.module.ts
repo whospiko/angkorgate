@@ -8,12 +8,18 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from '../users/users.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { AuthService } from './services/auth.service';
-import { AuthController } from './controllers/auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { EmailVerificationToken } from './entities/email-verification-token.entity';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { CustomersModule } from '../customers/customers.module';
+import { AuthController } from './controllers/auth.controller';
+import { MfaController } from './controllers/mfa.controller';
+import { MfaBackupCode } from './entities/mfa-backup-code.entity';
+import { UserMfa } from './entities/user-mfa.entity';
+import { EncryptionService } from './services/encryption.service';
+import { MfaService } from './services/mfa.service';
+import { MfaPendingGuard } from './guards/mfa-pending.guard';
 
 @Module({
     imports: [
@@ -32,16 +38,19 @@ import { CustomersModule } from '../customers/customers.module';
             LoginAttempt,
             EmailVerificationToken,
             PasswordResetToken,
+            UserMfa,
+            MfaBackupCode
         ]),
         UsersModule,
         RbacModule,
         CustomersModule
     ],
-    controllers: [AuthController],
-    providers: [AuthService, JwtStrategy, JwtAuthGuard],
+    controllers: [AuthController, MfaController],
+    providers: [AuthService, JwtStrategy, JwtAuthGuard, EncryptionService, MfaService, MfaPendingGuard],
     exports: [
         AuthService,
         JwtAuthGuard,
+        MfaService
     ],
 })
 export class AuthModule { }

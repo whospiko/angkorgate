@@ -18,7 +18,7 @@ import { RbacService } from '../../rbac/services/rbac.service';
 import { RefreshToken } from '../entities/refresh-token.entity';
 import { LoginAttempt } from '../entities/login-attempt.entity';
 import { LoginDto } from '../dto/login.dto';
-import { AuthResponseDto } from '../dto/auth-response.dto';
+import { AuthResponseDto, LoginResponseDto, MfaChallengeDto } from '../dto/auth-response.dto';
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
 import { EmailVerificationToken } from '../entities/email-verification-token.entity';
 import { PasswordResetToken } from '../entities/password-reset-token.entity';
@@ -29,6 +29,9 @@ import { verifyEmailTemplate } from '../templates/verify-email.template';
 import { RegisterCustomerDto } from '../dto/register-customer.dto';
 import { AuditService } from '../../audit/services/audit.service';
 
+import { MfaService } from './mfa.service';
+
+
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_MINUTES = 15;
 const BCRYPT_ROUNDS = 12;
@@ -36,6 +39,8 @@ const BCRYPT_ROUNDS = 12;
 const EMAIL_VERIFY_TTL_HOURS = 24;
 const PASSWORD_RESET_TTL_MINUTES = 30;
 const RESEND_COOLDOWN_SECONDS = 60;
+
+const MFA_PENDING_TTL_SECONDS = 300; // 5 minutes
 
 @Injectable()
 export class AuthService {
@@ -57,7 +62,8 @@ export class AuthService {
         @InjectRepository(PasswordResetToken)
         private readonly prtRepo: Repository<PasswordResetToken>,
         private readonly mail: MailService,
-        private readonly customers: CustomersService
+        private readonly customers: CustomersService,
+        private readonly mfa: MfaService,
     ) { }
 
     async hashPassword(plain: string): Promise<string> {
@@ -68,7 +74,10 @@ export class AuthService {
         return bcrypt.compare(plain, hash);
     }
 
-    async login(dto: LoginDto, ctx: LoginContext): Promise<AuthResponseDto> {
+    async login(
+        dto: LoginDto,
+        ctx: LoginContext,
+    ): Promise<LoginResponseDto> {
         const identifier = dto.email ?? dto.phone ?? '';
         const audit = (success: boolean, userId: string | null = null) =>
             this.attemptRepo.save(
@@ -76,23 +85,22 @@ export class AuthService {
                     userId,
                     emailPhone: identifier,
                     success,
-                    ipAddress: ctx.ip,
-                    userAgent: ctx.userAgent,
+                    ipAddress: ctx.ip ?? null,
+                    userAgent: ctx.userAgent ?? null,
                 }),
             );
 
-        // 1. Look up the user (raw, with password hash)
+        // ─── 1. Look up user ────────────────────────────────────────────
         const record = dto.email
             ? await this.users.findAuthRecordByEmail(dto.email)
             : await this.users.findAuthRecordByPhone(dto.phone!);
 
         if (!record) {
             await audit(false);
-            // Same message for "no user" and "wrong password" — avoid enumeration
             throw new UnauthorizedException('Invalid credentials');
         }
 
-        // 2. Check active + lock
+        // ─── 2. Active + lockout ────────────────────────────────────────
         if (!record.isActive) {
             await audit(false, record.id);
             throw new ForbiddenException('Account disabled');
@@ -104,7 +112,7 @@ export class AuthService {
             );
         }
 
-        // 3. Verify password
+        // ─── 3. Verify password ─────────────────────────────────────────
         const ok = await this.verifyPassword(dto.password, record.passwordHash);
         if (!ok) {
             const failed = record.failedAttempts + 1;
@@ -114,11 +122,13 @@ export class AuthService {
                     : null;
 
             await this.users.setFailedAttempts(record.id, failed, lockedUntil);
-
             await audit(false, record.id);
             throw new UnauthorizedException('Invalid credentials');
         }
 
+        // ─── 4. Email verification — BEFORE MFA ─────────────────────────
+        // Doing this before MFA means the user discovers the email problem
+        // right after the password step, not after entering a TOTP code.
         if (record.email && !record.isEmailVerified) {
             await audit(false, record.id);
             throw new ForbiddenException(
@@ -126,12 +136,41 @@ export class AuthService {
             );
         }
 
-        // 4. Success — reset counters + last_login
+        // ─── 5. MFA gate ────────────────────────────────────────────────
+        const mfaEnabled = await this.mfa.isEnabled(record.id);
+        if (mfaEnabled) {
+            const mfaToken = await this.jwt.signAsync(
+                { sub: record.id, mfaPending: true },
+                {
+                    secret: this.config.get<string>('JWT_ACCESS_SECRET')!,
+                    expiresIn: MFA_PENDING_TTL_SECONDS,
+                },
+            );
+
+            // Clear lockout so they can proceed to MFA; don't touch lastLogin yet
+            await this.users.setFailedAttempts(record.id, 0, null);
+
+            void this.audit.log({
+                actorId: record.id,
+                action: 'auth.login.mfa_challenge_issued',
+                entity: 'user',
+                entityId: record.id,
+                ipAddress: ctx.ip ?? null,
+            });
+
+            const { remainingBackupCodes } = await this.mfa.getStatus(record.id);
+
+            const challenge: MfaChallengeDto = {
+                mfaRequired: true,
+                mfaToken,
+                backupCodesRemaining: remainingBackupCodes,
+            };
+            return challenge;
+        }
+
+        // ─── 6. Full success path ───────────────────────────────────────
         await this.users.setLastLogin(record.id);
         await audit(true, record.id);
-
-        // 5. Build tokens
-        const roles = await this.rbac.getUserRoleCodes(record.id);
 
         void this.audit.log({
             actorId: record.id,
@@ -141,8 +180,68 @@ export class AuthService {
             ipAddress: ctx.ip ?? null,
         });
 
+        const roles = await this.rbac.getUserRoleCodes(record.id);
         return this.issueTokens(record.id, record.email, record.phone, roles, ctx);
+    }
 
+    async completeMfaLogin(
+        userId: string,
+        code: string,
+        ctx: LoginContext,
+    ): Promise<AuthResponseDto> {
+        const result = await this.mfa.verifyCodeOrBackup(userId, code);
+
+        if (!result.valid) {
+            // Count as a failed login attempt (security: prevent brute force on MFA)
+            const record = await this.users.findByIdOrFail(userId);
+            const failed = (record as any).failedAttempts ?? 0;
+            // You may want a separate counter for MFA failures — for now reuse failed_attempts
+            await this.users.setFailedAttempts(userId, failed + 1, null);
+
+            void this.audit.log({
+                actorId: userId,
+                action: 'auth.login.mfa.failed',
+                entity: 'user',
+                entityId: userId,
+                ipAddress: ctx.ip ?? null,
+            });
+
+            throw new UnauthorizedException('Invalid MFA code');
+        }
+
+        // Success — reset failed attempts, set last login
+        await this.users.setLastLogin(userId);
+
+        const user = await this.users.findByIdOrFail(userId);
+        if (!user.isActive) throw new ForbiddenException('Account disabled');
+
+        const roles = await this.rbac.getUserRoleCodes(userId);
+
+        void this.audit.log({
+            actorId: userId,
+            action: `auth.login.mfa.success.${result.method}`,
+            entity: 'user',
+            entityId: userId,
+            ipAddress: ctx.ip ?? null,
+            newValue: { method: result.method, remaining: result.remaining },
+        });
+
+        // Issue tokens (existing helper)
+        const tokens = await this.issueTokens(
+            userId,
+            user.email,
+            user.phone,
+            roles,
+            ctx,
+        );
+
+        return {
+            ...tokens,
+            // extra context for frontend
+            ...(result.remaining <= 2
+                ? { warning: `Only ${result.remaining} backup codes remaining` }
+                : {}),
+        };
     }
 
     async registerCustomer(

@@ -23,7 +23,7 @@ import { AuthService, LoginContext } from '../services/auth.service';
 import { LoginDto } from '../dto/login.dto';
 import { RefreshDto } from '../dto/refresh.dto';
 import { ChangePasswordDto } from '../dto/change-password.dto';
-import { AuthResponseDto } from '../dto/auth-response.dto';
+import { AuthResponseDto, LoginResponseDto } from '../dto/auth-response.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../interfaces/jwt-payload.interface';
@@ -33,6 +33,12 @@ import { VerifyEmailDto } from '../dto/verify-email.dto';
 import { ResendVerificationDto } from '../dto/resend-verification.dto';
 import { ForgotPasswordDto } from '../dto/forgot-password.dto';
 import { ResetPasswordDto } from '../dto/reset-password.dto';
+import { MfaPendingGuard } from '../guards/mfa-pending.guard';
+import { LoginMfaDto } from '../dto/login-mfa.dto';
+
+interface MfaRequest extends Request {
+    mfaUserId?: string;
+}
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -48,8 +54,16 @@ export class AuthController {
     login(
         @Body() dto: LoginDto,
         @Req() req: Request,
-    ): Promise<AuthResponseDto> {
+    ): Promise<LoginResponseDto> {
         return this.auth.login(dto, this.ctxFrom(req));
+    }
+
+    @Post('login/mfa')
+    @UseGuards(MfaPendingGuard)
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @HttpCode(HttpStatus.OK)
+    loginMfa(@Req() req: MfaRequest, @Body() dto: LoginMfaDto) {
+        return this.auth.completeMfaLogin(req.mfaUserId!, dto.code, this.ctxFrom(req));
     }
 
     @Post('register')
