@@ -471,6 +471,102 @@ describe('Auth (e2e)', () => {
     });
 
     // ─────────────────────────────────────────────────────────────
+    //  EMAIL CHANGE FLOW
+    // ─────────────────────────────────────────────────────────────
+
+    describe('Email Change Flow', () => {
+        /**
+         * Helper to intercept the raw token from the DB.
+         * Since the API hashes the token, we can't read it directly.
+         * In a real app, you'd inject a mock MailService to spy on `send()`.
+         * For this E2E test against a real DB, we temporarily spoof the hash
+         * or we rely on the mock mail service output.
+         * 
+         * NOTE: If you are using MAIL_PROVIDER=console, you can parse the console output,
+         * but that's brittle. A better way is to inject a test-only MailService that captures
+         * the token before it sends. Assuming you have a way to capture it, here is the flow:
+         */
+
+        it('requests an email change, verifies the token, and applies it', async () => {
+            const admin = await seedAdmin(dataSource);
+            const { accessToken } = await loginAs(app, admin.email, admin.password);
+
+            // 1. Request change
+            await request(app.getHttpServer())
+                .post('/auth/email/change-request')
+                .set('Authorization', `Bearer ${accessToken}`)
+                .send({ newEmail: 'new-email@example.com' })
+                .expect(200);
+
+            // 2. Get the raw token
+            // ⚠️ E2E HACK: We update the DB to set a known hash for the test.
+            // In a real E2E test, you'd use a MailInterceptor to grab the link.
+            const knownRawToken = `my-test-token-${Date.now()}`;
+            const knownHash = require('crypto').createHash('sha256').update(knownRawToken).digest('hex');
+
+            await dataSource.query(
+                `UPDATE email_change_tokens SET token_hash = $1 WHERE user_id = (SELECT id FROM users WHERE email = $2) AND used_at IS NULL`,
+                [knownHash, admin.email]
+            );
+
+            // 3. Confirm change
+            await request(app.getHttpServer())
+                .post('/auth/email/confirm')
+                .send({ token: knownRawToken })
+                .expect(200);
+
+            // 4. Check DB: email updated
+            const users = await dataSource.query(
+                `SELECT email FROM users WHERE email = 'new-email@example.com'`
+            );
+            expect(users.length).toBe(1);
+
+            // 5. Check sessions revoked (refresh_tokens should have revoked_at set)
+            const tokens = await dataSource.query(
+                `SELECT revoked_at FROM refresh_tokens`
+            );
+            expect(tokens.every((t: any) => t.revoked_at !== null)).toBe(true);
+
+            // 6. Login with new email
+            await request(app.getHttpServer())
+                .post('/auth/login')
+                .send({ email: 'new-email@example.com', password: admin.password })
+                .expect(200);
+        });
+
+        it('rejects if MFA is enabled but code is missing', async () => {
+            const admin = await seedAdmin(dataSource);
+            const { accessToken } = await loginAs(app, admin.email, admin.password);
+
+            // Enable MFA
+            const setup = await request(app.getHttpServer())
+                .post('/auth/mfa/setup')
+                .set('Authorization', `Bearer ${accessToken}`)
+                .send({ password: admin.password });
+            const secret = (setup.body?.data ?? setup.body).secret;
+            await request(app.getHttpServer())
+                .post('/auth/mfa/verify')
+                .set('Authorization', `Bearer ${accessToken}`)
+                .send({ code: await generate({ secret }) });
+
+            // Try to change email without MFA code
+            await request(app.getHttpServer())
+                .post('/auth/email/change-request')
+                .set('Authorization', `Bearer ${accessToken}`)
+                .send({ newEmail: 'new@example.com' })
+                .expect(401); // UnauthorizedException
+
+            // Try with MFA code
+            const code = await generate({ secret });
+            await request(app.getHttpServer())
+                .post('/auth/email/change-request')
+                .set('Authorization', `Bearer ${accessToken}`)
+                .send({ newEmail: 'new@example.com', mfaCode: code })
+                .expect(200);
+        });
+    });
+
+    // ─────────────────────────────────────────────────────────────
     //  PROTECTED
     // ─────────────────────────────────────────────────────────────
 

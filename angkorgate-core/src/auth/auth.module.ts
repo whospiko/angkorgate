@@ -20,6 +20,9 @@ import { UserMfa } from './entities/user-mfa.entity';
 import { EncryptionService } from './services/encryption.service';
 import { MfaService } from './services/mfa.service';
 import { MfaPendingGuard } from './guards/mfa-pending.guard';
+import { EmailChangeService } from './services/email-change.service';
+import { EmailChangeToken } from './entities/email-change-token.entity';
+import { EmailChangeController } from './controllers/email-change.controller';
 
 @Module({
     imports: [
@@ -39,14 +42,15 @@ import { MfaPendingGuard } from './guards/mfa-pending.guard';
             EmailVerificationToken,
             PasswordResetToken,
             UserMfa,
-            MfaBackupCode
+            MfaBackupCode,
+            EmailChangeToken,
         ]),
         UsersModule,
         RbacModule,
         CustomersModule
     ],
-    controllers: [AuthController, MfaController],
-    providers: [AuthService, JwtStrategy, JwtAuthGuard, EncryptionService, MfaService, MfaPendingGuard],
+    controllers: [AuthController, MfaController, EmailChangeController],
+    providers: [AuthService, EmailChangeService, JwtStrategy, JwtAuthGuard, EncryptionService, MfaService, MfaPendingGuard, EmailChangeService],
     exports: [
         AuthService,
         JwtAuthGuard,

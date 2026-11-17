@@ -203,4 +203,19 @@ export class UsersService {
         await this.userRepo.update(id, { isPhoneVerified: verified });
     }
 
+
+    async updateEmail(id: string, newEmail: string): Promise<void> {
+        const result = await this.userRepo.update(id, {
+            email: newEmail,
+            isEmailVerified: true, // confirmed via token
+        });
+        if (result.affected === 0) throw new NotFoundException(`User ${id} not found`);
+    }
+
+    /**
+     * Invalidate all active sessions (refresh tokens).
+     * Delegates to AuthService — to avoid circular deps, use a callback pattern
+     * or move this logic into a small shared service.
+     */
+    async invalidateAllSessions?(id: string): Promise<void>;
 }
