@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # 1. The Database for the Auth Server
+  angkorgate-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER:
+      POSTGRES_PASSWORD:
+      POSTGRES_DB:
+
+  # 2. Your Core Engine (Auth & OIDC Provider)
+  angkorgate-core:
+    build: ./angkorgate-core
+    ports:
+      - "8080:8080" # Standard Keycloak port
+    environment:
+      - PORT=8080
+      - DB_HOST=angkorgate-db
+      - DB_NAME=clinic
+      - DB_USER=myuser
+      - DB_PASSWORD=mypass1234
+      - JWT_ACCESS_SECRET=044f00bb36c436c2be0d49edd97f6991cac1433fe19fea152abbf84d5e50156073cf896d7fa3f2589a4d5ea689e9a201
+      - APP_WEB_URL=http://localhost:3000 # Points to the Next.js console
+      - OIDC_ISSUER=http://localhost:8080/oidc
+      - REDIS_ENABLED=true
+      - REDIS_HOST=angkorgate-redis
+      - REDIS_PORT=6379
+    depends_on:
+      - angkorgate-db
+      - angkorgate-redis
+
+  # 3. Redis Cache & Distributed Store
+  angkorgate-redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: always
+
+  # 4. Your Admin Dashboard (Next.js)
+  angkorgate-console:
+    build: ./angkorgate-console
+    ports:
+      - "3000:3000" # Runs Next.js on port 3000
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080 # Points to AngkorGate Core
+    depends_on:
+      - angkorgate-core
