@@ -1,3 +1,5 @@
+import { escapeHtml } from '../../common/utils/string.util';
+
 export function resetPasswordTemplate(params: {
     fullName: string;
     resetUrl: string;
@@ -27,10 +29,4 @@ export function resetPasswordTemplate(params: {
     `,
         text: `Hi ${fullName},\n\nReset your password: ${resetUrl}\n\nExpires in ${expiresInMinutes} minutes.`,
     };
-}
-
-function escapeHtml(s: string): string {
-    return s.replace(/[&<>"']/g, (c) =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
-    );
 }

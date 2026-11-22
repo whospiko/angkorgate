@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WorkSchedule } from '../entities/work-schedule.entity';
 import { CreateScheduleDto } from '../dto/create-schedule.dto';
+import { UpdateScheduleDto } from '../dto/update-schedule.dto';
 import { EmployeesService } from './employees.service';
 
 @Injectable()
@@ -38,6 +39,19 @@ export class SchedulesService {
             where: { employeeId },
             order: { dayOfWeek: 'ASC', startTime: 'ASC' },
         });
+    }
+
+    async findById(employeeId: string, id: string): Promise<WorkSchedule> {
+        const s = await this.repo.findOne({ where: { id, employeeId } });
+        if (!s) throw new NotFoundException(`Schedule ${id} not found`);
+        return s;
+    }
+
+    async update(id: string, dto: UpdateScheduleDto): Promise<WorkSchedule> {
+        const s = await this.repo.findOne({ where: { id } });
+        if (!s) throw new NotFoundException(`Schedule ${id} not found`);
+        Object.assign(s, dto);
+        return this.repo.save(s);
     }
 
     async remove(id: string): Promise<void> {

@@ -17,6 +17,9 @@ export class AppSetting {
     @Column({ type: 'varchar', length: 100 })
     name: string;
 
+    @Column({ name: 'client_secret', type: 'varchar', length: 255, nullable: true })
+    clientSecret?: string | null;
+
     @Column({ name: 'oauth_enabled', type: 'boolean', default: false })
     oauthEnabled: boolean;
 

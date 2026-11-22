@@ -69,6 +69,15 @@ export class PositionsService {
         });
     }
 
+    async findById(employeeId: string, positionId: string): Promise<EmployeePosition> {
+        const p = await this.posRepo.findOne({
+            where: { id: positionId, employeeId },
+            relations: { jobTitle: true, department: true },
+        });
+        if (!p) throw new NotFoundException(`Position ${positionId} not found`);
+        return p;
+    }
+
     async remove(positionId: string): Promise<void> {
         const result = await this.posRepo.delete(positionId);
         if (result.affected === 0) {
@@ -76,8 +85,7 @@ export class PositionsService {
         }
     }
 
-    // ─── ATTRIBUTES (JSONB key/value) ────────────────────────────────
-
+    /** Dynamic attributes (JSONB key/value) */
     async setAttribute(
         positionId: string,
         key: string,

@@ -7,6 +7,7 @@ import { UpdateEmployeeDto } from '../dto/update-employee.dto';
 import { EmployeeResponseDto } from '../dto/employee-response.dto';
 import { UsersService } from '../../users/services/users.service';
 import { AuditService } from '../../audit/services/audit.service';
+import { normalizePagination } from '../../common/utils/pagination.util';
 
 @Injectable()
 export class EmployeesService {
@@ -68,8 +69,7 @@ export class EmployeesService {
         page?: number;
         limit?: number;
     }) {
-        const page = Math.max(1, params.page ?? 1);
-        const limit = Math.min(100, Math.max(1, params.limit ?? 20));
+        const { page, limit, skip } = normalizePagination(params.page, params.limit);
 
         const qb = this.repo
             .createQueryBuilder('e')
@@ -81,7 +81,7 @@ export class EmployeesService {
         if (params.departmentCode) qb.andWhere('d.code = :dc', { dc: params.departmentCode });
         if (params.jobTitleCode) qb.andWhere('jt.code = :jc', { jc: params.jobTitleCode });
 
-        qb.orderBy('e.fullName', 'ASC').skip((page - 1) * limit).take(limit);
+        qb.orderBy('e.fullName', 'ASC').skip(skip).take(limit);
 
         const [rows, total] = await qb.getManyAndCount();
         return {
@@ -144,9 +144,7 @@ export class EmployeesService {
         });
     }
 
-    // ─── NARROW API FOR OTHER MODULES ────────────────────────────────
-
-    /** Returns employees who hold the given job title (e.g. all doctors). */
+    /** Narrow domain queries for external module integration */
     async findByJobTitle(jobTitleCode: string): Promise<EmployeeResponseDto[]> {
         const rows = await this.repo
             .createQueryBuilder('e')

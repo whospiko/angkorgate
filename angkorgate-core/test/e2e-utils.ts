@@ -65,7 +65,8 @@ export async function truncateAll(ds: DataSource): Promise<void> {
       departments,
       user_permission_overrides,
       user_roles,
-      app_settings
+      app_settings,
+      oidc_sessions
     RESTART IDENTITY CASCADE;
   `);
     // Note: roles, permissions, users kept if you re-seed per test class;

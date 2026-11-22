@@ -9,6 +9,7 @@ import { Observable, map } from 'rxjs';
 import { Request, Response } from 'express';
 import { ApiResponseDto } from '../dto/api-response.dto';
 import { SKIP_TRANSFORM_KEY } from '../decorators/skip-transform.decorator';
+import { inferMessage } from '../utils/http.util';
 
 @Injectable()
 export class TransformInterceptor<T>
@@ -60,11 +61,4 @@ export class TransformInterceptor<T>
             }),
         );
     }
-}
-
-function inferMessage(method: string, status: number): string {
-    if (method === 'POST' && status === 201) return 'Created';
-    if (method === 'DELETE' && status === 204) return 'Deleted';
-    if (method === 'PUT' || method === 'PATCH') return 'Updated';
-    return 'OK';
 }

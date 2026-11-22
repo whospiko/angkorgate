@@ -3,6 +3,7 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
@@ -17,6 +18,7 @@ import {
 import { CreateRoleDto } from '../dto/create-role.dto';
 import { UpdateRoleDto } from '../dto/update-role.dto';
 import { CreatePermissionDto } from '../dto/create-permission.dto';
+import { CacheService } from '../../cache/cache.service';
 
 @Injectable()
 export class RbacService {
@@ -31,48 +33,60 @@ export class RbacService {
         private readonly userRoleRepo: Repository<UserRole>,
         @InjectRepository(UserPermissionOverride)
         private readonly overrideRepo: Repository<UserPermissionOverride>,
+        @Optional()
+        private readonly cache?: CacheService,
     ) { }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  PUBLIC API — what AuthModule and other modules actually call
-    // ══════════════════════════════════════════════════════════════════
-
-    /** Resolved effective permission codes for a user (roles ∪ grants − revokes). */
+    /** Public resolution API (effective permissions and roles) */
     async getUserPermissions(userId: string): Promise<string[]> {
-        const rolePerms = await this.rolePermRepo
-            .createQueryBuilder('rp')
-            .innerJoin('rp.permission', 'p')
-            .innerJoin('rp.role', 'r')
-            .innerJoin('user_roles', 'ur', 'ur.role_id = r.id')
-            .where('ur.user_id = :userId', { userId })
-            .select('p.code', 'code')
-            .getRawMany<{ code: string }>();
+        const fetcher = async () => {
+            const rolePerms = await this.rolePermRepo
+                .createQueryBuilder('rp')
+                .innerJoin('rp.permission', 'p')
+                .innerJoin('rp.role', 'r')
+                .innerJoin('user_roles', 'ur', 'ur.role_id = r.id')
+                .where('ur.user_id = :userId', { userId })
+                .select('p.code', 'code')
+                .getRawMany<{ code: string }>();
 
-        const overrides = await this.overrideRepo
-            .createQueryBuilder('o')
-            .innerJoin('o.permission', 'p')
-            .where('o.user_id = :userId', { userId })
-            .select(['p.code AS code', 'o.effect AS effect'])
-            .getRawMany<{ code: string; effect: OverrideEffect }>();
+            const overrides = await this.overrideRepo
+                .createQueryBuilder('o')
+                .innerJoin('o.permission', 'p')
+                .where('o.user_id = :userId', { userId })
+                .select(['p.code AS code', 'o.effect AS effect'])
+                .getRawMany<{ code: string; effect: OverrideEffect }>();
 
-        const set = new Set(rolePerms.map((r) => r.code));
-        for (const ov of overrides) {
-            if (ov.effect === 'GRANT') set.add(ov.code);
+            const set = new Set(rolePerms.map((r) => r.code));
+            for (const ov of overrides) {
+                if (ov.effect === 'GRANT') set.add(ov.code);
+            }
+            for (const ov of overrides) {
+                if (ov.effect === 'REVOKE') set.delete(ov.code);
+            }
+            return Array.from(set);
+        };
+
+        if (this.cache) {
+            return this.cache.wrap(`rbac:perms:${userId}`, fetcher, 300);
         }
-        for (const ov of overrides) {
-            if (ov.effect === 'REVOKE') set.delete(ov.code);
-        }
-        return Array.from(set);
+        return fetcher();
     }
 
     async getUserRoleCodes(userId: string): Promise<string[]> {
-        const rows = await this.userRoleRepo
-            .createQueryBuilder('ur')
-            .innerJoin('ur.role', 'r')
-            .where('ur.user_id = :userId', { userId })
-            .select('r.code', 'code')
-            .getRawMany<{ code: string }>();
-        return rows.map((r) => r.code);
+        const fetcher = async () => {
+            const rows = await this.userRoleRepo
+                .createQueryBuilder('ur')
+                .innerJoin('ur.role', 'r')
+                .where('ur.user_id = :userId', { userId })
+                .select('r.code', 'code')
+                .getRawMany<{ code: string }>();
+            return rows.map((r) => r.code);
+        };
+
+        if (this.cache) {
+            return this.cache.wrap(`rbac:roles:${userId}`, fetcher, 300);
+        }
+        return fetcher();
     }
 
     async hasPermission(userId: string, permissionCode: string): Promise<boolean> {
@@ -85,10 +99,7 @@ export class RbacService {
         return roles.includes(roleCode);
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  ROLE MANAGEMENT (called from RolesController)
-    // ══════════════════════════════════════════════════════════════════
-
+    /** Role administration */
     async createRole(dto: CreateRoleDto): Promise<Role> {
         const exists = await this.roleRepo.findOne({ where: { code: dto.code } });
         if (exists) throw new ConflictException(`Role ${dto.code} already exists`);
@@ -130,6 +141,7 @@ export class RbacService {
         const role = await this.findRoleByIdOrFail(id);
         Object.assign(role, dto);
         await this.roleRepo.save(role);
+        await this.cache?.delByPattern('rbac:*');
         return this.findRoleByIdOrFail(id);
     }
 
@@ -139,6 +151,7 @@ export class RbacService {
             throw new BadRequestException('Cannot delete a system role');
         }
         await this.roleRepo.delete(id);
+        await this.cache?.delByPattern('rbac:*');
     }
 
     async setRolePermissions(roleId: string, permissionCodes: string[]): Promise<void> {
@@ -152,6 +165,7 @@ export class RbacService {
         await this.rolePermRepo.save(
             perms.map((p) => this.rolePermRepo.create({ roleId, permissionId: p.id })),
         );
+        await this.cache?.delByPattern('rbac:perms:*');
     }
 
     async getRolePermissions(roleId: string): Promise<string[]> {
@@ -164,10 +178,7 @@ export class RbacService {
         return rows.map((r) => r.code);
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  PERMISSION MANAGEMENT
-    // ══════════════════════════════════════════════════════════════════
-
+    /** Permission administration */
     async createPermission(dto: CreatePermissionDto): Promise<Permission> {
         const exists = await this.permRepo.findOne({ where: { code: dto.code } });
         if (exists) throw new ConflictException(`Permission ${dto.code} already exists`);
@@ -191,10 +202,7 @@ export class RbacService {
         return p;
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  USER ↔ ROLE ASSIGNMENT
-    // ══════════════════════════════════════════════════════════════════
-
+    /** User-role assignment management */
     async assignRoleToUser(
         userId: string,
         roleCode: string,
@@ -212,6 +220,7 @@ export class RbacService {
                 assignedBy: assignedBy ?? null,
             }),
         );
+        await this.cache?.delByPattern(`rbac:*:${userId}`);
     }
 
     async replaceUserRoles(
@@ -226,7 +235,10 @@ export class RbacService {
             throw new BadRequestException(`Unknown roles: ${missing.join(', ')}`);
         }
         await this.userRoleRepo.delete({ userId });
-        if (roles.length === 0) return;
+        if (roles.length === 0) {
+            await this.cache?.delByPattern(`rbac:*:${userId}`);
+            return;
+        }
         await this.userRoleRepo.save(
             roles.map((r) =>
                 this.userRoleRepo.create({
@@ -236,17 +248,16 @@ export class RbacService {
                 }),
             ),
         );
+        await this.cache?.delByPattern(`rbac:*:${userId}`);
     }
 
     async revokeRoleFromUser(userId: string, roleCode: string): Promise<void> {
         const role = await this.findRoleByCodeOrFail(roleCode);
         await this.userRoleRepo.delete({ userId, roleId: role.id });
+        await this.cache?.delByPattern(`rbac:*:${userId}`);
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  PER-USER PERMISSION OVERRIDES
-    // ══════════════════════════════════════════════════════════════════
-
+    /** User-specific permission overrides */
     async setUserPermissionOverride(
         userId: string,
         permissionCode: string,
@@ -257,6 +268,7 @@ export class RbacService {
             { userId, permissionId: perm.id, effect },
             ['userId', 'permissionId'],
         );
+        await this.cache?.delByPattern(`rbac:*:${userId}`);
     }
 
     async clearUserPermissionOverride(
@@ -265,5 +277,16 @@ export class RbacService {
     ): Promise<void> {
         const perm = await this.findPermissionByCodeOrFail(permissionCode);
         await this.overrideRepo.delete({ userId, permissionId: perm.id });
+        await this.cache?.delByPattern(`rbac:*:${userId}`);
+    }
+
+    async getUserOverrides(userId: string): Promise<Array<{ permissionCode: string; effect: OverrideEffect }>> {
+        const rows = await this.overrideRepo
+            .createQueryBuilder('o')
+            .innerJoin('o.permission', 'p')
+            .where('o.user_id = :userId', { userId })
+            .select(['p.code AS code', 'o.effect AS effect'])
+            .getRawMany<{ code: string; effect: OverrideEffect }>();
+        return rows.map((r) => ({ permissionCode: r.code, effect: r.effect }));
     }
 }

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JobTitle } from '../entities/job-title.entity';
 import { CreateJobTitleDto } from '../dto/create-job-title.dto';
+import { UpdateJobTitleDto } from '../dto/update-job-title.dto';
 
 @Injectable()
 export class JobTitlesService {
@@ -28,5 +29,16 @@ export class JobTitlesService {
         const j = await this.repo.findOne({ where: { code } });
         if (!j) throw new NotFoundException(`Job title ${code} not found`);
         return j;
+    }
+
+    async update(code: string, dto: UpdateJobTitleDto): Promise<JobTitle> {
+        const j = await this.findByCodeOrFail(code);
+        Object.assign(j, dto);
+        return this.repo.save(j);
+    }
+
+    async remove(code: string): Promise<void> {
+        const j = await this.findByCodeOrFail(code);
+        await this.repo.delete(j.id);
     }
 }

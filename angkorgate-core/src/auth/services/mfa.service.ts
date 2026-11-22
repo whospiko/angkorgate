@@ -21,16 +21,9 @@ import { MfaSetupResponseDto } from '../dto/mfa-response.dto';
 import { UsersService } from '../../users/services/users.service';
 import { AuditService } from '../../audit/services/audit.service';
 
-const BCRYPT_ROUNDS = 10; // backup codes don't need 12 — they're high-entropy already
+const BCRYPT_ROUNDS = 10;
 const BACKUP_CODE_COUNT = 10;
 const BACKUP_CODE_LENGTH = 10;
-
-// TOTP config — tighter window than default (no ±1 drift allowance)
-// authenticator.options = {
-//     window: 1, // allows ±30s drift, fine for slow phones; set 0 for max security
-//     step: 30,
-//     digits: 6,
-// };
 
 @Injectable()
 export class MfaService {
@@ -47,10 +40,7 @@ export class MfaService {
         private readonly config: ConfigService,
     ) { }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  STATUS
-    // ══════════════════════════════════════════════════════════════════
-
+    /** Check if MFA is enabled for user */
     async isEnabled(userId: string): Promise<boolean> {
         const mfa = await this.mfaRepo.findOne({ where: { userId } });
         return mfa?.isEnabled === true;
@@ -70,10 +60,7 @@ export class MfaService {
         };
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  SETUP — step 1: generate secret + QR + backup codes (not yet enabled)
-    // ══════════════════════════════════════════════════════════════════
-
+    /** Setup step 1: generate secret, QR code, and backup codes */
     async setup(
         userId: string,
         password: string,
@@ -140,10 +127,7 @@ export class MfaService {
         return { secret, otpauthUrl, qrCodeDataUrl, backupCodes };
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  SETUP — step 2: verify the first TOTP code to enable
-    // ══════════════════════════════════════════════════════════════════
-
+    /** Setup step 2: verify first TOTP code to activate MFA */
     async verifySetup(
         userId: string,
         code: string,
@@ -180,10 +164,7 @@ export class MfaService {
         return { message: 'MFA enabled successfully' };
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  DISABLE — requires password + current TOTP or backup code
-    // ══════════════════════════════════════════════════════════════════
-
+    /** Disable MFA */
     async disable(
         userId: string,
         password: string,
@@ -216,13 +197,9 @@ export class MfaService {
         });
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  LOGIN VERIFICATION — second step
-    // ══════════════════════════════════════════════════════════════════
-
     /**
-     * Called from the login flow after password is verified.
-     * Returns { valid, method } — 'totp' or 'backup_code'.
+     * Verify TOTP code or backup code during login challenge.
+     * Returns verification result, method ('totp' | 'backup_code'), and remaining codes.
      */
     async verifyCodeOrBackup(
         userId: string,
@@ -284,10 +261,7 @@ export class MfaService {
         return { valid: false, method: null, remaining };
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  BACKUP CODES — regenerate
-    // ══════════════════════════════════════════════════════════════════
-
+    /** Regenerate emergency one-time backup codes */
     async regenerateBackupCodes(
         userId: string,
         password: string,
@@ -318,9 +292,7 @@ export class MfaService {
         return { backupCodes };
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  INTERNAL HELPERS
-    // ══════════════════════════════════════════════════════════════════
+    /** Internal Helper Methods */
 
     private generateBackupCodes(count: number): string[] {
         // 10 chars, base32-ish alphabet (no 0/O/1/I confusion)

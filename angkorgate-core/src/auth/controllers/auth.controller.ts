@@ -8,14 +8,17 @@ import {
     Param,
     ParseUUIDPipe,
     Post,
+    Query,
     Req,
     UseGuards,
 } from '@nestjs/common';
 import {
     ApiBearerAuth,
     ApiOperation,
+    ApiParam,
+    ApiQuery,
     ApiResponse,
-    ApiTags
+    ApiTags,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
 
@@ -35,6 +38,8 @@ import { ForgotPasswordDto } from '../dto/forgot-password.dto';
 import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { MfaPendingGuard } from '../guards/mfa-pending.guard';
 import { LoginMfaDto } from '../dto/login-mfa.dto';
+import { SessionResponseDto } from '../dto/session-response.dto';
+import { extractClientContext } from '../utils/client-context.util';
 
 interface MfaRequest extends Request {
     mfaUserId?: string;
@@ -48,7 +53,7 @@ export class AuthController {
     @Post('login')
     @Throttle({ default: { limit: 5, ttl: 60_000 } }) // brute-force protection
     @HttpCode(HttpStatus.OK)
-    @ApiOperation({ summary: 'Authenticate user and return tokens' })
+    @ApiOperation({ summary: 'Authenticate user and return tokens or MFA challenge' })
     @ApiResponse({ status: 200, description: 'Login successful', type: AuthResponseDto })
     @ApiResponse({ status: 401, description: 'Invalid credentials' })
     login(
@@ -62,6 +67,9 @@ export class AuthController {
     @UseGuards(MfaPendingGuard)
     @Throttle({ default: { limit: 10, ttl: 60_000 } })
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Complete two-factor authentication challenge' })
+    @ApiResponse({ status: 200, description: 'MFA verified and tokens issued', type: AuthResponseDto })
+    @ApiResponse({ status: 401, description: 'Invalid or expired MFA session / code' })
     loginMfa(@Req() req: MfaRequest, @Body() dto: LoginMfaDto) {
         return this.auth.completeMfaLogin(req.mfaUserId!, dto.code, this.ctxFrom(req));
     }
@@ -69,6 +77,10 @@ export class AuthController {
     @Post('register')
     @Throttle({ default: { limit: 3, ttl: 60_000 } }) // 3 attempts / min / IP
     @HttpCode(HttpStatus.CREATED)
+    @ApiOperation({ summary: 'Register a new customer account' })
+    @ApiResponse({ status: 201, description: 'Customer registered successfully' })
+    @ApiResponse({ status: 400, description: 'Validation error' })
+    @ApiResponse({ status: 409, description: 'Email or phone already registered' })
     register(@Body() dto: RegisterCustomerDto, @Req() req: Request) {
         return this.auth.registerCustomer(dto, this.ctxFrom(req));
     }
@@ -129,9 +141,22 @@ export class AuthController {
         return user;
     }
 
+    @ApiBearerAuth('bearerAuth')
+    @UseGuards(JwtAuthGuard)
+    @Get('me/permissions')
+    @ApiOperation({ summary: 'Get the effective permissions of the currently authenticated user' })
+    @ApiResponse({ status: 200, description: 'List of effective permissions for current user' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    myPermissions(@CurrentUser('id') userId: string): Promise<string[]> {
+        return this.auth.getUserPermissions(userId);
+    }
+
     @Post('verify-email')
     @Throttle({ default: { limit: 10, ttl: 60_000 } })
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Verify email address with confirmation token' })
+    @ApiResponse({ status: 200, description: 'Email verified successfully' })
+    @ApiResponse({ status: 400, description: 'Invalid or expired verification token' })
     verifyEmail(@Body() dto: VerifyEmailDto, @Req() req: Request) {
         return this.auth.verifyEmail(dto.token, this.ctxFrom(req));
     }
@@ -139,6 +164,8 @@ export class AuthController {
     @Post('resend-verification')
     @Throttle({ default: { limit: 2, ttl: 60_000 } })
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Resend email verification token' })
+    @ApiResponse({ status: 200, description: 'Verification email sent if account exists' })
     resendVerification(@Body() dto: ResendVerificationDto, @Req() req: Request) {
         return this.auth.resendVerification(
             { email: dto.email, phone: dto.phone },
@@ -149,6 +176,8 @@ export class AuthController {
     @Post('forgot-password')
     @Throttle({ default: { limit: 3, ttl: 60_000 } })
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Request password reset email' })
+    @ApiResponse({ status: 200, description: 'Password reset link sent if account exists' })
     forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: Request) {
         return this.auth.forgotPassword(dto.email, this.ctxFrom(req));
     }
@@ -156,22 +185,36 @@ export class AuthController {
     @Post('reset-password')
     @Throttle({ default: { limit: 5, ttl: 60_000 } })
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Reset account password using reset token' })
+    @ApiResponse({ status: 200, description: 'Password successfully reset' })
+    @ApiResponse({ status: 400, description: 'Invalid or expired reset token' })
     resetPassword(@Body() dto: ResetPasswordDto, @Req() req: Request) {
         return this.auth.resetPassword(dto.token, dto.newPassword, this.ctxFrom(req));
     }
 
+    @ApiBearerAuth('bearerAuth')
     @UseGuards(JwtAuthGuard)
     @Get('sessions')
+    @ApiOperation({ summary: 'List all active sessions for current user' })
+    @ApiQuery({ name: 'currentRefreshToken', required: false, description: 'Current refresh token to identify this session in results' })
+    @ApiResponse({ status: 200, description: 'Active sessions retrieved', type: [SessionResponseDto] })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
     listSessions(
         @CurrentUser('id') userId: string,
+        @Query('currentRefreshToken') queryToken?: string,
         @Body() body?: { currentRefreshToken?: string },
     ) {
-        return this.auth.listSessions(userId, body?.currentRefreshToken);
+        return this.auth.listSessions(userId, queryToken || body?.currentRefreshToken);
     }
 
+    @ApiBearerAuth('bearerAuth')
     @UseGuards(JwtAuthGuard)
     @Delete('sessions/:id')
     @HttpCode(HttpStatus.NO_CONTENT)
+    @ApiOperation({ summary: 'Revoke a specific active session' })
+    @ApiParam({ name: 'id', description: 'Session UUID' })
+    @ApiResponse({ status: 204, description: 'Session revoked successfully' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
     revokeSession(
         @CurrentUser('id') userId: string,
         @Param('id', ParseUUIDPipe) id: string,
@@ -180,9 +223,6 @@ export class AuthController {
     }
 
     private ctxFrom(req: Request): LoginContext {
-        return {
-            ip: req.ip, // Ensure 'trust proxy' is enabled in Express if behind a proxy like Traefik/Nginx
-            userAgent: req.headers['user-agent']?.toString(),
-        };
+        return extractClientContext(req);
     }
 }

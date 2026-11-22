@@ -1,3 +1,5 @@
+import { escapeHtml } from '../../common/utils/string.util';
+
 export function emailChangeAlertTemplate(params: {
     fullName: string;
     newEmail: string;
@@ -31,10 +33,4 @@ export function emailChangeAlertTemplate(params: {
     `,
         text: `Hi ${fullName},\n\nSomeone requested to change your account email to ${newEmail} at ${when} from ${changeIp ?? 'unknown IP'}.\n\nIf this wasn't you, change your password immediately and log out all devices.\n`,
     };
-}
-
-function escapeHtml(s: string): string {
-    return s.replace(/[&<>"']/g, (c) =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
-    );
 }

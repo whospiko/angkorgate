@@ -33,6 +33,9 @@ export class MfaPendingGuard implements CanActivate {
         try {
             payload = await this.jwt.verifyAsync<MfaPendingPayload>(token, {
                 secret: this.config.get<string>('JWT_ACCESS_SECRET')!,
+                algorithms: ['HS256'],
+                issuer: 'angkorgate-core',
+                audience: 'angkorgate-mfa',
             });
         } catch {
             throw new UnauthorizedException('Invalid or expired MFA token');

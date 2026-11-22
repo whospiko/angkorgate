@@ -32,6 +32,9 @@ import { EmailChangeController } from './controllers/email-change.controller';
             useFactory: (config: ConfigService) => ({
                 secret: config.get<string>('JWT_ACCESS_SECRET'),
                 signOptions: {
+                    algorithm: 'HS256',
+                    issuer: 'angkorgate-core',
+                    audience: 'angkorgate-api',
                     expiresIn: parseInt(config.get<string>('JWT_ACCESS_TTL') ?? '900', 10),
                 }
             }),

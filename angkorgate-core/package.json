@@ -25,7 +25,7 @@
     "test:e2e": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-e2e.json --runInBand",
     "test:e2e:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-e2e.json --watch --runInBand",
     "test:all": "npm run test && npm run test:e2e",
-    "smoke": "ts-node -r tsconfig-paths/register test/smoke-test.ts"
+    "smoke": "./node_modules/.bin/ts-node -r tsconfig-paths/register test/smoke-test.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
@@ -41,7 +41,10 @@
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "ioredis": "^5.11.1",
+    "jose": "^6.2.18",
     "nodemailer": "^10.4.0",
+    "oidc-provider": "^9.15.1",
     "otplib": "^13.6.0",
     "passport": "^0.7.0",
     "passport-apple": "^2.0.2",
@@ -61,9 +64,11 @@
     "@testcontainers/postgresql": "^12.2.1",
     "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.0",
+    "@types/ioredis": "^4.28.10",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.0",
     "@types/nodemailer": "^8.0.2",
+    "@types/oidc-provider": "^9.13.1",
     "@types/passport-apple": "^2.0.3",
     "@types/passport-google-oauth20": "^2.0.17",
     "@types/passport-jwt": "^4.0.1",

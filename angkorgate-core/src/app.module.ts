@@ -16,6 +16,8 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { OauthModule } from './oauth/oauth.module';
 import { AppsModule } from './apps/apps.module';
+import { OidcModule } from './oidc/oidc.module';
+import { CacheModule } from './cache/cache.module';
 import { AppContextMiddleware } from './apps/middleware/app-context.middleware';
 import { OauthConfigService } from './oauth/services/oauth-config.service';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -52,6 +54,8 @@ import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
     NotificationsModule,
     OauthModule,
     AppsModule,
+    OidcModule,
+    CacheModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

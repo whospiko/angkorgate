@@ -47,11 +47,36 @@ export class OauthRedirectService {
 
         const allowed = app.allowedRedirectUrls ?? [];
         const matched = allowed.some((pattern) => {
-            // Support both exact match and prefix-with-wildcard ('https://app.com/*')
+            // Support wildcard path prefix (e.g. 'https://app.com/*')
             if (pattern.endsWith('/*')) {
-                return parsed.origin + '/' === pattern.slice(0, -1);
+                const base = pattern.slice(0, -2);
+                try {
+                    const baseParsed = new URL(base);
+                    return (
+                        parsed.origin === baseParsed.origin &&
+                        (parsed.pathname === baseParsed.pathname ||
+                            parsed.pathname.startsWith(
+                                baseParsed.pathname.endsWith('/')
+                                    ? baseParsed.pathname
+                                    : `${baseParsed.pathname}/`,
+                            ))
+                    );
+                } catch {
+                    return false;
+                }
             }
-            return redirect.startsWith(pattern);
+
+            try {
+                const allowedUrl = new URL(pattern);
+                return (
+                    parsed.origin === allowedUrl.origin &&
+                    (parsed.pathname === allowedUrl.pathname ||
+                        (allowedUrl.pathname !== '/' &&
+                            parsed.pathname.startsWith(`${allowedUrl.pathname}/`)))
+                );
+            } catch {
+                return false;
+            }
         });
 
         if (!matched) {

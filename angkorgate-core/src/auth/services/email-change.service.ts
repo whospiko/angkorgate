@@ -12,7 +12,6 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
-import { createHash, randomBytes } from 'crypto';
 
 import { EmailChangeToken } from '../entities/email-change-token.entity';
 import { UsersService } from '../../users/services/users.service';
@@ -24,6 +23,8 @@ import { emailChangeAlertTemplate } from '../templates/email-change-alert.templa
 import { emailChangeConfirmTemplate } from '../templates/email-change-confirm.template';
 import { AuthService } from './auth.service';
 import { RefreshToken } from '../entities/refresh-token.entity';
+import { generateSecureToken, hashSha256 } from '../../common/utils/crypto.util';
+import { emailToDisplayName } from '../../common/utils/string.util';
 
 const EMAIL_CHANGE_TTL_HOURS = 24;
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -53,10 +54,7 @@ export class EmailChangeService {
         private readonly refreshRepo: Repository<RefreshToken>,
     ) { }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  REQUEST — initiate email change
-    // ══════════════════════════════════════════════════════════════════
-
+    /** Initiate email change request */
     async requestChange(
         userId: string,
         dto: RequestEmailChangeDto,
@@ -120,9 +118,9 @@ export class EmailChangeService {
             { usedAt: new Date() },
         );
 
-        // 6. Create new token
-        const rawToken = randomBytes(32).toString('base64url');
-        const tokenHash = this.hash(rawToken);
+        // Create new token
+        const rawToken = generateSecureToken(32);
+        const tokenHash = hashSha256(rawToken);
 
         await this.tokenRepo.save(
             this.tokenRepo.create({
@@ -134,10 +132,10 @@ export class EmailChangeService {
             }),
         );
 
-        // 7. Send "alert" email to OLD email (if any)
+        // Send alert email to current email address
         if (user.email) {
             const alertTpl = emailChangeAlertTemplate({
-                fullName: emailNameToDisplayName(user.email),
+                fullName: emailToDisplayName(user.email),
                 newEmail: dto.newEmail,
                 oldEmail: user.email,
                 changeIp: ctx.ip ?? null,
@@ -151,14 +149,14 @@ export class EmailChangeService {
             });
         }
 
-        // 8. Send "confirm" email to NEW email
+        // Send confirm email to requested new email address
         const webUrl =
             this.config.get<string>('APP_WEB_URL') ?? 'http://localhost:5173';
         const confirmUrl = `${webUrl}/confirm-email-change?token=${rawToken}`;
 
         const confirmTpl = emailChangeConfirmTemplate({
             fullName: user.email
-                ? emailNameToDisplayName(user.email)
+                ? emailToDisplayName(user.email)
                 : 'there',
             confirmUrl,
             expiresInHours: EMAIL_CHANGE_TTL_HOURS,
@@ -182,15 +180,12 @@ export class EmailChangeService {
         return GENERIC_RESPONSE;
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  CONFIRM — complete the change via token
-    // ══════════════════════════════════════════════════════════════════
-
+    /** Confirm email change via token */
     async confirmChange(
         rawToken: string,
         ctx: EmailChangeContext,
     ): Promise<{ message: string }> {
-        const tokenHash = this.hash(rawToken);
+        const tokenHash = hashSha256(rawToken);
         const record = await this.tokenRepo.findOne({ where: { tokenHash } });
 
         if (!record) throw new BadRequestException('Invalid or expired token');
@@ -238,10 +233,7 @@ export class EmailChangeService {
         };
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  RESEND — resend confirmation to the pending new email
-    // ══════════════════════════════════════════════════════════════════
-
+    /** Resend confirmation to pending new email */
     async resend(userId: string, ctx: EmailChangeContext): Promise<{ message: string }> {
         const pending = await this.tokenRepo.findOne({
             where: { userId, usedAt: IsNull() },
@@ -280,8 +272,8 @@ export class EmailChangeService {
             { usedAt: new Date() },
         );
 
-        const rawToken = randomBytes(32).toString('base64url');
-        const tokenHash = this.hash(rawToken);
+        const rawToken = generateSecureToken(32);
+        const tokenHash = hashSha256(rawToken);
 
         await this.tokenRepo.save(
             this.tokenRepo.create({
@@ -300,7 +292,7 @@ export class EmailChangeService {
 
         const tpl = emailChangeConfirmTemplate({
             fullName: user.email
-                ? emailNameToDisplayName(user.email)
+                ? emailToDisplayName(user.email)
                 : 'there',
             confirmUrl,
             expiresInHours: EMAIL_CHANGE_TTL_HOURS,
@@ -328,10 +320,7 @@ export class EmailChangeService {
         };
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  STATUS — check if there's a pending change (for UI)
-    // ══════════════════════════════════════════════════════════════════
-
+    /** Check pending email change status */
     async getPendingStatus(userId: string): Promise<{
         pending: boolean;
         newEmail?: string;
@@ -350,17 +339,4 @@ export class EmailChangeService {
             expiresAt: pending.expiresAt,
         };
     }
-
-    // ══════════════════════════════════════════════════════════════════
-    //  HELPERS
-    // ══════════════════════════════════════════════════════════════════
-
-    private hash(s: string): string {
-        return createHash('sha256').update(s).digest('hex');
-    }
-}
-
-function emailNameToDisplayName(email: string): string {
-    const localPart = email.split('@')[0];
-    return localPart.replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }

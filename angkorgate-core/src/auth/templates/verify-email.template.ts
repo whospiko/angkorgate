@@ -1,3 +1,5 @@
+import { escapeHtml } from '../../common/utils/string.util';
+
 export function verifyEmailTemplate(params: {
     fullName: string;
     verifyUrl: string;
@@ -26,10 +28,4 @@ export function verifyEmailTemplate(params: {
     `,
         text: `Welcome, ${fullName}!\n\nVerify your email: ${verifyUrl}\n\nThis link expires in ${expiresInHours} hours.`,
     };
-}
-
-function escapeHtml(s: string): string {
-    return s.replace(/[&<>"']/g, (c) =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
-    );
 }

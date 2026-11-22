@@ -49,8 +49,8 @@ import { SchedulesService } from "./services/schedules.service";
         SchedulesService,
     ],
     exports: [
-        EmployeesService,    // 👈 used by future appointments/attendance modules
-        SchedulesService,    // 👈 used by future appointments
+        EmployeesService,
+        SchedulesService,
         DepartmentsService,
         JobTitlesService,
     ],

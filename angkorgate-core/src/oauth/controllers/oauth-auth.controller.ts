@@ -10,8 +10,14 @@ import {
     Res,
     UseGuards,
 } from '@nestjs/common';
+import {
+    ApiBearerAuth,
+    ApiOperation,
+    ApiQuery,
+    ApiResponse,
+    ApiTags,
+} from '@nestjs/swagger';
 import { type Request, type Response } from 'express';
-import { IsString, MinLength } from 'class-validator';
 import { OauthConfigService } from '../services/oauth-config.service';
 import { OauthLoginService } from '../services/oauth-login.service';
 import { OauthTicketService } from '../services/oauth-ticket.service';
@@ -21,13 +27,15 @@ import { OauthProfile } from '../interfaces/oauth-profile.interface';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { SkipTransform } from '../../common/decorators/skip-transform.decorator';
+import { RedeemTicketDto } from '../dto/redeem-ticket.dto';
+import {
+    GoogleLinkStartDto,
+    GoogleLinkStartResponseDto,
+    ListProvidersResponseDto,
+    OauthTicketResponseDto,
+} from '../dto/oauth-response.dto';
 
-class RedeemTicketDto {
-    @IsString()
-    @MinLength(20)
-    ticket: string;
-}
-
+@ApiTags('OAuth Providers - Auth')
 @Controller('auth/oauth')
 export class OauthAuthController {
     constructor(
@@ -40,6 +48,8 @@ export class OauthAuthController {
     /** Public: list enabled providers for the caller's app. */
     @Get('providers')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'List available OAuth providers configured for client application' })
+    @ApiResponse({ status: 200, description: 'List of enabled OAuth providers', type: ListProvidersResponseDto })
     async listProviders(@Req() req: Request) {
         return {
             providers: await this.config.listAvailableProviders(
@@ -48,12 +58,16 @@ export class OauthAuthController {
         };
     }
 
-    // ───────────────────── GOOGLE — LOGIN FLOW ─────────────────────
+    /**
+     * Google OAuth - Login Flow
+     */
 
     /** Start Google flow — 302 to Google. */
     @Get('google')
     @UseGuards(GoogleOauthGuard)
     @SkipTransform()
+    @ApiOperation({ summary: 'Initiate Google OAuth authentication flow (redirects to Google)' })
+    @ApiResponse({ status: 302, description: 'Redirect to Google authentication consent screen' })
     googleStart() {
         // Passport redirects; nothing to return.
     }
@@ -70,6 +84,10 @@ export class OauthAuthController {
     @Get('google/callback')
     @UseGuards(GoogleOauthGuard)
     @SkipTransform()
+    @ApiOperation({ summary: 'Handle OAuth callback from Google and redirect with ticket' })
+    @ApiQuery({ name: 'redirect', required: false, description: 'Frontend redirect URL' })
+    @ApiQuery({ name: 'mode', required: false, enum: ['ticket', 'tokens'], description: 'Auth token dispatch mode' })
+    @ApiResponse({ status: 302, description: 'Redirect to application frontend with ticket or tokens' })
     async googleCallback(
         @Req() req: Request,
         @Res() res: Response,
@@ -109,10 +127,15 @@ export class OauthAuthController {
             url.searchParams.set('ticket', ticket);
             url.searchParams.set('provider', profile.provider);
             res.redirect(url.toString());
-            return;  // ⚠️ IMPORTANT: return after redirect
+            return;
         }
 
-        // Legacy mode — tokens in URL. Discouraged, but useful for quick dev.
+        // Direct token transmission in URL is forbidden in production
+        if (process.env.NODE_ENV === 'production') {
+            throw new Error('Legacy token transmission via URL query parameters is disabled in production.');
+        }
+
+        // Legacy mode — tokens in URL (dev only)
         const url = new URL(targetBase);
         url.searchParams.set('access_token', tokens.accessToken);
         url.searchParams.set('refresh_token', tokens.refreshToken);
@@ -123,6 +146,9 @@ export class OauthAuthController {
     /** Frontend exchanges ticket for real tokens (single-use, 60s TTL). */
     @Post('ticket')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Exchange single-use OAuth ticket for access and refresh tokens' })
+    @ApiResponse({ status: 200, description: 'Tokens issued successfully', type: OauthTicketResponseDto })
+    @ApiResponse({ status: 400, description: 'Invalid or expired ticket' })
     async redeemTicket(@Body() dto: RedeemTicketDto) {
         const payload = await this.tickets.redeem(dto.ticket);
         return {
@@ -133,31 +159,24 @@ export class OauthAuthController {
         };
     }
 
-    // ───────────────────── GOOGLE — LINK FLOW ─────────────────────
+    /**
+     * Google OAuth - Account Linking Flow
+     */
 
     /**
      * Link Google to the currently logged-in user.
-     *
-     * ⚠️ TWO-STEP flow because Google's redirect cannot carry our JWT:
-     *
-     *   1. Frontend POSTs /auth/oauth/google/link/start  (with Bearer JWT)
-     *      → returns { state } — a short-lived opaque token bound to the user
-     *   2. Frontend navigates to /auth/oauth/google/link?state=<state>
-     *      → Google consent → /auth/oauth/google/link/callback?state=...
-     *      → we redeem state → get userId → link → redirect to frontend
-     *
-     * We CANNOT use JwtAuthGuard on the callback (Google's browser redirect
-     * has no Authorization header).
      */
+    @ApiBearerAuth('bearerAuth')
     @UseGuards(JwtAuthGuard)
     @Post('google/link/start')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Start account linking with Google for current user' })
+    @ApiResponse({ status: 200, description: 'Linking state token generated', type: GoogleLinkStartResponseDto })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
     async googleLinkStart(
         @CurrentUser('id') userId: string,
-        @Body() _body: { redirect: string },
+        @Body() _body: GoogleLinkStartDto,
     ) {
-        // Implement via the same OauthTicketService (with a different payload type)
-        // or a dedicated OauthLinkStateService — see note below.
         const state = await this.tickets.issue({
             accessToken: '',           // unused
             refreshToken: '',          // unused
@@ -169,14 +188,18 @@ export class OauthAuthController {
 
     @Get('google/link')
     @UseGuards(GoogleOauthGuard)
+    @ApiOperation({ summary: 'Redirect to Google authorization for account linking' })
+    @ApiQuery({ name: 'state', description: 'State token generated from link/start' })
+    @ApiResponse({ status: 302, description: 'Redirect to Google' })
     googleLinkStartRedirect(@Query('state') _state: string) {
-        // Passport redirects. `state` is passed through automatically by
-        // passport-google-oauth20 if you set `state: true` in the strategy config.
-        // See strategy patch below.
+        // Passport redirects.
     }
 
     @Get('google/link/callback')
     @UseGuards(GoogleOauthGuard)
+    @ApiOperation({ summary: 'Handle Google callback to finalize account link' })
+    @ApiQuery({ name: 'state', description: 'State token' })
+    @ApiResponse({ status: 302, description: 'Redirect to frontend after linking' })
     async googleLinkCallback(
         @Req() req: Request,
         @Res() res: Response,

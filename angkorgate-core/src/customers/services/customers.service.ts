@@ -12,13 +12,12 @@ import { UpdateCustomerDto } from '../dto/update-customer.dto';
 import { CustomerResponseDto } from '../dto/customer-response.dto';
 import { UsersService } from '../../users/services/users.service';
 import { AuditService } from '../../audit/services/audit.service';
-
-/** Prefixes per type — makes IDs human-scannable: PAT-0001, GST-0001, CUS-0001 */
-const TYPE_PREFIX: Record<CustomerType, string> = {
-    PATIENT: 'PAT',
-    GUEST: 'GST',
-    CUSTOMER: 'CUS',
-};
+import {
+    CUSTOMER_TYPE_PREFIX,
+    formatCustomerCode,
+    parseCustomerSequence,
+} from '../utils/customer-code.util';
+import { normalizePagination } from '../../common/utils/pagination.util';
 
 @Injectable()
 export class CustomersService {
@@ -147,8 +146,7 @@ export class CustomersService {
         page: number;
         limit: number;
     }> {
-        const page = Math.max(1, params.page ?? 1);
-        const limit = Math.min(100, Math.max(1, params.limit ?? 20));
+        const { page, limit, skip } = normalizePagination(params.page, params.limit);
 
         const qb = this.repo.createQueryBuilder('c');
 
@@ -162,7 +160,7 @@ export class CustomersService {
         }
 
         qb.orderBy('c.fullName', 'ASC')
-            .skip((page - 1) * limit)
+            .skip(skip)
             .take(limit);
 
         const [rows, total] = await qb.getManyAndCount();
@@ -219,19 +217,19 @@ export class CustomersService {
     /** Generates PAT-0001 / GST-0001 / CUS-0001 atomically using a transaction. */
     private async nextCode(type: CustomerType): Promise<string> {
         return this.repo.manager.transaction(async (em: EntityManager) => {
-            const prefix = TYPE_PREFIX[type];
+            const prefix = CUSTOMER_TYPE_PREFIX[type];
 
             const lastCustomer = await em
                 .createQueryBuilder(Customer, 'c')
                 .where('c.customerCode LIKE :p', { p: `${prefix}-%` })
                 .orderBy('CAST(SUBSTRING(c.customerCode FROM 5) AS INT)', 'DESC')
-                .setLock('pessimistic_write') // serialize concurrent creations of same type
+                .setLock('pessimistic_write')
                 .getOne();
 
-            const currentMax = lastCustomer ? parseInt(lastCustomer.customerCode.substring(4), 10) : 0;
+            const currentMax = lastCustomer ? parseCustomerSequence(lastCustomer.customerCode) : 0;
             const next = currentMax + 1;
 
-            return `${prefix}-${String(next).padStart(4, '0')}`;
+            return formatCustomerCode(prefix, next);
         });
     }
 }

@@ -33,8 +33,8 @@ import { OauthTicket } from './entities/oauth-ticket.entity';
         OauthProvidersService,
         OauthAccountsService,
         OauthLoginService,
-        OauthRedirectService,   // 👈 new
-        OauthTicketService,     // 👈 new
+        OauthRedirectService,
+        OauthTicketService,
         GoogleOauthGuard,
         GoogleStrategyProvider,
     ],

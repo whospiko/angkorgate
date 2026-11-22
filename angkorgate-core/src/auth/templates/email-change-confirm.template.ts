@@ -1,3 +1,5 @@
+import { escapeHtml } from '../../common/utils/string.util';
+
 export function emailChangeConfirmTemplate(params: {
     fullName: string;
     confirmUrl: string;
@@ -26,10 +28,4 @@ export function emailChangeConfirmTemplate(params: {
     `,
         text: `Hi ${fullName},\n\nConfirm your new email address: ${confirmUrl}\n\nThis link expires in ${expiresInHours} hours. If you didn't request this, ignore this email.\n`,
     };
-}
-
-function escapeHtml(s: string): string {
-    return s.replace(/[&<>"']/g, (c) =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
-    );
 }

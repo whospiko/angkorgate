@@ -50,3 +50,19 @@ export class BulkAssignRolesDto {
     @IsUUID()
     assignedBy?: string;
 }
+
+export class UnassignRoleDto {
+    @ApiProperty({
+        description: 'The UUID of the user from whom the role will be removed',
+        example: '123e4567-e89b-12d3-a456-426614174000',
+    })
+    @IsUUID()
+    userId: string;
+
+    @ApiProperty({
+        description: 'The code of the role to revoke',
+        example: 'ADMIN',
+    })
+    @IsString()
+    roleCode: string;
+}

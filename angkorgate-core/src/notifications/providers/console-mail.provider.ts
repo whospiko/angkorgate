@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MailProvider, SendMailOptions } from '../interfaces/mail-provider.interface';
+import { stripHtml } from '../../common/utils/string.util';
 
 @Injectable()
 export class ConsoleMailProvider implements MailProvider {
@@ -14,8 +15,4 @@ export class ConsoleMailProvider implements MailProvider {
             `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
         );
     }
-}
-
-function stripHtml(html: string): string {
-    return html.replace(/<[^>]+>/g, '').trim();
 }

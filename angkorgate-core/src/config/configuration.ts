@@ -6,9 +6,18 @@ export default () => ({
         password: process.env.DB_PASSWORD,
         name: process.env.DB_NAME,
     },
+    redis: {
+        enabled: process.env.REDIS_ENABLED === 'true',
+        host: process.env.REDIS_HOST ?? 'localhost',
+        port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
+        password: process.env.REDIS_PASSWORD || undefined,
+        db: parseInt(process.env.REDIS_DB ?? '0', 10),
+        keyPrefix: process.env.REDIS_KEY_PREFIX ?? 'angkorgate:',
+        defaultTtl: parseInt(process.env.REDIS_DEFAULT_TTL ?? '300', 10),
+    },
     oauth: {
         enabled: process.env.OAUTH_ENABLED === 'true',
-        callbackBaseUrl: process.env.OAUTH_CALLBACK_BASE_URL ?? 'http://localhost:3000',
+        callbackBaseUrl: process.env.OAUTH_CALLBACK_BASE_URL ?? 'http://localhost:8080',
         webUrl: process.env.APP_WEB_URL ?? 'http://localhost:5173',
         google: {
             clientId: process.env.GOOGLE_CLIENT_ID,

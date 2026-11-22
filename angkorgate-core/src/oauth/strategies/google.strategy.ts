@@ -24,16 +24,9 @@ export class GoogleStrategy extends PassportStrategy(Strategy, GOOGLE_STRATEGY) 
             clientSecret,
             callbackURL: callbackUrl,
             scope: ['email', 'profile'],
-            state: false,  // 👈 REQUIRED for /link flow to preserve state through Google
+            state: false, // Required for /link flow to preserve state through Google
         });
     }
-
-    // authorizationParams(): { [key: string]: string } {
-    //     return {
-    //         access_type: 'offline', // gets refresh_token (not needed for login-only)
-    //         prompt: 'consent',      // forces consent screen (only for refresh_token)
-    //     };
-    // }
 
     async validate(
         accessToken: string,

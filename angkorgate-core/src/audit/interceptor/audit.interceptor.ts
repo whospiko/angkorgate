@@ -8,6 +8,7 @@ import { Reflector } from '@nestjs/core';
 import { Observable, tap } from 'rxjs';
 import { AUDIT_KEY, AuditOptions } from '../decorators/audit.decorator';
 import { AuditService } from '../services/audit.service';
+import { isPlainObject } from '../../common/utils/object.util';
 
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
@@ -43,8 +44,4 @@ export class AuditInterceptor implements NestInterceptor {
             }),
         );
     }
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

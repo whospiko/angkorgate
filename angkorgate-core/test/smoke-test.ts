@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import request from 'supertest';
 import { ValidationPipe } from '@nestjs/common';
 import { generate } from 'otplib';
+import { CacheService } from '../src/cache/cache.service';
 
 // ANSI colors for pretty console output
 const c = {
@@ -46,6 +47,7 @@ async function runSmokeTest() {
 
     const http = app.getHttpServer();
     const dataSource = app.get(DataSource);
+    await dataSource.runMigrations();
 
     // Helper to bypass email verification steps in tests
     const verifyUserInDb = async (email: string) => {
@@ -282,12 +284,417 @@ async function runSmokeTest() {
             .post('/admin/apps')
             .set('Authorization', `Bearer ${adminToken}`)
             .send({ appCode: 'smoke-app', name: 'Smoke App', oauthEnabled: true, enabledProviders: ['google'] });
-        assert('Admin can configure App settings', appRes.status === 201);
+        assert('Admin can configure App settings', appRes.status === 201, { status: appRes.status, body: appRes.body });
 
         const publicProviders = await request(http)
             .get('/auth/oauth/providers')
             .set('X-App-Code', 'smoke-app');
         assert('OAuth provider listed publicly', publicProviders.body?.data?.providers?.length > 0);
+
+        // ══════════════════════════════════════════════════════════════════
+        logSection('9. OpenID Connect (OIDC) & Identity Provider');
+        // ══════════════════════════════════════════════════════════════════
+        // 1. Root redirect check
+        const rootDisco = await request(http).get('/.well-known/openid-configuration');
+        assert('Root discovery redirects to /oidc/.well-known/openid-configuration', rootDisco.status === 302 && rootDisco.header.location === '/oidc/.well-known/openid-configuration');
+
+        // 2. OIDC Discovery Document
+        const discoRes = await request(http).get('/oidc/.well-known/openid-configuration');
+        assert('OIDC Discovery document returns 200', discoRes.status === 200);
+        assert('Discovery issuer ends with /oidc', discoRes.body?.issuer?.endsWith('/oidc'));
+        assert('Discovery includes standard endpoints',
+            !!discoRes.body?.authorization_endpoint &&
+            !!discoRes.body?.token_endpoint &&
+            !!discoRes.body?.jwks_uri &&
+            !!discoRes.body?.userinfo_endpoint
+        );
+        assert('Discovery includes custom scopes (roles, permissions)',
+            discoRes.body?.scopes_supported?.includes('roles') &&
+            discoRes.body?.scopes_supported?.includes('permissions')
+        );
+
+        // 3. JWKS Keys
+        const jwksRes = await request(http).get('/oidc/jwks');
+        assert('JWKS endpoint returns valid signing keys', jwksRes.status === 200 && Array.isArray(jwksRes.body?.keys) && jwksRes.body?.keys?.length > 0);
+        assert('JWKS contains RS256 RSA key', jwksRes.body?.keys?.[0]?.kty === 'RSA' && jwksRes.body?.keys?.[0]?.alg === 'RS256');
+
+        // 4. Register OIDC Client Application
+        const oidcClientCode = 'smoke-oidc-app';
+        const oidcClientSecret = 'smoke-secret-key-at-least-32chars';
+        const oidcRedirectUri = 'http://localhost:5173/callback';
+
+        await dataSource.query(`DELETE FROM app_settings WHERE app_code = $1`, [oidcClientCode]);
+
+        const oidcAppRes = await request(http)
+            .post('/admin/apps')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({
+                appCode: oidcClientCode,
+                name: 'Smoke OIDC Client App',
+                clientSecret: oidcClientSecret,
+                allowedRedirectUrls: [oidcRedirectUri],
+            });
+        assert('Register OIDC client app with secret & redirect URI', oidcAppRes.status === 201, { status: oidcAppRes.status, body: oidcAppRes.body });
+
+        // 5. Client Credentials Grant
+        const oidcBasicAuth = Buffer.from(`${oidcClientCode}:${oidcClientSecret}`).toString('base64');
+        const ccTokenRes = await request(http)
+            .post('/oidc/token')
+            .set('Authorization', `Basic ${oidcBasicAuth}`)
+            .type('form')
+            .send({ grant_type: 'client_credentials' });
+        assert('OIDC client_credentials grant returns access token', ccTokenRes.status === 200 && !!ccTokenRes.body?.access_token, { status: ccTokenRes.status, body: ccTokenRes.body });
+        const ccToken = ccTokenRes.body?.access_token;
+
+        // 6. Token Introspection (RFC 7662)
+        const introRes = await request(http)
+            .post('/oidc/introspect')
+            .set('Authorization', `Basic ${oidcBasicAuth}`)
+            .type('form')
+            .send({ token: ccToken });
+        assert('Token introspection shows active token', introRes.status === 200 && introRes.body?.active === true, { status: introRes.status, body: introRes.body });
+
+        // 7. Token Revocation (RFC 7009)
+        const revokeRes = await request(http)
+            .post('/oidc/revoke')
+            .set('Authorization', `Basic ${oidcBasicAuth}`)
+            .type('form')
+            .send({ token: ccToken });
+        assert('Token revocation endpoint accepted', revokeRes.status === 200);
+
+        const introAfterRevoke = await request(http)
+            .post('/oidc/introspect')
+            .set('Authorization', `Basic ${oidcBasicAuth}`)
+            .type('form')
+            .send({ token: ccToken });
+        assert('Token introspection shows revoked token is inactive', introAfterRevoke.status === 200 && introAfterRevoke.body?.active === false);
+
+        // 8. Interactive Authorization Code Flow
+        const authReq = await request(http)
+            .get('/oidc/auth')
+            .query({
+                client_id: oidcClientCode,
+                response_type: 'code',
+                scope: 'openid email profile roles',
+                redirect_uri: oidcRedirectUri,
+                state: 'smoke-state-42',
+                nonce: 'smoke-nonce-99',
+            });
+        assert('Authorization request initiates interaction flow (302/303)', authReq.status === 302 || authReq.status === 303, { status: authReq.status });
+
+        const locationHeader = authReq.header.location || '';
+        assert('Redirect target contains interaction UID', locationHeader.includes('interaction'), { location: locationHeader });
+
+        const interactionMatch = locationHeader.match(/interaction(?:=|\/)([a-zA-Z0-9_-]+)/);
+        const interactionUid = interactionMatch ? interactionMatch[1] : null;
+        assert('Successfully extracted interaction UID', !!interactionUid, { uid: interactionUid });
+
+        const cookieMap = new Map<string, string>();
+        const updateCookies = (headerVal: any) => {
+            const list = Array.isArray(headerVal) ? headerVal : (typeof headerVal === 'string' ? [headerVal] : []);
+            for (const c of list) {
+                const [pair] = c.split(';');
+                if (pair) {
+                    const idx = pair.indexOf('=');
+                    if (idx > -1) {
+                        const k = pair.slice(0, idx).trim();
+                        const v = pair.slice(idx + 1).trim();
+                        cookieMap.set(k, v);
+                    }
+                }
+            }
+        };
+        const getCookies = () => {
+            return Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; ');
+        };
+
+        const resolvePath = (urlOrPath: string): string => {
+            if (!urlOrPath) return '';
+            try {
+                return new URL(urlOrPath).pathname;
+            } catch {
+                return urlOrPath;
+            }
+        };
+
+        updateCookies(authReq.header['set-cookie']);
+
+        // Complete interaction login with the admin user created in section 2
+        const interLoginRes = await request(http)
+            .post(`/oidc/interaction/${interactionUid}/login`)
+            .set('Cookie', getCookies())
+            .set('Accept', 'application/json')
+            .send({
+                email: adminEmail,
+                password: adminPass,
+            });
+        assert('Interaction login accepts user credentials', interLoginRes.status === 200 && interLoginRes.body?.success === true, { status: interLoginRes.status, body: interLoginRes.body });
+
+        updateCookies(interLoginRes.header['set-cookie']);
+
+        let resumeUrl = resolvePath(interLoginRes.body?.redirectTo) || `/oidc/auth/${interactionUid}`;
+        let resumeRes = await request(http)
+            .get(resumeUrl)
+            .set('Cookie', getCookies());
+
+        updateCookies(resumeRes.header['set-cookie']);
+
+        // If redirected to consent, confirm consent
+        let finalLocation = resumeRes.header.location || '';
+        if (finalLocation.includes('interaction')) {
+            const consentMatch = finalLocation.match(/interaction(?:=|\/)([a-zA-Z0-9_-]+)/);
+            const consentUid = consentMatch ? consentMatch[1] : interactionUid;
+
+            const consentRes = await request(http)
+                .post(`/oidc/interaction/${consentUid}/confirm`)
+                .set('Cookie', getCookies())
+                .set('Accept', 'application/json');
+
+            updateCookies(consentRes.header['set-cookie']);
+
+            const afterConsentUrl = resolvePath(consentRes.body?.redirectTo) || `/oidc/auth/${consentUid}`;
+            resumeRes = await request(http)
+                .get(afterConsentUrl)
+                .set('Cookie', getCookies());
+
+            updateCookies(resumeRes.header['set-cookie']);
+            finalLocation = resumeRes.header.location || '';
+        }
+
+        assert('Authorization flow completes with redirect to client callback', finalLocation.startsWith(oidcRedirectUri), { finalLocation });
+
+        const parsedCallbackUrl = new URL(finalLocation);
+        const authCode = parsedCallbackUrl.searchParams.get('code');
+        const returnedState = parsedCallbackUrl.searchParams.get('state');
+
+        assert('Authorization code issued in callback URL', !!authCode);
+        assert('State matches original request state', returnedState === 'smoke-state-42');
+
+        // 9. Exchange Authorization Code for Tokens
+        const codeExchangeRes = await request(http)
+            .post('/oidc/token')
+            .set('Authorization', `Basic ${oidcBasicAuth}`)
+            .type('form')
+            .send({
+                grant_type: 'authorization_code',
+                code: authCode,
+                redirect_uri: oidcRedirectUri,
+            });
+
+        assert('Token endpoint exchanges authorization code for tokens', codeExchangeRes.status === 200, { status: codeExchangeRes.status, body: codeExchangeRes.body });
+        assert('Token response contains access_token, id_token, and Bearer type',
+            !!codeExchangeRes.body?.access_token &&
+            !!codeExchangeRes.body?.id_token &&
+            codeExchangeRes.body?.token_type === 'Bearer'
+        );
+
+        const oidcAccessToken = codeExchangeRes.body?.access_token;
+        const oidcIdToken = codeExchangeRes.body?.id_token;
+
+        // Verify ID Token format (header.payload.signature)
+        const idTokenParts = oidcIdToken.split('.');
+        assert('ID token is a valid 3-part signed JWT', idTokenParts.length === 3);
+
+        const idTokenPayload = JSON.parse(Buffer.from(idTokenParts[1], 'base64').toString('utf8'));
+        assert('ID token contains correct claims (sub, nonce, iss, aud)',
+            idTokenPayload.sub === adminUser.id &&
+            idTokenPayload.nonce === 'smoke-nonce-99' &&
+            idTokenPayload.aud === oidcClientCode &&
+            idTokenPayload.iss?.endsWith('/oidc')
+        );
+
+        // 10. UserInfo Endpoint (GET /oidc/me)
+        const userinfoRes = await request(http)
+            .get('/oidc/me')
+            .set('Authorization', `Bearer ${oidcAccessToken}`);
+
+        assert('UserInfo endpoint (/oidc/me) returns 200 with Bearer token', userinfoRes.status === 200, { status: userinfoRes.status, body: userinfoRes.body });
+        assert('UserInfo claims contain sub, email, and user roles',
+            userinfoRes.body?.sub === adminUser.id &&
+            userinfoRes.body?.email === adminEmail &&
+            Array.isArray(userinfoRes.body?.roles) &&
+            userinfoRes.body?.roles?.includes('ADMIN')
+        );
+
+        // ══════════════════════════════════════════════════════════════════
+        logSection('10. Distributed Redis & Cache Engine');
+        // ══════════════════════════════════════════════════════════════════
+        const cacheService = app.get(CacheService);
+        assert('CacheService instance resolved', !!cacheService);
+
+        // 1. Health & Status endpoint
+        const healthRes = await request(http).get('/');
+        assert('Health check returns cache status', healthRes.status === 200 && !!healthRes.body?.cache);
+
+        const cacheStatusRes = await request(http).get('/cache/status');
+        assert('Cache status endpoint returns operational metadata', cacheStatusRes.status === 200 && !!(cacheStatusRes.body?.data?.provider || cacheStatusRes.body?.provider));
+
+        // 2. Direct Set and Get
+        const samplePayload = { foo: 'bar', counter: 100, ok: true };
+        await cacheService.set('smoke:item', samplePayload, 60);
+        const retrieved = await cacheService.get<typeof samplePayload>('smoke:item');
+        assert('Cache set & get preserves complex objects', JSON.stringify(retrieved) === JSON.stringify(samplePayload));
+
+        // 3. Has check
+        const hasKey = await cacheService.has('smoke:item');
+        assert('Cache has() confirms key existence', hasKey === true);
+
+        // 4. Cache-aside wrap
+        let wrapExecutions = 0;
+        const wrappedVal1 = await cacheService.wrap('smoke:wrapped', async () => {
+            wrapExecutions++;
+            return 'calculated-value';
+        }, 60);
+        const wrappedVal2 = await cacheService.wrap('smoke:wrapped', async () => {
+            wrapExecutions++;
+            return 'calculated-value';
+        }, 60);
+        assert('Cache wrap() serves cached value on subsequent call', wrappedVal1 === 'calculated-value' && wrappedVal2 === 'calculated-value' && wrapExecutions === 1);
+
+        // 5. Pattern-based deletion
+        await cacheService.set('smoke:rbac:user-1:p1', true);
+        await cacheService.set('smoke:rbac:user-1:p2', true);
+        await cacheService.set('smoke:rbac:user-2:p1', true);
+
+        await cacheService.delByPattern('smoke:rbac:user-1:*');
+        const user1P1 = await cacheService.get('smoke:rbac:user-1:p1');
+        const user2P1 = await cacheService.get('smoke:rbac:user-2:p1');
+        assert('delByPattern invalidates matching keys and preserves others', user1P1 === null && user2P1 === true);
+
+        // 6. Delete key
+        await cacheService.del('smoke:item');
+        assert('Cache del() removes key', (await cacheService.get('smoke:item')) === null);
+
+        // ══════════════════════════════════════════════════════════════════
+        logSection('11. Extended Module APIs (Console / IAM Read & Write)');
+        // ══════════════════════════════════════════════════════════════════
+        const dataOf = (res: any) => (res?.body && 'data' in res.body ? res.body.data : res?.body);
+
+        // 1. Auth: /auth/me/permissions
+        const permsRes = await request(http)
+            .get('/auth/me/permissions')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const permsData = dataOf(permsRes);
+        assert('Auth /auth/me/permissions returns user effective permissions', permsRes.status === 200 && Array.isArray(permsData) && permsData.length > 0);
+
+        // 2. Users: Search & Filtering
+        const userSearchRes = await request(http)
+            .get(`/users?search=${encodeURIComponent(adminEmail.substring(0, 8))}`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        const searchData = dataOf(userSearchRes);
+        const searchItems = Array.isArray(searchData) ? searchData : searchData?.data;
+        assert('Users list with search filtering returns results', userSearchRes.status === 200 && Array.isArray(searchItems) && searchItems.length > 0);
+
+        // 3. Users: /users/:id/roles
+        const userRolesRes = await request(http)
+            .get(`/users/${adminUser.id}/roles`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        const userRolesData = dataOf(userRolesRes);
+        assert('Users /users/:id/roles returns assigned roles', userRolesRes.status === 200 && Array.isArray(userRolesData) && userRolesData.includes('ADMIN'));
+
+        // 4. Users: /users/:id/unlock
+        const unlockRes = await request(http)
+            .patch(`/users/${adminUser.id}/unlock`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert('Users /users/:id/unlock clears lock and returns 204', unlockRes.status === 204);
+
+        // 5. Users: /users/:id/reset-password
+        const resetPassRes = await request(http)
+            .post(`/users/${adminUser.id}/reset-password`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ newPassword: 'NewAdminPass123!', mustChangePassword: false });
+        assert('Users /users/:id/reset-password resets password and returns 204', resetPassRes.status === 204);
+
+        // 6. RBAC: /rbac/roles/:id/permissions
+        const [adminRoleRow] = await dataSource.query(`SELECT id FROM roles WHERE code = 'ADMIN'`);
+        const rolePermsRes = await request(http)
+            .get(`/rbac/roles/${adminRoleRow.id}/permissions`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        const rolePermsData = dataOf(rolePermsRes);
+        assert('RBAC /rbac/roles/:id/permissions returns role permissions', rolePermsRes.status === 200 && Array.isArray(rolePermsData) && rolePermsData.length > 0);
+
+        // 7. RBAC: /rbac/permissions/:code
+        const singlePermRes = await request(http)
+            .get('/rbac/permissions/user:read')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const singlePermData = dataOf(singlePermRes);
+        assert('RBAC /rbac/permissions/:code returns single permission', singlePermRes.status === 200 && singlePermData?.code === 'user:read');
+
+        // 8. RBAC: Overrides
+        const overrideRes = await request(http)
+            .post('/rbac/overrides')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ userId: adminUser.id, permissionCode: 'user:delete', effect: 'GRANT' });
+        assert('RBAC /rbac/overrides sets permission override', overrideRes.status === 204);
+
+        const listOverridesRes = await request(http)
+            .get(`/rbac/overrides/${adminUser.id}`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        const listOverridesData = dataOf(listOverridesRes);
+        assert('RBAC /rbac/overrides/:userId returns user overrides', listOverridesRes.status === 200 && Array.isArray(listOverridesData) && listOverridesData.some((o: any) => o.permissionCode === 'user:delete'));
+
+        // 9. Apps: regenerate-secret & toggle
+        const regenRes = await request(http)
+            .post('/admin/apps/smoke-app/regenerate-secret')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const regenData = dataOf(regenRes);
+        assert('Apps /admin/apps/:code/regenerate-secret returns new secret', regenRes.status === 200 && !!regenData?.clientSecret);
+
+        const toggleAppRes = await request(http)
+            .patch('/admin/apps/smoke-app/toggle?feature=passwordLogin')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const toggleAppData = dataOf(toggleAppRes);
+        assert('Apps /admin/apps/:code/toggle toggles feature flag', toggleAppRes.status === 200 && typeof toggleAppData?.passwordLoginEnabled === 'boolean');
+
+        // 10. OAuth: /admin/oauth/providers/:code
+        const singleProviderRes = await request(http)
+            .get('/admin/oauth/providers/google')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const singleProviderData = dataOf(singleProviderRes);
+        assert('OAuth /admin/oauth/providers/:code returns provider details', singleProviderRes.status === 200 && singleProviderData?.code === 'google');
+
+        // 11. Audit: /audit-logs/actions
+        const actionsRes = await request(http)
+            .get('/audit-logs/actions')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const actionsData = dataOf(actionsRes);
+        assert('Audit /audit-logs/actions returns distinct action codes', actionsRes.status === 200 && Array.isArray(actionsData) && actionsData.length > 0);
+
+        // 12. Customers: /customers/:customerId/contacts/:contactId
+        const contactId = contactRes.body?.data?.id || contactRes.body?.id;
+        if (contactId && patientId) {
+            const getContactRes = await request(http)
+                .get(`/customers/${patientId}/contacts/${contactId}`)
+                .set('Authorization', `Bearer ${adminToken}`);
+            const contactData = dataOf(getContactRes);
+            assert('Customers GET /customers/:customerId/contacts/:contactId returns contact', getContactRes.status === 200 && contactData?.fullName === 'Smoke Guardian');
+        }
+
+        // 13. Employees: Departments CRUD
+        const deptCode = `SMOKE_D_${Date.now().toString().slice(-6)}`;
+        const createDept = await request(http)
+            .post('/departments')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ code: deptCode, name: 'Smoke Test Department' });
+        assert('Departments POST /departments creates department', createDept.status === 201);
+
+        const getDept = await request(http)
+            .get(`/departments/${deptCode}`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        const getDeptData = dataOf(getDept);
+        assert('Departments GET /departments/:code retrieves department', getDept.status === 200 && getDeptData?.code === deptCode);
+
+        const patchDept = await request(http)
+            .patch(`/departments/${deptCode}`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ name: 'Smoke Test Department Updated' });
+        const patchDeptData = dataOf(patchDept);
+        assert('Departments PATCH /departments/:code updates department', patchDept.status === 200 && patchDeptData?.name === 'Smoke Test Department Updated');
+
+        const delDept = await request(http)
+            .delete(`/departments/${deptCode}`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert('Departments DELETE /departments/:code removes department', delDept.status === 204);
 
     } catch (err) {
         console.error(`\n${c.red}💥 Smoke test crashed unexpectedly:${c.reset}`, err);

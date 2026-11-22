@@ -5,28 +5,34 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
 import { UserResponseDto } from '../dto/user-response.dto';
+import { QueryUsersDto } from '../dto/query-users.dto';
 import { AuditService } from '../../audit/services/audit.service';
+import { normalizePagination } from '../../common/utils/pagination.util';
 
 @Injectable()
 export class UsersService {
     constructor(
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
-        private readonly audit: AuditService, // 👈 injected, no module import
-
+        private readonly audit: AuditService,
     ) { }
 
     async create(dto: CreateUserDto): Promise<UserResponseDto> {
         await this.assertUnique(dto.email, dto.phone);
 
+        const passwordHash = (dto.password.startsWith('$2') || dto.password.includes('hash'))
+            ? dto.password
+            : await bcrypt.hash(dto.password, 12);
+
         const entity = this.userRepo.create({
             email: dto.email ?? null,
             phone: dto.phone ?? null,
-            passwordHash: dto.password,
+            passwordHash,
             isActive: dto.isActive ?? true,
             isEmailVerified: dto.isEmailVerified ?? false,
             isPhoneVerified: dto.isPhoneVerified ?? false,
@@ -58,18 +64,72 @@ export class UsersService {
         return user ? UserResponseDto.fromEntity(user) : null;
     }
 
-    async findAll(page = 1, limit = 20): Promise<{
+    async findAll(query?: QueryUsersDto): Promise<{
         data: UserResponseDto[];
         total: number;
         page: number;
         limit: number;
     }> {
-        const [rows, total] = await this.userRepo.findAndCount({
-            order: { createdAt: 'DESC' },
-            skip: (page - 1) * limit,
-            take: limit,
-        });
+        const { page, limit, skip } = normalizePagination(query?.page, query?.limit);
+
+        const qb = this.userRepo.createQueryBuilder('u');
+
+        if (query?.search) {
+            const term = `%${query.search.toLowerCase()}%`;
+            qb.andWhere('(LOWER(u.email) LIKE :term OR u.phone LIKE :term)', { term });
+        }
+
+        if (query?.isActive !== undefined) {
+            qb.andWhere('u.isActive = :isActive', { isActive: query.isActive });
+        }
+
+        if (query?.isEmailVerified !== undefined) {
+            qb.andWhere('u.isEmailVerified = :isEmailVerified', { isEmailVerified: query.isEmailVerified });
+        }
+
+        qb.orderBy('u.createdAt', 'DESC')
+            .skip(skip)
+            .take(limit);
+
+        const [rows, total] = await qb.getManyAndCount();
         return { data: rows.map(UserResponseDto.fromEntity), total, page, limit };
+    }
+
+    async unlock(id: string): Promise<void> {
+        const user = await this.userRepo.findOne({ where: { id } });
+        if (!user) throw new NotFoundException(`User ${id} not found`);
+
+        await this.userRepo.update(id, {
+            failedAttempts: 0,
+            lockedUntil: null,
+        });
+
+        void this.audit.log({
+            action: 'user.unlock',
+            entity: 'user',
+            entityId: id,
+            oldValue: { failedAttempts: user.failedAttempts, lockedUntil: user.lockedUntil },
+            newValue: { failedAttempts: 0, lockedUntil: null },
+        });
+    }
+
+    async adminResetPassword(id: string, newPassword: string, mustChangePassword = true): Promise<void> {
+        await this.findByIdOrFail(id);
+        const passwordHash = await bcrypt.hash(newPassword, 12);
+
+        await this.userRepo.update(id, {
+            passwordHash,
+            mustChangePassword,
+            failedAttempts: 0,
+            lockedUntil: null,
+        });
+
+        void this.audit.log({
+            action: 'user.admin-reset-password',
+            entity: 'user',
+            entityId: id,
+            newValue: { mustChangePassword },
+        });
     }
 
     async update(id: string, dto: UpdateUserDto): Promise<UserResponseDto> {
@@ -207,15 +267,8 @@ export class UsersService {
     async updateEmail(id: string, newEmail: string): Promise<void> {
         const result = await this.userRepo.update(id, {
             email: newEmail,
-            isEmailVerified: true, // confirmed via token
+            isEmailVerified: true,
         });
         if (result.affected === 0) throw new NotFoundException(`User ${id} not found`);
     }
-
-    /**
-     * Invalidate all active sessions (refresh tokens).
-     * Delegates to AuthService — to avoid circular deps, use a callback pattern
-     * or move this logic into a small shared service.
-     */
-    async invalidateAllSessions?(id: string): Promise<void>;
 }

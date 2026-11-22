@@ -70,6 +70,13 @@ export class ContactsService {
         });
     }
 
+    async findById(customerId: string, contactId: string): Promise<CustomerContact> {
+        await this.customers.findByIdOrFail(customerId);
+        const c = await this.repo.findOne({ where: { id: contactId, customerId } });
+        if (!c) throw new NotFoundException(`Contact ${contactId} not found`);
+        return c;
+    }
+
     async update(
         contactId: string,
         dto: Partial<CreateContactDto>,
@@ -92,8 +99,7 @@ export class ContactsService {
         const c = await this.repo.findOne({ where: { id: contactId } });
         if (!c) throw new NotFoundException(`Contact ${contactId} not found`);
 
-        // Rule: a customer must keep at least one contact (clinic-specific; can be relaxed)
-        // Comment this out for hotel/POS if not needed.
+        // Minimum contact rule: ensure the customer retains at least one contact
         const count = await this.repo.count({ where: { customerId: c.customerId } });
         if (count <= 1) {
             throw new BadRequestException(

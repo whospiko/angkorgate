@@ -9,6 +9,7 @@ import {
 import { Request, Response } from 'express';
 import { QueryFailedError } from 'typeorm';
 import { ApiResponseDto } from '../dto/api-response.dto';
+import { extractFieldFromConstraint } from '../utils/database-error.util';
 
 interface PgError {
     code?: string;
@@ -55,7 +56,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         error: string;
         details: unknown;
     } {
-        // ─── 1. Nest HttpException ────────────────────────────────
+        // 1. Nest HttpException
         if (exception instanceof HttpException) {
             const status = exception.getStatus();
             const response = exception.getResponse();
@@ -87,14 +88,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
             };
         }
 
-        // ─── 2. TypeORM QueryFailedError ──────────────────────────
+        // 2. TypeORM QueryFailedError
         if (exception instanceof QueryFailedError) {
             const driverError = (exception as unknown as { driverError: PgError })
                 .driverError;
             return this.fromPostgresError(driverError, exception.message);
         }
 
-        // ─── 3. Plain Error ───────────────────────────────────────
+        // 3. Plain Error
         if (exception instanceof Error) {
             return {
                 statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
@@ -107,7 +108,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
             };
         }
 
-        // ─── 4. Anything else (thrown strings, objects) ───────────
+        // 4. Anything else (thrown strings, objects)
         return {
             statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
             message: 'Unexpected error',
@@ -188,20 +189,4 @@ export class AllExceptionsFilter implements ExceptionFilter {
             details: null,
         };
     }
-}
-
-function extractFieldFromConstraint(
-    constraint: string,
-    detail?: string,
-): string | null {
-    // Postgres detail: Key (email)=(x@y.com) already exists.
-    const fromDetail = detail?.match(/Key \(([^)]+)\)/)?.[1];
-    if (fromDetail) return fromDetail;
-
-    // Fallback: guess from constraint name like UQ_97672ac88f789774dd47f7c8be3
-    // or users_email_key / uq_users_email
-    const fromConstraint = constraint
-        .toLowerCase()
-        .match(/uq[_\d]*_?(\w+?)(?:_key|_unique)?$/)?.[1];
-    return fromConstraint ?? null;
 }

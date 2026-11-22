@@ -16,6 +16,12 @@ export class OauthProvidersService {
         return this.repo.find({ order: { code: 'ASC' } });
     }
 
+    async findByCodeOrFail(code: string): Promise<OauthProvider> {
+        const p = await this.repo.findOne({ where: { code } });
+        if (!p) throw new NotFoundException(`Provider ${code} not found`);
+        return p;
+    }
+
     async create(dto: CreateProviderDto): Promise<OauthProvider> {
         const exists = await this.repo.findOne({ where: { code: dto.code } });
         if (exists) throw new ConflictException(`Provider ${dto.code} exists`);

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Department } from '../entities/department.entity';
 import { CreateDepartmentDto } from '../dto/create-department.dto';
+import { UpdateDepartmentDto } from '../dto/update-department.dto';
 import { SEED_TEMPLATES } from '../seed/default-templates';
 import { JobTitle } from '../entities/job-title.entity';
 
@@ -35,6 +36,17 @@ export class DepartmentsService {
         const d = await this.repo.findOne({ where: { code } });
         if (!d) throw new NotFoundException(`Department ${code} not found`);
         return d;
+    }
+
+    async update(code: string, dto: UpdateDepartmentDto): Promise<Department> {
+        const d = await this.findByCodeOrFail(code);
+        Object.assign(d, dto);
+        return this.repo.save(d);
+    }
+
+    async remove(code: string): Promise<void> {
+        const d = await this.findByCodeOrFail(code);
+        await this.repo.delete(d.id);
     }
 
     async seedFromTemplate(template: string): Promise<{ departments: number; jobTitles: number }> {

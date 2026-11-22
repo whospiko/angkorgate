@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, FindOptionsWhere, Repository } from 'typeorm';
 import { AuditLog } from '../entities/audit-log.entity';
 import { AuditLogResponseDto, PaginatedAuditLogsDto } from '../dto/audit-log-response.dto';
+import { normalizePagination } from '../../common/utils/pagination.util';
 
 export interface AuditEvent {
     actorId?: string | null;
@@ -97,10 +98,7 @@ export class AuditService {
         return this.log(event);
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  READ API (admin-only via controller)
-    // ══════════════════════════════════════════════════════════════════
-
+    /** Audit log query and retrieval API */
     async query(params: {
         actorId?: string;
         entity?: string;
@@ -111,8 +109,7 @@ export class AuditService {
         page?: number;
         limit?: number;
     }): Promise<PaginatedAuditLogsDto> {
-        const page = Math.max(1, params.page ?? 1);
-        const limit = Math.min(100, Math.max(1, params.limit ?? 20));
+        const { page, limit, skip } = normalizePagination(params.page, params.limit);
 
         const where: FindOptionsWhere<AuditLog> = {};
         if (params.actorId) where.actorId = params.actorId;
@@ -127,7 +124,7 @@ export class AuditService {
         const [rows, total] = await this.logRepo.findAndCount({
             where,
             order: { createdAt: 'DESC' },
-            skip: (page - 1) * limit,
+            skip,
             take: limit,
         });
 
@@ -148,5 +145,20 @@ export class AuditService {
             order: { createdAt: 'DESC' },
         });
         return rows.map(AuditLogResponseDto.fromEntity);
+    }
+
+    async getDistinctActions(): Promise<string[]> {
+        const rows = await this.logRepo
+            .createQueryBuilder('a')
+            .select('DISTINCT a.action', 'action')
+            .orderBy('action', 'ASC')
+            .getRawMany<{ action: string }>();
+        return rows.map((r) => r.action);
+    }
+
+    async findById(id: string): Promise<AuditLogResponseDto> {
+        const log = await this.logRepo.findOne({ where: { id } });
+        if (!log) throw new NotFoundException(`Audit log ${id} not found`);
+        return AuditLogResponseDto.fromEntity(log);
     }
 }

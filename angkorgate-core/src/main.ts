@@ -8,8 +8,8 @@ async function bootstrap() {
 
   // 1. Add Bearer Auth to your DocumentBuilder config
   const config = new DocumentBuilder()
-    .setTitle('Easy Auth API')
-    .setDescription('provide auth with rbac strategy.')
+    .setTitle('AngkorGate IAM API')
+    .setDescription('Open-Source Identity and Access Management with OAuth 2.0, OpenID Connect 1.0, RBAC, and Multi-Tenancy.')
     .setVersion('1.0')
     .addBearerAuth(
       {
@@ -17,11 +17,27 @@ async function bootstrap() {
         scheme: 'bearer',
         bearerFormat: 'JWT',
         name: 'JWT',
-        description: 'Enter JWT token',
+        description: 'Enter JWT Bearer token',
         in: 'header',
       },
-      'bearerAuth', // This is the reference name you will use in @ApiBearerAuth()
+      'bearerAuth', // Reference name used in @ApiBearerAuth('bearerAuth')
     )
+    .addTag('Auth', 'Authentication, registration, tokens, and password management')
+    .addTag('Auth - MFA', 'Multi-Factor Authentication (TOTP and backup codes)')
+    .addTag('Auth - Email Change', 'Self-service email address change flow')
+    .addTag('OIDC', 'OpenID Connect 1.0 & OAuth 2.0 Authorization Server Endpoints')
+    .addTag('Apps', 'Client application management (OAuth / OIDC clients)')
+    .addTag('Users', 'User management, status, and administration')
+    .addTag('RBAC - Roles', 'Role management and assignment')
+    .addTag('RBAC - Permissions', 'Permission catalog and user permission overrides')
+    .addTag('OAuth Providers - Admin', 'External OAuth/social provider management')
+    .addTag('OAuth Providers - Auth', 'External OAuth/social login endpoints')
+    .addTag('Customers', 'Customer management')
+    .addTag('Customer Contacts', 'Customer contact management')
+    .addTag('Employees', 'Employee, position, department, and schedule management')
+    .addTag('Audit', 'Audit trail logs and query')
+    .addTag('Cache', 'Distributed Redis & In-Memory Cache engine')
+    .addTag('System', 'Health and system discovery')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -77,7 +93,10 @@ async function bootstrap() {
     }),
   );
 
-  await app.listen(process.env.PORT ?? 3000);
+  const port = process.env.PORT ?? 8080;
+  await app.listen(port);
+  console.log(`🚀 AngkorGate Core running on http://localhost:${port}`);
+  console.log(`🔑 OIDC Discovery at http://localhost:${port}/oidc/.well-known/openid-configuration`);
 
 }
 void bootstrap();

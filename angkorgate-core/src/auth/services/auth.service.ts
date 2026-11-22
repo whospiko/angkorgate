@@ -11,7 +11,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { createHash, randomBytes } from 'crypto';
+import { generateNumericOtp, generateSecureToken, hashSha256 } from '../../common/utils/crypto.util';
 
 import { UsersService } from '../../users/services/users.service';
 import { RbacService } from '../../rbac/services/rbac.service';
@@ -74,6 +74,10 @@ export class AuthService {
         return bcrypt.compare(plain, hash);
     }
 
+    async getUserPermissions(userId: string): Promise<string[]> {
+        return this.rbac.getUserPermissions(userId);
+    }
+
     async login(
         dto: LoginDto,
         ctx: LoginContext,
@@ -90,7 +94,7 @@ export class AuthService {
                 }),
             );
 
-        // ─── 1. Look up user ────────────────────────────────────────────
+        // 1. Look up user
         const record = dto.email
             ? await this.users.findAuthRecordByEmail(dto.email)
             : await this.users.findAuthRecordByPhone(dto.phone!);
@@ -100,7 +104,7 @@ export class AuthService {
             throw new UnauthorizedException('Invalid credentials');
         }
 
-        // ─── 2. Active + lockout ────────────────────────────────────────
+        // 2. Check active and lockout status
         if (!record.isActive) {
             await audit(false, record.id);
             throw new ForbiddenException('Account disabled');
@@ -112,7 +116,7 @@ export class AuthService {
             );
         }
 
-        // ─── 3. Verify password ─────────────────────────────────────────
+        // 3. Verify password
         const ok = await this.verifyPassword(dto.password, record.passwordHash);
         if (!ok) {
             const failed = record.failedAttempts + 1;
@@ -126,9 +130,7 @@ export class AuthService {
             throw new UnauthorizedException('Invalid credentials');
         }
 
-        // ─── 4. Email verification — BEFORE MFA ─────────────────────────
-        // Doing this before MFA means the user discovers the email problem
-        // right after the password step, not after entering a TOTP code.
+        // 4. Check email verification before MFA
         if (record.email && !record.isEmailVerified) {
             await audit(false, record.id);
             throw new ForbiddenException(
@@ -136,7 +138,7 @@ export class AuthService {
             );
         }
 
-        // ─── 5. MFA gate ────────────────────────────────────────────────
+        // 5. MFA challenge gate
         const mfaEnabled = await this.mfa.isEnabled(record.id);
         if (mfaEnabled) {
             const mfaToken = await this.jwt.signAsync(
@@ -144,6 +146,9 @@ export class AuthService {
                 {
                     secret: this.config.get<string>('JWT_ACCESS_SECRET')!,
                     expiresIn: MFA_PENDING_TTL_SECONDS,
+                    algorithm: 'HS256',
+                    issuer: 'angkorgate-core',
+                    audience: 'angkorgate-mfa',
                 },
             );
 
@@ -168,7 +173,7 @@ export class AuthService {
             return challenge;
         }
 
-        // ─── 6. Full success path ───────────────────────────────────────
+        // 6. Login success path
         await this.users.setLastLogin(record.id);
         await audit(true, record.id);
 
@@ -376,10 +381,13 @@ export class AuthService {
         const accessToken = await this.jwt.signAsync(payload, {
             secret: this.config.get<string>('JWT_ACCESS_SECRET')!,
             expiresIn: accessTtl, // Now properly passed as a Number
+            algorithm: 'HS256',
+            issuer: 'angkorgate-core',
+            audience: 'angkorgate-api',
         });
 
         // Refresh token = random opaque string (NOT a JWT). We store its hash.
-        const refreshToken = randomBytes(48).toString('base64url');
+        const refreshToken = generateSecureToken(48);
         const tokenHash = this.hashToken(refreshToken);
 
         await this.refreshRepo.save(
@@ -413,7 +421,7 @@ export class AuthService {
     }
 
     private hashToken(token: string): string {
-        return createHash('sha256').update(token).digest('hex');
+        return hashSha256(token);
     }
 
     async sendVerificationEmail(userId: string, email: string, fullName: string): Promise<void> {
@@ -423,7 +431,7 @@ export class AuthService {
             { usedAt: new Date() },
         );
 
-        const raw = randomBytes(32).toString('base64url');
+        const raw = generateSecureToken(32);
         const tokenHash = this.hashToken(raw);
 
         await this.evtRepo.save(
@@ -452,9 +460,8 @@ export class AuthService {
     }
 
     async sendVerificationSms(userId: string, phone: string): Promise<void> {
-        // For now: log only. Add SMS provider later.
-        // Generate a 6-digit code, store hashed, compare on verify.
-        const code = String(Math.floor(100000 + Math.random() * 900000));
+        // Generate a 6-digit code, store hashed, compare on verify
+        const code = generateNumericOtp(6);
         const tokenHash = this.hashToken(code);
 
         await this.evtRepo.save(
@@ -465,10 +472,6 @@ export class AuthService {
             }),
         );
 
-        // SmsService stub — replace with real provider
-        const { SmsService } = require('../notifications/sms.service');
-        void SmsService;
-        // await this.sms.send(phone, `Your verification code is ${code}`);
         this.logger.log(`SMS verification code for ${phone}: ${code}`);
     }
 
@@ -561,7 +564,7 @@ export class AuthService {
             { usedAt: new Date() },
         );
 
-        const raw = randomBytes(32).toString('base64url');
+        const raw = generateSecureToken(32);
         const tokenHash = this.hashToken(raw);
 
         await this.prtRepo.save(
@@ -665,7 +668,7 @@ export class AuthService {
         }
     }
 
-    // src/auth/auth.service.ts — make this public
+    /** Issue authentication tokens for a user ID */
     async issueTokensForUser(
         userId: string,
         email: string | null,

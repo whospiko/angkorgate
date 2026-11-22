@@ -8,6 +8,7 @@ import { CustomersService } from '../../customers/services/customers.service';
 import { RbacService } from '../../rbac/services/rbac.service';
 import { AuthService } from '../../auth/services/auth.service';
 import { AuditService } from '../../audit/services/audit.service';
+import { generateSecureToken } from '../../common/utils/crypto.util';
 
 export interface OauthLoginResult {
     userId: string;
@@ -115,7 +116,7 @@ export class OauthLoginService {
         return this.linkAccount(userId, profile);
     }
 
-    // ───────────────────────── INTERNAL ─────────────────────────
+    /** Internal Helper Methods */
 
     private async linkAccount(
         userId: string,
@@ -156,8 +157,7 @@ export class OauthLoginService {
 
         // Create user (no password — they'll use OAuth)
         // For password_hash NOT NULL constraint: generate a random one they'll never know
-        const randomPasswordHash =
-            '$2b$12$' + require('crypto').randomBytes(40).toString('base64url').slice(0, 53);
+        const randomPasswordHash = '$2b$12$' + generateSecureToken(40).slice(0, 53);
 
         const user = await this.users.create({
             email: profile.email,

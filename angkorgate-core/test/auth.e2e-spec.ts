@@ -197,6 +197,27 @@ describe('Auth (e2e)', () => {
             expect(body.refreshToken).toBeUndefined();
         });
 
+        it('rejects an mfaToken if sent to a protected endpoint (prevents MFA bypass)', async () => {
+            const admin = await seedAdmin(dataSource);
+            await enableMfa(admin);
+
+            const res = await request(app.getHttpServer())
+                .post('/auth/login')
+                .send({ email: admin.email, password: admin.password })
+                .expect(200);
+
+            const mfaToken = (res.body?.data ?? res.body).mfaToken;
+            expect(mfaToken).toBeDefined();
+
+            // Attempting to access /auth/me with mfaToken MUST fail with 401 Unauthorized
+            const meRes = await request(app.getHttpServer())
+                .get('/auth/me')
+                .set('Authorization', `Bearer ${mfaToken}`)
+                .expect(401);
+
+            expect(meRes.body.statusCode).toBe(401);
+        });
+
         it('completes login with a valid TOTP code', async () => {
             const admin = await seedAdmin(dataSource);
             const { secret } = await enableMfa(admin);
