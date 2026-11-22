@@ -2,8 +2,8 @@
 name: angkorgate-console-design
 description: >-
   Use this skill when developing, designing, styling, or adding new UI components and pages in angkorgate-console.
-  Enforces consistency with the Claude Code theme (https://tweakcn.com/r/themes/claude.json), base-lyra style,
-  terracotta primary accents, warm paper/slate surfaces, 0.5rem radius, Remixicon icons, JetBrains Mono body typography,
+  Enforces consistency with the Discord theme (https://tweakcn.com/r/themes/cmn4wp9hz000104lbgtucaj5m), base-luma style,
+  Discord Blurple primary accents, dark slate surfaces, 0.625rem radius, Remixicon icons, JetBrains Mono body typography,
   Merriweather headings, sidebar-16 dashboard layout, and the Feature-Driven Modular Architecture.
 ---
 
@@ -16,18 +16,19 @@ All UI and feature development in `angkorgate-console` must follow these convent
 
 ## 1. Theme Specifications & Design Tokens
 
-The console is configured with the **Claude Code Theme** via tweakcn (`https://tweakcn.com/r/themes/claude.json`):
+The console is configured with the **Discord Theme** via tweakcn (`https://tweakcn.com/r/themes/cmn4wp9hz000104lbgtucaj5m`):
 
 | Property | Value | Notes |
 | :--- | :--- | :--- |
-| **Theme / Accent** | `claude` (Terracotta `#D97757`) | `oklch(0.6171 0.1375 39.0427)` signature Claude warm accent |
-| **Surfaces** | Warm Paper / Dark Slate | Light: `oklch(0.9818 0.0054 95.0986)` · Dark: `oklch(0.2679 0.0036 106.6427)` |
-| **Style Foundation** | `base-lyra` | Radix / Base-UI foundations |
-| **Border Radius** | `0.5rem` (`8px`) | Refined rounded corners across cards, buttons, inputs |
-| **Chart Palette** | Terracotta & Violet | `oklch(0.5583 0.1276 42.9956)` & `oklch(0.6898 0.1581 290.4107)` |
+| **Theme / Accent** | `discord` (Blurple) | `oklch(0.5774 0.2091 273.8504)` signature Discord Blurple accent |
+| **Surfaces** | Light Mode / Discord Slate Dark | Light: `oklch(0.9881 0 0)` · Dark: `oklch(0.3225 0.0107 278.2517)` |
+| **Style Foundation** | `base-luma` | Base UI with Luma fluid rounded architecture |
+| **Border Radius** | `0.625rem` (`10px`) | Modern smooth rounded corners across cards, buttons, inputs |
+| **Chart Palette** | Discord Violet & Multi-spectrum | Chart 1-5 definitions in `globals.css` |
 | **Icon Library** | `@remixicon/react` | Standardized on Remixicon (`Ri...Line`) |
-| **Body & Code Font** | `JetBrains Mono` | Applied globally on `html` / `body` (`var(--font-mono)`) |
-| **Heading Font** | `Merriweather` | Applied using `font-heading` class (`var(--font-heading)`) |
+| **Body & UI Font** | `gg sans` | Discord's primary typeface applied globally on `html` / `body` (`var(--font-sans)`) |
+| **Heading Font** | `gg sans` | Bold Discord sans-serif headings via `font-heading` (`var(--font-heading)`) |
+| **Code & Data Font** | `JetBrains Mono` | Applied selectively on code, tokens, IDs, and terminal logs (`var(--font-mono)`) |
 | **Menu Accent** | `subtle` | Subtle background shifts on hover |
 | **Menu Color** | `inverted` | Inverted popover / menu backgrounds |
 | **Shell Layout** | `sidebar-16` | Sticky header, inset collapsible sidebar |

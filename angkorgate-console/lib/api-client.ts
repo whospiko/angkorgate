@@ -79,8 +79,9 @@ async function request<T>(
   }
 
   if (!res.ok) {
+    const rawMsg = (json as { message?: string | string[]; error?: string })?.message
     const errorMsg =
-      (json as { message?: string; error?: string })?.message ||
+      (Array.isArray(rawMsg) ? rawMsg.join(", ") : rawMsg) ||
       (json as { error?: string })?.error ||
       `API request failed with status ${res.status}`
     throw new ApiError(errorMsg, res.status, json)

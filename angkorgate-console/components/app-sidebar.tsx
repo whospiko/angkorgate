@@ -24,7 +24,9 @@ import {
   RiServerLine,
   RiShieldCheckLine,
   RiRadarLine,
+  RiPaletteLine,
 } from "@remixicon/react"
+import { useBranding } from "@/features/system"
 
 const defaultNavData = {
   navMain: [
@@ -69,7 +71,7 @@ const defaultNavData = {
       ],
     },
     {
-      title: "Operations & Audit",
+      title: "Operations & Branding",
       url: "/audit",
       icon: <RiFileList3Line className="size-4" />,
       isActive: true,
@@ -77,6 +79,10 @@ const defaultNavData = {
         {
           title: "Audit Logs",
           url: "/audit",
+        },
+        {
+          title: "Content Management",
+          url: "/settings/content",
         },
         {
           title: "Customers CRM",
@@ -138,6 +144,10 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 }
 
 export function AppSidebar({ currentUser, ...props }: AppSidebarProps) {
+  const { branding } = useBranding()
+  const appName = branding?.appName || "AngkorGate"
+  const logoUrl = branding?.logoUrl
+
   const displayUser = {
     name: currentUser?.email?.split("@")[0] || "Administrator",
     email: currentUser?.email || "admin@angkorgate.local",
@@ -153,11 +163,16 @@ export function AppSidebar({ currentUser, ...props }: AppSidebarProps) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<Link href="/dashboard" />}>
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
-                <RiCommandLine className="size-4" />
+              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs overflow-hidden">
+                {logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logoUrl} alt={appName} className="size-5 object-contain" />
+                ) : (
+                  <RiCommandLine className="size-4" />
+                )}
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold tracking-wide font-heading">AngkorGate</span>
+                <span className="truncate font-semibold tracking-wide font-heading">{appName}</span>
                 <span className="truncate text-xs text-muted-foreground">Admin Console</span>
               </div>
             </SidebarMenuButton>

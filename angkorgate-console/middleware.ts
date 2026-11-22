@@ -38,13 +38,28 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  // If landing on /login with unauthorized query param, clear stale cookies
+  if (pathname === "/login" && request.nextUrl.searchParams.has("unauthorized")) {
+    const response = NextResponse.next()
+    response.cookies.delete("angkorgate_token")
+    response.cookies.delete("angkorgate_refresh_token")
+    response.cookies.delete("angkorgate_user")
+    response.cookies.delete("angkorgate_session")
+    return response
+  }
+
   // Redirect unauthenticated requests targeting protected routes to /login with unauthorized signal
   if (isProtected && !isValidToken) {
     const loginUrl = new URL("/login", request.url)
     const redirectTarget = `${pathname}${search}`
     loginUrl.searchParams.set("redirect", redirectTarget)
     loginUrl.searchParams.set("unauthorized", "1")
-    return NextResponse.redirect(loginUrl)
+    const response = NextResponse.redirect(loginUrl)
+    response.cookies.delete("angkorgate_token")
+    response.cookies.delete("angkorgate_refresh_token")
+    response.cookies.delete("angkorgate_user")
+    response.cookies.delete("angkorgate_session")
+    return response
   }
 
   // Redirect authenticated requests away from /login to /dashboard

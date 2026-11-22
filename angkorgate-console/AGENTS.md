@@ -10,15 +10,15 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # AngkorGate Console Agent Rules & Design System
 
-## 1. Design System Standards (Claude Code Theme)
-- **Theme**: Claude Code (`https://tweakcn.com/r/themes/claude.json`), signature terracotta primary accent (`#D97757` / `oklch(0.6171 0.1375 39.0427)`).
-- **Surfaces**: Warm Paper light mode (`oklch(0.9818 0.0054 95.0986)`) and Warm Dark Charcoal (`oklch(0.2679 0.0036 106.6427)`).
+## 1. Design System Standards (Discord Theme)
+- **Theme**: Discord (`https://tweakcn.com/r/themes/cmn4wp9hz000104lbgtucaj5m`), signature Blurple primary accent (`oklch(0.5774 0.2091 273.8504)`).
+- **Surfaces**: Discord light mode (`oklch(0.9881 0 0)`) and Discord dark slate (`oklch(0.3225 0.0107 278.2517)`).
 - **Style**: `base-lyra` (Radix / Base UI foundations).
 - **Icons**: Always import `@remixicon/react` (`Ri*Line`). Do not use lucide-react.
 - **Typography**:
   - Body & UI text: `JetBrains Mono` (`font-mono`, `var(--font-mono)`).
   - Headings: `Merriweather` (`font-heading`, `var(--font-heading)`).
-- **Border Radius**: `0.5rem` (`8px` / `rounded-md` / `rounded-lg`).
+- **Border Radius**: `0.625rem` (`10px` / `rounded-md` / `rounded-lg`).
 - **Sidebar**: Based on `sidebar-16` with sticky site header, top search bar, and inset layout.
 
 ## 2. CLI Execution in this Workspace

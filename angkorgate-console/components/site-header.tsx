@@ -25,6 +25,7 @@ const routeTitles: Record<string, string> = {
   "/audit": "Audit Logs",
   "/customers": "Customer Directory",
   "/employees": "Organization & Staff",
+  "/settings/content": "Content Management",
   "/oidc": "OpenID Connect Discovery",
 }
 

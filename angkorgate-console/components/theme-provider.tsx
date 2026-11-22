@@ -3,6 +3,17 @@
 import * as React from "react"
 import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes"
 
+// Suppress false-positive React 19 warnings about inline <script> tags from next-themes
+if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+  const originalError = console.error
+  console.error = (...args: unknown[]) => {
+    if (typeof args[0] === "string" && args[0].includes("Encountered a script tag")) {
+      return
+    }
+    originalError.apply(console, args)
+  }
+}
+
 function ThemeProvider({
   children,
   ...props
@@ -10,7 +21,7 @@ function ThemeProvider({
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="system"
+      defaultTheme="dark"
       enableSystem
       disableTransitionOnChange
       {...props}
@@ -30,7 +41,8 @@ function isTypingTarget(target: EventTarget | null) {
     target.isContentEditable ||
     target.tagName === "INPUT" ||
     target.tagName === "TEXTAREA" ||
-    target.tagName === "SELECT"
+    target.tagName === "SELECT" ||
+    target.closest("input, textarea, select, [contenteditable='true']") !== null
   )
 }
 
@@ -39,7 +51,7 @@ function ThemeHotkey() {
 
   React.useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented || event.repeat) {
+      if (!event.key || event.defaultPrevented || event.repeat) {
         return
       }
 

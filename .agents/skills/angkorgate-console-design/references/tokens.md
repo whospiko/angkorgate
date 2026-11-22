@@ -1,63 +1,69 @@
-# Design Tokens & Palette Reference (Claude Code Theme)
+# Design Tokens & Palette Reference (Discord Theme)
 
-Theme Registry Item: `https://tweakcn.com/r/themes/claude.json`
+Theme Registry Item: `https://tweakcn.com/r/themes/cmn4wp9hz000104lbgtucaj5m`
 
-## Color System (OKLCH - Claude Palette)
+## Color System (OKLCH - Discord Palette)
 
 ### Light Mode (`:root`)
-- **`--primary`**: `oklch(0.6171 0.1375 39.0427)` (Claude signature Terracotta)
+- **`--primary`**: `oklch(0.5774 0.2091 273.8504)` (Discord Blurple)
 - **`--primary-foreground`**: `oklch(1.0000 0 0)`
-- **`--background`**: `oklch(0.9818 0.0054 95.0986)` (Warm Paper)
-- **`--foreground`**: `oklch(0.3438 0.0269 95.7226)`
-- **`--card`**: `oklch(0.9818 0.0054 95.0986)`
-- **`--card-foreground`**: `oklch(0.1908 0.0020 106.5859)`
+- **`--background`**: `oklch(0.9881 0 0)`
+- **`--foreground`**: `oklch(0.2789 0.0091 285.7942)`
+- **`--card`**: `oklch(1.0000 0 0)`
+- **`--card-foreground`**: `oklch(0.2789 0.0091 285.7942)`
 - **`--popover`**: `oklch(1.0000 0 0)`
-- **`--popover-foreground`**: `oklch(0.2671 0.0196 98.9390)`
-- **`--secondary`**: `oklch(0.9245 0.0138 92.9892)`
-- **`--secondary-foreground`**: `oklch(0.4334 0.0177 98.6048)`
-- **`--muted`**: `oklch(0.9341 0.0153 90.2390)`
-- **`--muted-foreground`**: `oklch(0.6059 0.0075 97.4233)`
-- **`--accent`**: `oklch(0.9245 0.0138 92.9892)`
-- **`--accent-foreground`**: `oklch(0.2671 0.0196 98.9390)`
-- **`--destructive`**: `oklch(0.1908 0.0020 106.5859)`
+- **`--popover-foreground`**: `oklch(0.2789 0.0091 285.7942)`
+- **`--secondary`**: `oklch(0.9614 0.0013 286.3750)`
+- **`--secondary-foreground`**: `oklch(0.2789 0.0091 285.7942)`
+- **`--muted`**: `oklch(0.9731 0 0)`
+- **`--muted-foreground`**: `oklch(0.5370 0.0140 280.8555)`
+- **`--accent`**: `oklch(0.9497 0.0027 286.3490)`
+- **`--accent-foreground`**: `oklch(0.2789 0.0091 285.7942)`
+- **`--destructive`**: `oklch(0.5156 0.1810 22.5393)`
 - **`--destructive-foreground`**: `oklch(1.0000 0 0)`
-- **`--border`**: `oklch(0.8847 0.0069 97.3627)`
-- **`--input`**: `oklch(0.7621 0.0156 98.3528)`
-- **`--ring`**: `oklch(0.6171 0.1375 39.0427)`
-- **`--radius`**: `0.5rem` (8px)
+- **`--border`**: `oklch(0.9042 0.0027 286.3457)`
+- **`--input`**: `oklch(0.9614 0.0013 286.3750)`
+- **`--ring`**: `oklch(0.5774 0.2091 273.8504)`
+- **`--radius`**: `0.625rem` (10px)
 
 ### Dark Mode (`.dark`)
-- **`--primary`**: `oklch(0.6724 0.1308 38.7559)` (Warm Terracotta)
+- **`--primary`**: `oklch(0.5774 0.2091 273.8504)` (Discord Blurple)
 - **`--primary-foreground`**: `oklch(1.0000 0 0)`
-- **`--background`**: `oklch(0.2679 0.0036 106.6427)` (Warm Dark Charcoal)
-- **`--foreground`**: `oklch(0.8074 0.0142 93.0137)`
-- **`--card`**: `oklch(0.2679 0.0036 106.6427)`
-- **`--card-foreground`**: `oklch(0.9818 0.0054 95.0986)`
-- **`--popover`**: `oklch(0.3085 0.0035 106.6039)`
-- **`--popover-foreground`**: `oklch(0.9211 0.0040 106.4781)`
-- **`--secondary`**: `oklch(0.9818 0.0054 95.0986)`
-- **`--secondary-foreground`**: `oklch(0.3085 0.0035 106.6039)`
-- **`--muted`**: `oklch(0.2213 0.0038 106.7070)`
-- **`--muted-foreground`**: `oklch(0.7713 0.0169 99.0657)`
-- **`--accent`**: `oklch(0.2130 0.0078 95.4245)`
-- **`--accent-foreground`**: `oklch(0.9663 0.0080 98.8792)`
-- **`--destructive`**: `oklch(0.6368 0.2078 25.3313)`
+- **`--background`**: `oklch(0.3225 0.0107 278.2517)` (Discord Dark Slate)
+- **`--foreground`**: `oklch(1.0000 0 0)`
+- **`--card`**: `oklch(0.3502 0.0122 279.2835)`
+- **`--card-foreground`**: `oklch(1.0000 0 0)`
+- **`--popover`**: `oklch(0.3502 0.0122 279.2835)`
+- **`--popover-foreground`**: `oklch(1.0000 0 0)`
+- **`--secondary`**: `oklch(0.3779 0.0118 285.8207)`
+- **`--secondary-foreground`**: `oklch(1.0000 0 0)`
+- **`--muted`**: `oklch(0.3066 0.0108 278.2166)`
+- **`--muted-foreground`**: `oklch(0.7230 0.0087 278.5820)`
+- **`--accent`**: `oklch(0.4074 0.0134 280.1154)`
+- **`--accent-foreground`**: `oklch(1.0000 0 0)`
+- **`--destructive`**: `oklch(0.8004 0.1141 23.1850)`
 - **`--destructive-foreground`**: `oklch(1.0000 0 0)`
-- **`--border`**: `oklch(0.3618 0.0101 106.8928)`
-- **`--input`**: `oklch(0.4336 0.0113 100.2195)`
-- **`--ring`**: `oklch(0.6724 0.1308 38.7559)`
-- **`--radius`**: `0.5rem` (8px)
+- **`--border`**: `oklch(0.3690 0.0103 278.3345)`
+- **`--input`**: `oklch(0.3066 0.0108 278.2166)`
+- **`--ring`**: `oklch(0.5774 0.2091 273.8504)`
+- **`--radius`**: `0.625rem` (10px)
 
 ### Chart Palette
-- **`--chart-1`**: `oklch(0.5583 0.1276 42.9956)` (Terracotta accent)
-- **`--chart-2`**: `oklch(0.6898 0.1581 290.4107)` (Lavender / Violet accent)
-- **`--chart-3`**: light `oklch(0.8816 0.0276 93.1280)` / dark `oklch(0.2130 0.0078 95.4245)`
-- **`--chart-4`**: light `oklch(0.8822 0.0403 298.1792)` / dark `oklch(0.3074 0.0516 289.3230)`
-- **`--chart-5`**: `oklch(0.5608 0.1348 42.0584)`
+- **`--chart-1`**: `oklch(0.8092 0.1122 345.1956)`
+- **`--chart-2`**: `oklch(0.8757 0.0979 83.6546)`
+- **`--chart-3`**: `oklch(0.9075 0.0946 165.0540)`
+- **`--chart-4`**: `oklch(0.8406 0.0699 242.1914)`
+- **`--chart-5`**: `oklch(0.7865 0.1232 309.4396)`
 
 ### Sidebar Variables
-- **`--sidebar`**: light `oklch(0.9663 0.0080 98.8792)` / dark `oklch(0.2357 0.0024 67.7077)`
-- **`--sidebar-foreground`**: light `oklch(0.3590 0.0051 106.6524)` / dark `oklch(0.8074 0.0142 93.0137)`
+- **`--sidebar`**: light `oklch(0.9644 0.0013 286.3751)` / dark `oklch(0.2981 0.0091 276.8201)`
+- **`--sidebar-foreground`**: light `oklch(0.5160 0.0141 280.8326)` / dark `oklch(0.6876 0.0102 279.6082)`
+- **`--sidebar-primary`**: light `oklch(0.8984 0.0041 286.3179)` / dark `oklch(0.3804 0.0102 278.3511)`
+- **`--sidebar-primary-foreground`**: light `oklch(0.2789 0.0091 285.7942)` / dark `oklch(1.0000 0 0)`
+- **`--sidebar-accent`**: light `oklch(0.9285 0.0027 286.3475)` / dark `oklch(0.3309 0.0087 285.9137)`
+- **`--sidebar-accent-foreground`**: light `oklch(0.2789 0.0091 285.7942)` / dark `oklch(1.0000 0 0)`
+- **`--sidebar-border`**: light `oklch(0.8862 0.0041 286.3164)` / dark `oklch(0.3494 0.0087 276.9030)`
+- **`--sidebar-ring`**: `oklch(0.7151 0.1523 235.2888)`
 - **`--sidebar-primary`**: `oklch(0.6171 0.1375 39.0427)` / dark `oklch(0.3250 0 0)`
 - **`--sidebar-primary-foreground`**: `oklch(0.9881 0 0)`
 - **`--sidebar-accent`**: light `oklch(0.9245 0.0138 92.9892)` / dark `oklch(0.1680 0.0020 106.6177)`

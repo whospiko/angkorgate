@@ -1,6 +1,7 @@
 "use client"
 
-import { useTransition } from "react"
+import { useState, useEffect, useTransition } from "react"
+import { useTheme } from "next-themes"
 import {
   Avatar,
   AvatarFallback,
@@ -21,6 +22,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { Switch } from "@/components/ui/switch"
 import {
   RiArrowUpDownLine,
   RiSparklingLine,
@@ -29,6 +31,8 @@ import {
   RiNotificationLine,
   RiLogoutBoxLine,
   RiLoader4Line,
+  RiSunLine,
+  RiMoonLine,
 } from "@remixicon/react"
 import { logoutAction } from "@/features/auth"
 
@@ -44,6 +48,14 @@ export interface NavUserProps {
 export function NavUser({ user }: NavUserProps) {
   const { isMobile } = useSidebar()
   const [isPending, startTransition] = useTransition()
+  const { resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const isDark = mounted ? resolvedTheme === "dark" : true
 
   const handleLogout = () => {
     startTransition(async () => {
@@ -133,6 +145,29 @@ export function NavUser({ user }: NavUserProps) {
               <DropdownMenuItem>
                 <RiNotificationLine />
                 Notifications
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem
+                className="flex items-center justify-between cursor-pointer py-1.5"
+                onClick={() => setTheme(isDark ? "light" : "dark")}
+              >
+                <div className="flex items-center gap-2">
+                  {isDark ? (
+                    <RiMoonLine className="size-4 text-primary" />
+                  ) : (
+                    <RiSunLine className="size-4 text-amber-500" />
+                  )}
+                  <span className="font-mono text-xs">
+                    {isDark ? "Dark Mode" : "Light Mode"}
+                  </span>
+                </div>
+                <Switch
+                  checked={isDark}
+                  onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+                  className="pointer-events-none scale-75"
+                />
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
