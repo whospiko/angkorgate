@@ -25,10 +25,28 @@ import {
 import { loginAction } from "../server/auth-actions"
 import { OAuthProviders } from "./oauth-providers"
 
+export interface LoginFormProps extends React.ComponentProps<"div"> {
+  branding?: {
+    appName: string
+    appDescription?: string | null
+    logoUrl?: string | null
+    faviconUrl?: string | null
+    organizationName?: string | null
+    supportEmail?: string | null
+    footerText?: string | null
+  }
+}
+
 export function LoginForm({
   className,
+  branding,
   ...props
-}: React.ComponentProps<"div">) {
+}: LoginFormProps) {
+  const appName = branding?.appName || "AngkorGate"
+  const logoUrl = branding?.logoUrl
+  const appDescription =
+    branding?.appDescription ||
+    "Sign in to manage API routes, gateway policies, and OIDC identity."
   const [state, formAction, isPending] = useActionState(loginAction, null)
   const [showPassword, setShowPassword] = useState(false)
   const searchParams = useSearchParams()
@@ -50,16 +68,21 @@ export function LoginForm({
               href="/"
               className="flex flex-col items-center gap-2 font-medium"
             >
-              <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-                <RiCommandLine className="size-6" />
+              <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm overflow-hidden">
+                {logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logoUrl} alt={appName} className="size-6 object-contain" />
+                ) : (
+                  <RiCommandLine className="size-6" />
+                )}
               </div>
-              <span className="sr-only">AngkorGate</span>
+              <span className="sr-only">{appName}</span>
             </Link>
             <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-              Welcome to AngkorGate
+              Welcome to {appName}
             </h1>
             <FieldDescription className="font-mono text-xs">
-              Sign in to manage API routes, gateway policies, and OIDC identity.
+              {appDescription}
             </FieldDescription>
           </div>
 

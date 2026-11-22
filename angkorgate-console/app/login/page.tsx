@@ -1,7 +1,19 @@
 import { Suspense } from "react"
+import { redirect } from "next/navigation"
 import { LoginForm } from "@/features/auth"
+import { getSetupStatus, getBranding } from "@/features/system"
 
-export default function LoginPage() {
+export const dynamic = "force-dynamic"
+
+export default async function LoginPage() {
+  const status = await getSetupStatus()
+
+  if (!status.isInitialized) {
+    redirect("/setup")
+  }
+
+  const branding = await getBranding()
+
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
       <div className="w-full max-w-sm">
@@ -12,7 +24,7 @@ export default function LoginPage() {
             </div>
           }
         >
-          <LoginForm />
+          <LoginForm branding={branding} />
         </Suspense>
       </div>
     </div>

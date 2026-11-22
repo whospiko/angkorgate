@@ -132,16 +132,15 @@ export async function getCurrentUser(): Promise<UserSummary | null> {
   const token = cookieStore.get("angkorgate_token")?.value
   if (!token) return null
 
-  const userCookie = cookieStore.get("angkorgate_user")?.value
-  if (!userCookie) return null
-
+  // Authoritatively verify with backend /auth/me to guarantee account is active
   try {
-    const user = JSON.parse(userCookie) as UserSummary
-    if (!user || typeof user !== "object" || !user.id || !user.email) {
-      return null
+    const user = await apiClient.get<UserSummary>("/auth/me", { token })
+    if (user && user.id && user.email) {
+      return user
     }
-    return user
   } catch {
     return null
   }
+
+  return null
 }

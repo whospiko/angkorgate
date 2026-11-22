@@ -102,7 +102,7 @@ export function CreateUserDialog() {
               <Label htmlFor="user-role">Primary Role</Label>
               <select
                 id="user-role"
-                className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 font-mono text-xs shadow-xs focus:outline-hidden focus:ring-1 focus:ring-ring"
+                className="w-full h-9 rounded-md border border-input bg-background/90 dark:bg-black/25 px-3 py-1.5 font-mono text-xs text-foreground shadow-xs transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 outline-none"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
               >

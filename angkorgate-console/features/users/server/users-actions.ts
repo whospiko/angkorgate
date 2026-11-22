@@ -1,8 +1,8 @@
 "use server"
 
-import "server-only"
 import { revalidatePath } from "next/cache"
-import { apiClient } from "@/lib/api-client"
+import { redirect } from "next/navigation"
+import { apiClient, ApiError } from "@/lib/api-client"
 import type { User, CreateUserInput, PaginatedUsers } from "../types/users.types"
 
 export async function getUsers(query?: {
@@ -22,11 +22,17 @@ export async function getUsers(query?: {
     if (Array.isArray(res)) {
       return { items: res, total: res.length, page: 1, limit: res.length }
     }
+    if (res && Array.isArray(res.data)) {
+      return { items: res.data, total: res.total ?? res.data.length, page: res.page ?? 1, limit: res.limit ?? 20 }
+    }
     if (res && Array.isArray(res.items)) {
       return res as PaginatedUsers
     }
     return { items: [], total: 0, page: 1, limit: 20 }
   } catch (error) {
+    if (error instanceof ApiError && error.statusCode === 401) {
+      redirect("/login?unauthorized=1&redirect=/users")
+    }
     console.error("Failed to fetch users:", error)
     return { items: [], total: 0, page: 1, limit: 20 }
   }
@@ -36,7 +42,35 @@ export async function createUserAction(
   input: CreateUserInput
 ): Promise<{ success: boolean; message?: string; data?: User }> {
   try {
-    const created = await apiClient.post<User>("/users", input)
+    const { roles, phoneNumber, ...rest } = input
+    const payload: Record<string, any> = {
+      ...rest,
+    }
+    if (phoneNumber) {
+      payload.phone = phoneNumber
+    }
+
+    // Clean undefined keys
+    Object.keys(payload).forEach(
+      (key) => payload[key] === undefined && delete payload[key]
+    )
+
+    const created = await apiClient.post<User>("/users", payload)
+
+    // Assign roles through RBAC assignment endpoint
+    if (roles && roles.length > 0 && created?.id) {
+      for (const roleCode of roles) {
+        try {
+          await apiClient.post("/rbac/roles/assign", {
+            userId: created.id,
+            roleCode,
+          })
+        } catch (roleErr) {
+          console.error(`Failed to assign role ${roleCode} to user ${created.id}:`, roleErr)
+        }
+      }
+    }
+
     revalidatePath("/users")
     revalidatePath("/dashboard")
     return { success: true, data: created }

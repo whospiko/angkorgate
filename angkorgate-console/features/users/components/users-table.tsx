@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -150,21 +151,25 @@ export function UsersTable({ users }: UsersTableProps) {
                     }
                   />
                   <DropdownMenuContent align="end" className="font-mono text-xs">
-                    <DropdownMenuLabel>User Actions</DropdownMenuLabel>
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel>User Actions</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleToggle(u.id, u.isActive)}>
+                        {u.isActive ? "Deactivate User" : "Activate User"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleUnlock(u.id)}>
+                        <RiLockUnlockLine className="mr-2 size-4" /> Reset Failed Attempts
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => handleToggle(u.id, u.isActive)}>
-                      {u.isActive ? "Deactivate User" : "Activate User"}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleUnlock(u.id)}>
-                      <RiLockUnlockLine className="mr-2 size-4" /> Reset Failed Attempts
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => handleDelete(u.id, u.email)}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <RiDeleteBinLine className="mr-2 size-4" /> Delete Account
-                    </DropdownMenuItem>
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem
+                        onClick={() => handleDelete(u.id, u.email)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <RiDeleteBinLine className="mr-2 size-4" /> Delete Account
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </TableCell>
