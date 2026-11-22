@@ -14,7 +14,7 @@ export default async function AppsPage() {
           <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
             Client Applications
           </h1>
-          <p className="font-mono text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Manage registered OpenID Connect and OAuth 2.0 client apps.
           </p>
         </div>

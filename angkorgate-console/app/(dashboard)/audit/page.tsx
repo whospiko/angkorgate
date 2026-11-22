@@ -14,7 +14,7 @@ export default async function AuditPage() {
           <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
             Audit Trail & Event Logs
           </h1>
-          <p className="font-mono text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Immutable security audit logs of authentication, authorization, and administrative events.
           </p>
         </div>

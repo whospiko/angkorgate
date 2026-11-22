@@ -23,7 +23,7 @@ export default async function EmployeesPage() {
           <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
             Organization & Staff
           </h1>
-          <p className="font-mono text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Internal departments, job titles, positions, and staff schedules.
           </p>
         </div>

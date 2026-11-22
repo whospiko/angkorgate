@@ -36,12 +36,12 @@ export default async function DashboardPage() {
           <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
             Console Overview
           </h1>
-          <p className="font-mono text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             AngkorGate IAM & Gateway Management Console
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="font-mono text-xs gap-1.5">
+          <Badge variant="outline" className="text-xs gap-1.5 font-sans">
             <span className="size-2 rounded-full bg-emerald-500 inline-block" />
             API Core: Connected
           </Badge>
@@ -55,14 +55,14 @@ export default async function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="border border-border/50">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Client Apps
             </CardTitle>
             <RiKey2Line className="size-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="font-heading text-2xl font-bold">{apps.length}</div>
-            <p className="text-xs text-muted-foreground font-mono mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Registered OIDC clients
             </p>
           </CardContent>
@@ -70,14 +70,14 @@ export default async function DashboardPage() {
 
         <Card className="border border-border/50">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Total Users
             </CardTitle>
             <RiUserLine className="size-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="font-heading text-2xl font-bold">{usersData.total || usersData.items.length}</div>
-            <p className="text-xs text-muted-foreground font-mono mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Accounts in database
             </p>
           </CardContent>
@@ -85,14 +85,14 @@ export default async function DashboardPage() {
 
         <Card className="border border-border/50">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Audit Logs
             </CardTitle>
             <RiFileList3Line className="size-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="font-heading text-2xl font-bold">{auditData.total || auditData.items.length}</div>
-            <p className="text-xs text-muted-foreground font-mono mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Recorded audit events
             </p>
           </CardContent>
@@ -100,21 +100,21 @@ export default async function DashboardPage() {
 
         <Card className="border border-border/50">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               OIDC Engine
             </CardTitle>
             <RiShieldCheckLine className="size-4 text-emerald-600 dark:text-emerald-400" />
           </CardHeader>
           <CardContent>
             <div className="font-heading text-2xl font-bold">Active</div>
-            <p className="text-xs text-muted-foreground font-mono mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               RFC 7662 / RFC 7009 compliant
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* System Status & Claude Theme Specs */}
+      {/* System Status & Theme Specs */}
       <div className="grid gap-6 md:grid-cols-7">
         <div className="md:col-span-4">
           <SystemStatusCard health={health} cache={cache} />
@@ -123,39 +123,47 @@ export default async function DashboardPage() {
         <Card className="md:col-span-3 border border-border/50">
           <CardHeader>
             <CardTitle className="font-heading text-lg">Architecture & Theme</CardTitle>
-            <CardDescription className="font-mono text-xs">
-              Live Claude Code styling & Feature-Driven Modular standards
+            <CardDescription className="text-xs">
+              Live Discord theme styling & gg sans typography standards
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2 font-mono text-xs">
+            <div className="space-y-2 text-xs">
               <div className="flex justify-between py-1 border-b border-border/40">
                 <span className="text-muted-foreground">Theme:</span>
-                <span className="font-semibold text-primary">Claude Code (Terracotta)</span>
+                <span className="font-semibold text-primary">Discord (Blurple)</span>
               </div>
               <div className="flex justify-between py-1 border-b border-border/40">
                 <span className="text-muted-foreground">Architecture:</span>
                 <span>Feature-Driven (FSD-lite)</span>
               </div>
               <div className="flex justify-between py-1 border-b border-border/40">
+                <span className="text-muted-foreground">Style Foundation:</span>
+                <span className="font-semibold text-primary">base-luma</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-border/40">
                 <span className="text-muted-foreground">API Core URL:</span>
-                <span>http://localhost:8080</span>
+                <span className="font-mono">http://localhost:8080</span>
               </div>
               <div className="flex justify-between py-1 border-b border-border/40">
                 <span className="text-muted-foreground">Icons:</span>
                 <span>@remixicon/react</span>
               </div>
               <div className="flex justify-between py-1 border-b border-border/40">
-                <span className="text-muted-foreground">Body Typography:</span>
-                <span>JetBrains Mono</span>
+                <span className="text-muted-foreground">Primary Typography:</span>
+                <span className="font-semibold">gg sans</span>
               </div>
               <div className="flex justify-between py-1 border-b border-border/40">
                 <span className="text-muted-foreground">Heading Typography:</span>
-                <span>Merriweather</span>
+                <span className="font-semibold">gg sans</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-border/40">
+                <span className="text-muted-foreground">Monospace / Code:</span>
+                <span className="font-mono">JetBrains Mono</span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-muted-foreground">Border Radius:</span>
-                <span>0.5rem (8px)</span>
+                <span>0.625rem (10px)</span>
               </div>
             </div>
           </CardContent>

@@ -36,17 +36,17 @@ export function SystemStatusCard({ health, cache }: SystemStatusCardProps) {
             )}
           </Badge>
         </div>
-        <CardDescription className="font-mono text-xs">
+        <CardDescription className="text-xs">
           Upstream runtime and caching telemetry probe
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-3 sm:grid-cols-2 font-mono text-xs">
+        <div className="grid gap-3 sm:grid-cols-2 text-xs">
           <div className="flex items-center justify-between p-2.5 rounded-md bg-muted/40 border border-border/40">
             <span className="text-muted-foreground flex items-center gap-1.5">
               <RiDatabase2Line className="size-4" /> Cache Provider
             </span>
-            <span className="font-semibold uppercase">{cache.provider || "memory"}</span>
+            <span className="font-mono font-semibold uppercase">{cache.provider || "memory"}</span>
           </div>
           <div className="flex items-center justify-between p-2.5 rounded-md bg-muted/40 border border-border/40">
             <span className="text-muted-foreground">Cache Status</span>
@@ -56,11 +56,11 @@ export function SystemStatusCard({ health, cache }: SystemStatusCardProps) {
           </div>
           <div className="flex items-center justify-between p-2.5 rounded-md bg-muted/40 border border-border/40">
             <span className="text-muted-foreground">Cache Prefix</span>
-            <span className="font-semibold">{cache.prefix || "angkorgate:"}</span>
+            <span className="font-mono font-semibold">{cache.prefix || "angkorgate:"}</span>
           </div>
           <div className="flex items-center justify-between p-2.5 rounded-md bg-muted/40 border border-border/40">
             <span className="text-muted-foreground">Cached Items</span>
-            <span className="font-semibold">{cache.itemCount ?? 0} keys</span>
+            <span className="font-mono font-semibold">{cache.itemCount ?? 0} keys</span>
           </div>
         </div>
       </CardContent>

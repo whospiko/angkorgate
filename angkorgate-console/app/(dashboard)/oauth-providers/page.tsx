@@ -18,7 +18,7 @@ export default async function OAuthProvidersPage() {
           <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
             OAuth Identity Providers
           </h1>
-          <p className="font-mono text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Configure federated social identity providers (Google, Apple, Microsoft, etc.).
           </p>
         </div>

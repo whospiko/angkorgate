@@ -2,13 +2,17 @@
 
 import "server-only"
 import { revalidatePath } from "next/cache"
-import { apiClient } from "@/lib/api-client"
+import { redirect } from "next/navigation"
+import { apiClient, ApiError } from "@/lib/api-client"
 import type { AppSetting, CreateAppInput } from "../types/apps.types"
 
 export async function getApps(): Promise<AppSetting[]> {
   try {
     return await apiClient.get<AppSetting[]>("/admin/apps")
   } catch (error) {
+    if (error instanceof ApiError && error.statusCode === 401) {
+      redirect("/login?unauthorized=1&redirect=/apps")
+    }
     console.error("Failed to fetch apps:", error)
     return []
   }

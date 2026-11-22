@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -161,31 +162,35 @@ export function AppsTable({ apps }: AppsTableProps) {
                     }
                   />
                   <DropdownMenuContent align="end" className="font-mono text-xs">
-                    <DropdownMenuLabel>Client Actions</DropdownMenuLabel>
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel>Client Actions</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleRegenerate(app.appCode)}>
+                        <RiRefreshLine className="mr-2 size-4" /> Regenerate Secret
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleToggle(app.appCode, "oauth", app.oauthEnabled)}
+                      >
+                        {app.oauthEnabled ? (
+                          <>
+                            <RiCloseCircleLine className="mr-2 size-4 text-destructive" /> Disable OAuth
+                          </>
+                        ) : (
+                          <>
+                            <RiCheckboxCircleLine className="mr-2 size-4 text-emerald-600" /> Enable OAuth
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => handleRegenerate(app.appCode)}>
-                      <RiRefreshLine className="mr-2 size-4" /> Regenerate Secret
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleToggle(app.appCode, "oauth", app.oauthEnabled)}
-                    >
-                      {app.oauthEnabled ? (
-                        <>
-                          <RiCloseCircleLine className="mr-2 size-4 text-destructive" /> Disable OAuth
-                        </>
-                      ) : (
-                        <>
-                          <RiCheckboxCircleLine className="mr-2 size-4 text-emerald-600" /> Enable OAuth
-                        </>
-                      )}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => handleDelete(app.appCode)}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <RiDeleteBinLine className="mr-2 size-4" /> Delete App
-                    </DropdownMenuItem>
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem
+                        onClick={() => handleDelete(app.appCode)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <RiDeleteBinLine className="mr-2 size-4" /> Delete App
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </TableCell>

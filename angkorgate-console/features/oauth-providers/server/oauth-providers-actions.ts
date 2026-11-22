@@ -2,7 +2,8 @@
 
 import "server-only"
 import { revalidatePath } from "next/cache"
-import { apiClient } from "@/lib/api-client"
+import { redirect } from "next/navigation"
+import { apiClient, ApiError } from "@/lib/api-client"
 import type { OAuthProvider, CreateOAuthProviderInput } from "../types/oauth-providers.types"
 
 export async function getOAuthProviders(): Promise<OAuthProvider[]> {
@@ -10,6 +11,9 @@ export async function getOAuthProviders(): Promise<OAuthProvider[]> {
     const res = await apiClient.get<OAuthProvider[]>("/admin/oauth/providers")
     return Array.isArray(res) ? res : []
   } catch (error) {
+    if (error instanceof ApiError && error.statusCode === 401) {
+      redirect("/login?unauthorized=1&redirect=/oauth-providers")
+    }
     console.error("Failed to fetch OAuth providers:", error)
     return []
   }

@@ -14,7 +14,7 @@ export default async function OidcPage() {
           <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
             OpenID Connect Provider
           </h1>
-          <p className="font-mono text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Discovery configuration metadata, token endpoints, and published cryptographic keys (JWKS).
           </p>
         </div>

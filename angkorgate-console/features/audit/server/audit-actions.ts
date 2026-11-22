@@ -1,7 +1,8 @@
 "use server"
 
 import "server-only"
-import { apiClient } from "@/lib/api-client"
+import { redirect } from "next/navigation"
+import { apiClient, ApiError } from "@/lib/api-client"
 import type { AuditLog, PaginatedAuditLogs } from "../types/audit.types"
 
 export async function getAuditLogs(query?: {
@@ -28,6 +29,9 @@ export async function getAuditLogs(query?: {
     }
     return { items: [], total: 0, page: 1, limit: 20 }
   } catch (error) {
+    if (error instanceof ApiError && error.statusCode === 401) {
+      redirect("/login?unauthorized=1&redirect=/audit")
+    }
     console.error("Failed to fetch audit logs:", error)
     return { items: [], total: 0, page: 1, limit: 20 }
   }
