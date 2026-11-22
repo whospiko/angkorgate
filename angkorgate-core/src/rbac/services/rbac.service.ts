@@ -119,7 +119,10 @@ export class RbacService {
     }
 
     async findAllRoles(): Promise<Role[]> {
-        return this.roleRepo.find({ order: { code: 'ASC' } });
+        return this.roleRepo.find({
+            relations: { rolePermissions: { permission: true } },
+            order: { code: 'ASC' },
+        });
     }
 
     async findRoleByIdOrFail(id: string): Promise<Role> {
