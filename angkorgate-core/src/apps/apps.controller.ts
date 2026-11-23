@@ -8,6 +8,7 @@ import {
     Param,
     Patch,
     Post,
+    Put,
     Query,
     UseGuards,
 } from '@nestjs/common';
@@ -60,17 +61,7 @@ export class AppsController {
     @ApiResponse({ status: 201, description: 'Application registered successfully' })
     @ApiResponse({ status: 400, description: 'Validation failed or invalid format' })
     create(@Body() dto: CreateAppDto) {
-        return this.apps.create({
-            appCode: dto.appCode,
-            name: dto.name,
-            clientSecret: dto.clientSecret ?? null,
-            oauthEnabled: dto.oauthEnabled ?? false,
-            enabledProviders: dto.enabledProviders ?? [],
-            passwordLoginEnabled: dto.passwordLoginEnabled ?? true,
-            registrationEnabled: dto.registrationEnabled ?? true,
-            emailVerificationRequired: dto.emailVerificationRequired ?? true,
-            allowedRedirectUrls: dto.allowedRedirectUrls ?? [],
-        });
+        return this.apps.create(dto);
     }
 
     @Patch(':code')
@@ -100,12 +91,28 @@ export class AppsController {
     @Post(':code/regenerate-secret')
     @HttpCode(HttpStatus.OK)
     @Permissions('app:write')
-    @ApiOperation({ summary: 'Regenerate client secret for an application' })
+    @ApiOperation({ summary: 'Regenerate client secret for an application with zero-downtime grace period' })
     @ApiParam({ name: 'code', description: 'Application code', example: 'clinic-prod' })
+    @ApiQuery({ name: 'gracePeriodHours', required: false, description: 'Hours before secondary secret expires', example: 24 })
     @ApiResponse({ status: 200, description: 'Client secret regenerated successfully' })
     @ApiResponse({ status: 404, description: 'Application not found' })
-    regenerateSecret(@Param('code') code: string) {
-        return this.apps.regenerateSecret(code);
+    regenerateSecret(
+        @Param('code') code: string,
+        @Query('gracePeriodHours') gracePeriodHours?: number,
+    ) {
+        return this.apps.regenerateSecret(code, gracePeriodHours ? Number(gracePeriodHours) : 24);
+    }
+
+    @Put(':code/scopes')
+    @Permissions('app:write')
+    @ApiOperation({ summary: 'Update scopes assigned to an application' })
+    @ApiParam({ name: 'code', description: 'Application code', example: 'clinic-prod' })
+    @ApiResponse({ status: 200, description: 'Scopes assigned successfully' })
+    setScopes(
+        @Param('code') code: string,
+        @Body('scopeIds') scopeIds: string[],
+    ) {
+        return this.apps.setScopes(code, scopeIds || []);
     }
 
     @Patch(':code/toggle')

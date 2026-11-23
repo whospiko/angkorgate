@@ -16,6 +16,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { OauthModule } from './oauth/oauth.module';
 import { AppsModule } from './apps/apps.module';
+import { ScopesModule } from './scopes/scopes.module';
 import { OidcModule } from './oidc/oidc.module';
 import { CacheModule } from './cache/cache.module';
 import { SystemModule } from './system/system.module';
@@ -55,6 +56,7 @@ import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
     NotificationsModule,
     OauthModule,
     AppsModule,
+    ScopesModule,
     OidcModule,
     CacheModule,
     SystemModule,

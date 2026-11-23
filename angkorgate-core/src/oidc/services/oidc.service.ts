@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { Provider, Configuration, KoaContextWithOIDC, JWK, ClientMetadata } from 'oidc-provider';
+import { Provider, Configuration, KoaContextWithOIDC, JWK, ClientMetadata, AccountClaims } from 'oidc-provider';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -63,18 +63,40 @@ export class OidcService implements OnModuleInit {
 
                 return {
                     accountId: id,
-                    async claims() {
-                        return {
+                    async claims(use?: string, scope?: string): Promise<AccountClaims> {
+                        const scopeList = typeof scope === 'string' ? scope.split(' ') : [];
+                        const shouldIncludeAll = !scope || scopeList.length === 0;
+
+                        const claimsObj: AccountClaims = {
                             sub: id,
-                            email: user.email,
-                            email_verified: user.isEmailVerified,
-                            phone: user.phone,
-                            phone_verified: user.isPhoneVerified,
-                            roles: roles,
-                            permissions: permissions,
-                            'https://angkorgate.com/roles': roles,
-                            'https://angkorgate.com/permissions': permissions,
                         };
+
+                        if (shouldIncludeAll || scopeList.includes('email')) {
+                            claimsObj.email = user.email;
+                            claimsObj.email_verified = user.isEmailVerified;
+                        }
+
+                        if (shouldIncludeAll || scopeList.includes('profile')) {
+                            claimsObj.name = user.email || id;
+                            claimsObj.preferred_username = user.email || id;
+                        }
+
+                        if (shouldIncludeAll || scopeList.includes('phone')) {
+                            claimsObj.phone = user.phone;
+                            claimsObj.phone_verified = user.isPhoneVerified;
+                        }
+
+                        if (shouldIncludeAll || scopeList.includes('roles')) {
+                            claimsObj.roles = roles;
+                            claimsObj['https://angkorgate.com/roles'] = roles;
+                        }
+
+                        if (shouldIncludeAll || scopeList.includes('permissions')) {
+                            claimsObj.permissions = permissions;
+                            claimsObj['https://angkorgate.com/permissions'] = permissions;
+                        }
+
+                        return claimsObj;
                     },
                 };
             },
@@ -83,12 +105,20 @@ export class OidcService implements OnModuleInit {
                 openid: ['sub'],
                 email: ['email', 'email_verified'],
                 phone: ['phone', 'phone_verified'],
-                profile: ['name', 'roles', 'permissions'],
+                profile: ['name', 'preferred_username', 'roles', 'permissions'],
                 roles: ['roles', 'https://angkorgate.com/roles'],
                 permissions: ['permissions', 'https://angkorgate.com/permissions'],
             },
 
-            scopes: ['openid', 'email', 'profile', 'phone', 'roles', 'permissions', 'offline_access'],
+            scopes: [
+                'openid',
+                'email',
+                'profile',
+                'phone',
+                'roles',
+                'permissions',
+                'offline_access',
+            ],
 
             features: {
                 devInteractions: { enabled: false },
@@ -103,19 +133,29 @@ export class OidcService implements OnModuleInit {
                 customizers: {
                     jwt: async (ctx: KoaContextWithOIDC, token: any, jwt: any) => {
                         if (token.accountId) {
-                            const roles = await this.rbacService.getUserRoleCodes(token.accountId);
-                            const permissions = await this.rbacService.getUserPermissions(token.accountId);
-                            jwt.payload.roles = roles;
-                            jwt.payload.permissions = permissions;
-                            jwt.payload['https://angkorgate.com/roles'] = roles;
-                            jwt.payload['https://angkorgate.com/permissions'] = permissions;
+                            const tokenScope = token.scope ? String(token.scope).split(' ') : [];
+                            const shouldIncludeAll = tokenScope.length === 0;
+
+                            if (shouldIncludeAll || tokenScope.includes('roles')) {
+                                const roles = await this.rbacService.getUserRoleCodes(token.accountId);
+                                jwt.payload.roles = roles;
+                                jwt.payload['https://angkorgate.com/roles'] = roles;
+                            }
+
+                            if (shouldIncludeAll || tokenScope.includes('permissions')) {
+                                const permissions = await this.rbacService.getUserPermissions(token.accountId);
+                                jwt.payload.permissions = permissions;
+                                jwt.payload['https://angkorgate.com/permissions'] = permissions;
+                            }
                         }
                     },
                 },
             },
 
             pkce: {
-                required: (ctx: KoaContextWithOIDC, client: any) => client.tokenEndpointAuthMethod === 'none',
+                required: (ctx: KoaContextWithOIDC, client: any) => {
+                    return client.tokenEndpointAuthMethod === 'none' || Boolean(client.require_pkce);
+                },
             },
 
             issueRefreshToken: (ctx: KoaContextWithOIDC, client: any) => {

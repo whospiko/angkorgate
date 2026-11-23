@@ -14,7 +14,7 @@ export const KNOWN_OAUTH_PROVIDERS = ['google', 'apple'] as const;
 
 export class CreateAppDto {
     @ApiProperty({
-        description: 'Unique lowercase kebab-case code for the application',
+        description: 'Unique lowercase kebab-case code for the application (Client ID)',
         example: 'clinic-prod',
     })
     @IsString()
@@ -33,6 +33,15 @@ export class CreateAppDto {
     name: string;
 
     @ApiPropertyOptional({
+        description: 'Application description',
+        example: 'Electronic health records and appointment portal',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(255)
+    description?: string;
+
+    @ApiPropertyOptional({
         description: 'Client secret for confidential OIDC clients. Omit for public clients with PKCE.',
         example: 'my-super-secret-client-key-32chars',
     })
@@ -40,6 +49,109 @@ export class CreateAppDto {
     @IsString()
     @MaxLength(255)
     clientSecret?: string;
+
+    @ApiPropertyOptional({
+        description: 'Root URL of the application',
+        example: 'https://clinic.example.com',
+    })
+    @IsOptional()
+    @IsString()
+    rootUrl?: string;
+
+    @ApiPropertyOptional({
+        description: 'Home/Base URL of the application',
+        example: 'https://clinic.example.com/home',
+    })
+    @IsOptional()
+    @IsString()
+    homeUrl?: string;
+
+    @ApiPropertyOptional({
+        description: 'Allowed OAuth/OIDC redirect URIs',
+        example: ['http://localhost:5173/callback', 'https://clinic.example.com/callback'],
+        type: [String],
+    })
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    validRedirectUris?: string[];
+
+    @ApiPropertyOptional({
+        description: 'Post-logout redirect URIs',
+        example: ['http://localhost:5173/logged-out', 'https://clinic.example.com/'],
+        type: [String],
+    })
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    validPostLogoutRedirectUris?: string[];
+
+    @ApiPropertyOptional({
+        description: 'Allowed Web Origins for CORS requests',
+        example: ['http://localhost:5173', 'https://clinic.example.com'],
+        type: [String],
+    })
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    webOrigins?: string[];
+
+    @ApiPropertyOptional({
+        description: 'Standard Authorization Code Flow enabled',
+        default: true,
+    })
+    @IsOptional()
+    @IsBoolean()
+    standardFlowEnabled?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Implicit Flow enabled (deprecated by OAuth 2.1)',
+        default: false,
+    })
+    @IsOptional()
+    @IsBoolean()
+    implicitFlowEnabled?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Direct Access Grants (Resource Owner Password Credentials) enabled',
+        default: false,
+    })
+    @IsOptional()
+    @IsBoolean()
+    directAccessGrantsEnabled?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Service Accounts (Machine-to-Machine client_credentials) enabled',
+        default: false,
+    })
+    @IsOptional()
+    @IsBoolean()
+    serviceAccountsEnabled?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Require Proof Key for Code Exchange (PKCE)',
+        default: true,
+    })
+    @IsOptional()
+    @IsBoolean()
+    requirePkce?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Whether this is a public client (SPA/Mobile) with no client secret',
+        default: false,
+    })
+    @IsOptional()
+    @IsBoolean()
+    isPublicClient?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'List of Scope IDs assigned to this client application',
+        type: [String],
+    })
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    scopeIds?: string[];
 
     @ApiPropertyOptional({
         description: 'Whether inbound OAuth federation is enabled for this app',
@@ -85,13 +197,12 @@ export class CreateAppDto {
     emailVerificationRequired?: boolean;
 
     @ApiPropertyOptional({
-        description: 'Allowed OAuth/OIDC redirect URIs',
-        example: ['http://localhost:5173/callback', 'https://clinic.app/callback'],
+        description: 'Allowed OAuth/OIDC redirect URIs (legacy field, syncs with validRedirectUris)',
+        example: ['http://localhost:5173/callback'],
         type: [String],
     })
     @IsOptional()
     @IsArray()
-    @ArrayNotEmpty()
     @IsString({ each: true })
     allowedRedirectUrls?: string[];
 }

@@ -33,21 +33,55 @@ export class TypeOrmOidcAdapter implements Adapter {
     }
 
     async find(id: string): Promise<AdapterPayload | undefined> {
-        // Dynamic client resolution via AppsService
+        // Dynamic client resolution via AppsService with full OIDC capabilities
         if (this.name === 'Client') {
             const app = await this.appsService.findByCode(id);
             if (!app) return undefined;
-            const isPublic = !app.clientSecret;
+
+            const isPublic = app.isPublicClient || !app.clientSecret;
+
+            const redirectUris =
+                app.validRedirectUris && app.validRedirectUris.length > 0
+                    ? app.validRedirectUris
+                    : app.allowedRedirectUrls && app.allowedRedirectUrls.length > 0
+                        ? app.allowedRedirectUrls
+                        : ['http://localhost:5173/callback'];
+
+            const postLogoutRedirectUris = app.validPostLogoutRedirectUris || [];
+
+            const grantTypes: string[] = [];
+            if (app.standardFlowEnabled) grantTypes.push('authorization_code');
+            if (app.implicitFlowEnabled) grantTypes.push('implicit');
+            if (app.directAccessGrantsEnabled) grantTypes.push('password');
+            if (app.serviceAccountsEnabled) grantTypes.push('client_credentials');
+            if (app.standardFlowEnabled || app.directAccessGrantsEnabled || app.serviceAccountsEnabled) {
+                grantTypes.push('refresh_token');
+            }
+            if (grantTypes.length === 0) {
+                grantTypes.push('authorization_code', 'refresh_token');
+            }
+
+            const responseTypes: string[] = [];
+            if (app.standardFlowEnabled) responseTypes.push('code');
+            if (app.implicitFlowEnabled) responseTypes.push('id_token token', 'id_token');
+            if (responseTypes.length === 0) responseTypes.push('code');
+
+            const allowedScopes =
+                app.allowedScopes && app.allowedScopes.length > 0
+                    ? app.allowedScopes.map((s) => s.name).join(' ')
+                    : 'openid profile email roles offline_access';
+
             return {
                 client_id: app.appCode,
                 client_name: app.name,
-                client_secret: app.clientSecret ?? undefined,
-                redirect_uris: app.allowedRedirectUrls && app.allowedRedirectUrls.length > 0
-                    ? app.allowedRedirectUrls
-                    : ['http://localhost:5173/callback'],
-                grant_types: ['authorization_code', 'refresh_token', 'client_credentials'],
-                response_types: ['code'],
+                client_secret: isPublic ? undefined : (app.clientSecret ?? undefined),
+                redirect_uris: redirectUris,
+                post_logout_redirect_uris: postLogoutRedirectUris,
+                grant_types: grantTypes,
+                response_types: responseTypes,
+                scope: allowedScopes,
                 token_endpoint_auth_method: isPublic ? 'none' : 'client_secret_basic',
+                require_pkce: app.requirePkce,
             } as unknown as AdapterPayload;
         }
 
