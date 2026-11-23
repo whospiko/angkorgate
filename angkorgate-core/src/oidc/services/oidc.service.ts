@@ -154,7 +154,7 @@ export class OidcService implements OnModuleInit {
 
             pkce: {
                 required: (ctx: KoaContextWithOIDC, client: any) => {
-                    return client.tokenEndpointAuthMethod === 'none' || Boolean(client.require_pkce);
+                    return Boolean(client.require_pkce);
                 },
             },
 
@@ -176,6 +176,10 @@ export class OidcService implements OnModuleInit {
                 end_session: '/session/end',
                 introspection: '/introspect',
                 revocation: '/revoke',
+            },
+
+            clientBasedCORS(ctx: any, origin: string, client: any) {
+                return true;
             },
         };
 

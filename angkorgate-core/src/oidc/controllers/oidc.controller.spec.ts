@@ -152,7 +152,7 @@ describe('OidcController', () => {
         });
 
         it('rejects if email or password missing', async () => {
-            await controller.login('interaction-123', { email: '' }, mockReq, mockRes);
+            await controller.login('interaction-123', { email: '', password: '' }, mockReq, mockRes);
             expect(mockRes.status).toHaveBeenCalledWith(400);
             expect(mockRes.json).toHaveBeenCalledWith({ error: 'Email and password are required' });
         });

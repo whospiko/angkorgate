@@ -128,6 +128,11 @@ export class CustomersService {
         return CustomerResponseDto.fromEntity(c);
     }
 
+    async findByUserId(userId: string): Promise<CustomerResponseDto | null> {
+        const c = await this.repo.findOne({ where: { userId } });
+        return c ? CustomerResponseDto.fromEntity(c) : null;
+    }
+
     async findByCodeOrFail(code: string): Promise<CustomerResponseDto> {
         const c = await this.repo.findOne({ where: { customerCode: code } });
         if (!c) throw new NotFoundException(`Customer ${code} not found`);

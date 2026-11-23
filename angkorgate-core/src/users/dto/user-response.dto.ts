@@ -26,6 +26,15 @@ export class UserResponseDto {
     @ApiProperty({ description: 'Indicates whether user must change password on next login', example: false })
     mustChangePassword: boolean;
 
+    @ApiProperty({ description: 'Number of failed consecutive login attempts', example: 0 })
+    failedAttempts: number;
+
+    @ApiPropertyOptional({ description: 'Timestamp until which account is locked', example: null, nullable: true })
+    lockedUntil: Date | null;
+
+    @ApiPropertyOptional({ description: 'Assigned role codes', example: ['ADMIN'], isArray: true })
+    roles?: string[];
+
     @ApiProperty({ description: 'Account creation timestamp', example: '2026-11-21T10:00:00.000Z' })
     createdAt: Date;
 
@@ -42,6 +51,8 @@ export class UserResponseDto {
         dto.isPhoneVerified = user.isPhoneVerified;
         dto.lastLoginAt = user.lastLoginAt;
         dto.mustChangePassword = user.mustChangePassword;
+        dto.failedAttempts = user.failedAttempts ?? 0;
+        dto.lockedUntil = user.lockedUntil ?? null;
         dto.createdAt = user.createdAt;
         dto.updatedAt = user.updatedAt;
         return dto;

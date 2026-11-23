@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import {
   Table,
   TableBody,
@@ -27,6 +28,7 @@ import {
   RiCheckLine,
   RiCloseLine,
   RiDeleteBinLine,
+  RiEyeLine,
 } from "@remixicon/react"
 import type { User } from "../types/users.types"
 import { toggleUserStatusAction, unlockUserAction, deleteUserAction } from "../server/users-actions"
@@ -94,9 +96,12 @@ export function UsersTable({ users }: UsersTableProps) {
           {users.map((u) => (
             <TableRow key={u.id} className="font-mono text-xs">
               <TableCell>
-                <div className="font-sans font-medium text-sm text-foreground">
-                  {u.email}
-                </div>
+                <Link
+                  href={`/users/${u.id}`}
+                  className="font-sans font-medium text-sm text-foreground hover:text-primary hover:underline transition-colors block"
+                >
+                  {u.email || u.phone || "Unnamed User"}
+                </Link>
                 <div className="font-mono text-[11px] text-muted-foreground truncate max-w-[220px]">
                   {u.id}
                 </div>
@@ -142,36 +147,50 @@ export function UsersTable({ users }: UsersTableProps) {
                 </div>
               </TableCell>
               <TableCell className="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    render={
-                      <Button variant="ghost" size="icon" className="size-8" disabled={loadingId === u.id}>
-                        <RiMoreLine className="size-4" />
-                      </Button>
-                    }
-                  />
-                  <DropdownMenuContent align="end" className="font-mono text-xs">
-                    <DropdownMenuGroup>
-                      <DropdownMenuLabel>User Actions</DropdownMenuLabel>
+                <div className="flex items-center justify-end gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1 font-mono text-xs"
+                    render={<Link href={`/users/${u.id}`} />}
+                  >
+                    <RiEyeLine className="size-3.5" />
+                    <span>View</span>
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <Button variant="ghost" size="icon" className="size-8" disabled={loadingId === u.id}>
+                          <RiMoreLine className="size-4" />
+                        </Button>
+                      }
+                    />
+                    <DropdownMenuContent align="end" className="font-mono text-xs">
+                      <DropdownMenuGroup>
+                        <DropdownMenuLabel>User Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem render={<Link href={`/users/${u.id}`} />}>
+                          <RiEyeLine className="mr-2 size-4" /> View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleToggle(u.id, u.isActive)}>
+                          {u.isActive ? "Deactivate User" : "Activate User"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleUnlock(u.id)}>
+                          <RiLockUnlockLine className="mr-2 size-4" /> Reset Failed Attempts
+                        </DropdownMenuItem>
+                      </DropdownMenuGroup>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleToggle(u.id, u.isActive)}>
-                        {u.isActive ? "Deactivate User" : "Activate User"}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleUnlock(u.id)}>
-                        <RiLockUnlockLine className="mr-2 size-4" /> Reset Failed Attempts
-                      </DropdownMenuItem>
-                    </DropdownMenuGroup>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuGroup>
-                      <DropdownMenuItem
-                        onClick={() => handleDelete(u.id, u.email)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <RiDeleteBinLine className="mr-2 size-4" /> Delete Account
-                      </DropdownMenuItem>
-                    </DropdownMenuGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      <DropdownMenuGroup>
+                        <DropdownMenuItem
+                          onClick={() => handleDelete(u.id, u.email || u.id)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <RiDeleteBinLine className="mr-2 size-4" /> Delete Account
+                        </DropdownMenuItem>
+                      </DropdownMenuGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </TableCell>
             </TableRow>
           ))}

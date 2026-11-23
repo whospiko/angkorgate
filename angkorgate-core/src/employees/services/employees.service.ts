@@ -56,6 +56,11 @@ export class EmployeesService {
         return EmployeeResponseDto.fromEntity(e);
     }
 
+    async findByUserId(userId: string): Promise<EmployeeResponseDto | null> {
+        const e = await this.repo.findOne({ where: { userId } });
+        return e ? EmployeeResponseDto.fromEntity(e) : null;
+    }
+
     async findByCodeOrFail(code: string): Promise<EmployeeResponseDto> {
         const e = await this.repo.findOne({ where: { employeeCode: code } });
         if (!e) throw new NotFoundException(`Employee ${code} not found`);

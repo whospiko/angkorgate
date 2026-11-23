@@ -65,8 +65,15 @@ export class UsersController {
     @ApiResponse({ status: 200, description: 'Paginated user list retrieved' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden (lacks user:read permission)' })
-    findAll(@Query() query: QueryUsersDto) {
-        return this.userService.findAll(query);
+    async findAll(@Query() query: QueryUsersDto) {
+        const result = await this.userService.findAll(query);
+        const dataWithRoles = await Promise.all(
+            result.data.map(async (u) => {
+                const roles = await this.rbacService.getUserRoleCodes(u.id);
+                return { ...u, roles };
+            }),
+        );
+        return { ...result, data: dataWithRoles };
     }
 
     @Get(':id')
@@ -78,10 +85,13 @@ export class UsersController {
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden (lacks user:read permission)' })
     @ApiResponse({ status: 404, description: 'User not found' })
-    findOne(
+    async findOne(
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<UserResponseDto> {
-        return this.userService.findByIdOrFail(id);
+        const user = await this.userService.findByIdOrFail(id);
+        const roles = await this.rbacService.getUserRoleCodes(id);
+        user.roles = roles;
+        return user;
     }
 
     @Get(':id/roles')

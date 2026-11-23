@@ -49,18 +49,81 @@ export function LoginForm({
     "Sign in to manage API routes, gateway policies, and OIDC identity."
   const [state, formAction, isPending] = useActionState(loginAction, null)
   const [showPassword, setShowPassword] = useState(false)
+  const [interactionPending, setInteractionPending] = useState(false)
+  const [interactionError, setInteractionError] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const redirectParam = searchParams.get("redirect") || "/dashboard"
+  const interactionParam = searchParams.get("interaction")
   const isUnauthorized =
-    searchParams.get("unauthorized") === "1" ||
-    (Boolean(searchParams.get("redirect")) &&
-      searchParams.get("redirect") !== "/" &&
-      searchParams.get("redirect") !== "/dashboard")
+    !interactionParam &&
+    (searchParams.get("unauthorized") === "1" ||
+      (Boolean(searchParams.get("redirect")) &&
+        searchParams.get("redirect") !== "/" &&
+        searchParams.get("redirect") !== "/dashboard"))
   const isExpired = searchParams.get("expired") === "1"
+
+  const handleInteractionSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    if (!interactionParam) return
+
+    e.preventDefault()
+    setInteractionPending(true)
+    setInteractionError(null)
+
+    const formData = new FormData(e.currentTarget)
+    const email = (formData.get("email") as string)?.trim()
+    const password = formData.get("password") as string
+
+    try {
+      const coreUrl =
+        process.env.NEXT_PUBLIC_CORE_API_URL || "http://localhost:8080"
+      const res = await fetch(
+        `${coreUrl}/oidc/interaction/${interactionParam}/login`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({ email, password }),
+        }
+      )
+
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setInteractionError(
+          data.message || data.error || "Authentication failed. Please check credentials."
+        )
+        setInteractionPending(false)
+        return
+      }
+
+      if (data.redirectTo) {
+        window.location.href = data.redirectTo.startsWith("http")
+          ? data.redirectTo
+          : `${coreUrl}${data.redirectTo}`
+      } else {
+        window.location.href = `${coreUrl}/oidc/auth/${interactionParam}`
+      }
+    } catch (err: unknown) {
+      setInteractionError(
+        err instanceof Error
+          ? err.message
+          : "Failed to connect to authentication server."
+      )
+      setInteractionPending(false)
+    }
+  }
+
+  const activeLoading = interactionParam ? interactionPending : isPending
+  const activeErrorMessage = interactionError || (state?.message && !state?.success ? state.message : null)
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <form action={formAction}>
+      <form
+        action={interactionParam ? undefined : formAction}
+        onSubmit={interactionParam ? handleInteractionSubmit : undefined}
+      >
         <input type="hidden" name="redirect" value={redirectParam} />
         <FieldGroup>
           <div className="flex flex-col items-center gap-2 text-center">
@@ -85,6 +148,22 @@ export function LoginForm({
               {appDescription}
             </FieldDescription>
           </div>
+
+          {/* OIDC Interactive Sign-in Notice Banner */}
+          {interactionParam && (
+            <div className="flex items-start gap-2.5 rounded-lg border border-primary/40 bg-primary/10 p-3 text-xs font-mono text-primary shadow-xs">
+              <RiShieldKeyholeLine className="mt-0.5 size-4 shrink-0" />
+              <div className="flex-1 space-y-1">
+                <div className="font-semibold uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <span className="inline-block size-1.5 rounded-full bg-primary animate-pulse" />
+                  OpenID Connect Authorization
+                </div>
+                <div className="text-xs text-foreground/90 leading-relaxed">
+                  An external application is requesting authorization. Sign in to grant access.
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 401 Unauthorized Notice Banner */}
           {isUnauthorized && !state?.message && (
@@ -122,7 +201,7 @@ export function LoginForm({
           )}
 
           {/* Authentication Failed / Invalid Credentials Error Banner */}
-          {state?.message && !state?.success && (
+          {activeErrorMessage && (
             <div className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs font-mono text-destructive shadow-xs">
               <RiAlertLine className="mt-0.5 size-4 shrink-0" />
               <div className="flex-1 space-y-1">
@@ -130,7 +209,7 @@ export function LoginForm({
                   <span className="inline-block size-1.5 rounded-full bg-destructive" />
                   Authentication Failed
                 </div>
-                <div className="text-xs leading-relaxed">{state.message}</div>
+                <div className="text-xs leading-relaxed">{activeErrorMessage}</div>
               </div>
             </div>
           )}
@@ -146,7 +225,7 @@ export function LoginForm({
               placeholder="admin@angkorgate.local"
               autoComplete="email"
               required
-              disabled={isPending}
+              disabled={activeLoading}
               className={cn(
                 "font-mono text-sm",
                 state?.errors?.email &&
@@ -180,7 +259,7 @@ export function LoginForm({
                 placeholder="••••••••••••"
                 autoComplete="current-password"
                 required
-                disabled={isPending}
+                disabled={activeLoading}
                 className={cn(
                   "font-mono text-sm pr-9",
                   state?.errors?.password &&
@@ -211,10 +290,10 @@ export function LoginForm({
           <Field>
             <Button
               type="submit"
-              disabled={isPending}
+              disabled={activeLoading}
               className="w-full font-mono"
             >
-              {isPending ? (
+              {activeLoading ? (
                 <>
                   <RiLoader4Line className="mr-2 size-4 animate-spin" />
                   Authenticating...

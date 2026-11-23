@@ -79,6 +79,15 @@ export class CustomersController {
         });
     }
 
+    @Get('by-user/:userId')
+    @Permissions('customer:read')
+    @ApiOperation({ summary: 'Get customer profile linked to a user account UUID' })
+    @ApiParam({ name: 'userId', description: 'User account UUID' })
+    @ApiResponse({ status: 200, description: 'Customer details or null if unlinked', type: CustomerResponseDto })
+    async findByUserId(@Param('userId', ParseUUIDPipe) userId: string) {
+        return this.customers.findByUserId(userId);
+    }
+
     @Get(':id')
     @Permissions('customer:read')
     @ApiOperation({ summary: 'Get customer profile by UUID' })

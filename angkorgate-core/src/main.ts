@@ -7,6 +7,13 @@ import { json, urlencoded } from 'express';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.enableCors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  });
+
   // 1. Add Bearer Auth to your DocumentBuilder config
   const config = new DocumentBuilder()
     .setTitle('AngkorGate IAM API')

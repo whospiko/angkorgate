@@ -78,6 +78,15 @@ export class EmployeesController {
         });
     }
 
+    @Get('by-user/:userId')
+    @Permissions('employee:read')
+    @ApiOperation({ summary: 'Get employee profile linked to a user account UUID' })
+    @ApiParam({ name: 'userId', description: 'User account UUID' })
+    @ApiResponse({ status: 200, description: 'Employee profile or null if unlinked', type: EmployeeResponseDto })
+    async findByUserId(@Param('userId', ParseUUIDPipe) userId: string) {
+        return this.employees.findByUserId(userId);
+    }
+
     @Get(':id')
     @Permissions('employee:read')
     @ApiOperation({ summary: 'Get employee profile by UUID' })

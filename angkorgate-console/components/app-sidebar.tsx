@@ -3,7 +3,6 @@
 import * as React from "react"
 import Link from "next/link"
 import { NavMain } from "@/components/nav-main"
-import { NavProjects } from "@/components/nav-projects"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
 import {
@@ -22,9 +21,7 @@ import {
   RiFileList3Line,
   RiBookOpenLine,
   RiServerLine,
-  RiShieldCheckLine,
   RiRadarLine,
-  RiPaletteLine,
 } from "@remixicon/react"
 import { useBranding } from "@/features/system"
 
@@ -96,9 +93,13 @@ const defaultNavData = {
     },
     {
       title: "API & Docs",
-      url: "http://localhost:8080/api#",
+      url: "/docs",
       icon: <RiBookOpenLine className="size-4" />,
       items: [
+        {
+          title: "Documentation",
+          url: "/docs",
+        },
         {
           title: "Swagger API Explorer",
           url: "http://localhost:8080/api#",
@@ -120,18 +121,6 @@ const defaultNavData = {
       title: "Cache Metrics",
       url: "http://localhost:8080/cache/status",
       icon: <RiRadarLine className="size-4" />,
-    },
-  ],
-  projects: [
-    {
-      name: "AngkorGate Core",
-      url: "http://localhost:8080",
-      icon: <RiServerLine className="size-4" />,
-    },
-    {
-      name: "OIDC Provider",
-      url: "http://localhost:8080/oidc",
-      icon: <RiShieldCheckLine className="size-4" />,
     },
   ],
 }
@@ -181,7 +170,6 @@ export function AppSidebar({ currentUser, ...props }: AppSidebarProps) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={defaultNavData.navMain} />
-        <NavProjects projects={defaultNavData.projects} />
         <NavSecondary items={defaultNavData.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
