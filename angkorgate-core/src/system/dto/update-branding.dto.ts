@@ -55,4 +55,9 @@ export class UpdateBrandingDto {
     @IsString()
     @MaxLength(255)
     footerText?: string;
+
+    @ApiPropertyOptional({ description: 'Allowed role codes permitted to access the administrative dashboard', example: ['ADMIN'], isArray: true })
+    @IsOptional()
+    @IsString({ each: true })
+    allowedDashboardRoles?: string[];
 }

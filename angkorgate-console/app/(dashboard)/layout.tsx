@@ -25,6 +25,21 @@ export default async function DashboardLayout({
 
   const branding = await getBranding()
 
+  // Enforce configurable dashboard access by role (default: ADMIN, supports multi-role)
+  const allowedRoles =
+    branding.allowedDashboardRoles && branding.allowedDashboardRoles.length > 0
+      ? branding.allowedDashboardRoles
+      : ["ADMIN"]
+
+  const userRoles = currentUser.roles || []
+  const hasAccess = userRoles.some((r) =>
+    allowedRoles.some((allowed) => allowed.toUpperCase() === r.toUpperCase())
+  )
+
+  if (!hasAccess) {
+    redirect("/forbidden")
+  }
+
   return (
     <BrandingProvider initialBranding={branding}>
       <div className="[--header-height:calc(--spacing(14))] min-h-svh flex flex-col">

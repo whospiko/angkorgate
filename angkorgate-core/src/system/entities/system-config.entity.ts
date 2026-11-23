@@ -35,6 +35,9 @@ export class SystemConfig {
     @Column({ name: 'footer_text', type: 'varchar', length: 255, nullable: true })
     footerText?: string | null;
 
+    @Column({ name: 'allowed_dashboard_roles', type: 'simple-array', nullable: true })
+    allowedDashboardRoles?: string[];
+
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 

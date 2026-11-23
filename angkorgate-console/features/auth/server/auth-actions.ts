@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 import { apiClient, ApiError } from "@/lib/api-client"
+import { getBranding } from "@/features/system/server/system-actions"
 import {
   LoginSchema,
   type AuthActionResult,
@@ -59,6 +60,35 @@ export async function loginAction(
     return {
       success: false,
       message: "Authentication response did not contain an access token.",
+    }
+  }
+
+  // Authorize dashboard access based on configured allowed roles (default: ADMIN)
+  let branding = null
+  try {
+    branding = await getBranding()
+  } catch {
+    // Backend fallback
+  }
+
+  const allowedRoles =
+    branding?.allowedDashboardRoles && branding.allowedDashboardRoles.length > 0
+      ? branding.allowedDashboardRoles
+      : ["ADMIN"]
+
+  const userRoles = authData.user?.roles || []
+  const hasAccess = userRoles.some((r) =>
+    allowedRoles.some((allowed) => allowed.toUpperCase() === r.toUpperCase())
+  )
+
+  if (!hasAccess) {
+    return {
+      success: false,
+      message: `Access denied. Your assigned role (${
+        userRoles.length > 0 ? userRoles.join(", ") : "CUSTOMER"
+      }) is not authorized to access the Admin Console. Configured access roles: ${allowedRoles.join(
+        ", "
+      )}.`,
     }
   }
 

@@ -101,4 +101,39 @@ describe("UpdateBrandingSchema validation", () => {
 
     assert.equal(result.success, false)
   })
+
+  it("validates and accepts allowedDashboardRoles with multi-role support", () => {
+    const result = UpdateBrandingSchema.safeParse({
+      appName: "Acme Identity",
+      allowedDashboardRoles: ["ADMIN", "MANAGER", "AUDITOR"],
+    })
+
+    assert.equal(result.success, true)
+    if (result.success) {
+      assert.deepEqual(result.data.allowedDashboardRoles, ["ADMIN", "MANAGER", "AUDITOR"])
+    }
+  })
+
+  it("evaluates multi-role access against configured allowedDashboardRoles accurately", () => {
+    const checkAccess = (userRoles: string[], allowedRoles: string[] = ["ADMIN"]) => {
+      return userRoles.some((r) =>
+        allowedRoles.some((allowed) => allowed.toUpperCase() === r.toUpperCase())
+      )
+    }
+
+    // Default configuration (ADMIN only)
+    assert.equal(checkAccess(["CUSTOMER"]), false)
+    assert.equal(checkAccess(["CUSTOMER", "ADMIN"]), true)
+    assert.equal(checkAccess(["ADMIN"]), true)
+
+    // Configured multi-role (ADMIN and MANAGER)
+    const configuredRoles = ["ADMIN", "MANAGER"]
+    assert.equal(checkAccess(["CUSTOMER"], configuredRoles), false)
+    assert.equal(checkAccess(["MANAGER"], configuredRoles), true)
+    assert.equal(checkAccess(["AUDITOR", "MANAGER"], configuredRoles), true)
+
+    // Admin adds CUSTOMER to allowed roles in the future
+    const expandedRoles = ["ADMIN", "CUSTOMER"]
+    assert.equal(checkAccess(["CUSTOMER"], expandedRoles), true)
+  })
 })

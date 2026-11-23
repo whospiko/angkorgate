@@ -13,6 +13,7 @@ export interface BrandingConfig {
   organizationName?: string | null
   supportEmail?: string | null
   footerText?: string | null
+  allowedDashboardRoles?: string[]
 }
 
 export interface SetupActionResult {

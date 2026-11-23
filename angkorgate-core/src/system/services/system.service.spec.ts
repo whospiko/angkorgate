@@ -30,6 +30,7 @@ describe('SystemService', () => {
         organizationName: null,
         supportEmail: null,
         footerText: null,
+        allowedDashboardRoles: ['ADMIN'],
         createdAt: new Date(),
         updatedAt: new Date(),
     };
@@ -189,6 +190,15 @@ describe('SystemService', () => {
             expect(auditService.log).toHaveBeenCalledWith(
                 expect.objectContaining({ action: 'system.branding.updated' }),
             );
+        });
+
+        it('updates and sanitizes allowedDashboardRoles', async () => {
+            const updated = await service.updateBranding(
+                { allowedDashboardRoles: ['admin', 'manager', 'developer', 'ADMIN'] },
+                'admin-1',
+            );
+
+            expect(updated.allowedDashboardRoles).toEqual(['ADMIN', 'MANAGER', 'DEVELOPER']);
         });
     });
 });

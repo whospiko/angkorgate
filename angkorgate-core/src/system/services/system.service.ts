@@ -46,7 +46,11 @@ export class SystemService {
                 id: 'default',
                 isInitialized: false,
                 appName: 'AngkorGate',
+                allowedDashboardRoles: ['ADMIN'],
             });
+            await this.configRepo.save(config);
+        } else if (!config.allowedDashboardRoles || config.allowedDashboardRoles.length === 0) {
+            config.allowedDashboardRoles = ['ADMIN'];
             await this.configRepo.save(config);
         }
         return config;
@@ -225,6 +229,12 @@ export class SystemService {
         if (dto.organizationName !== undefined) config.organizationName = dto.organizationName;
         if (dto.supportEmail !== undefined) config.supportEmail = dto.supportEmail;
         if (dto.footerText !== undefined) config.footerText = dto.footerText;
+        if (dto.allowedDashboardRoles !== undefined) {
+            const sanitized = Array.isArray(dto.allowedDashboardRoles)
+                ? Array.from(new Set(dto.allowedDashboardRoles.map((r) => r.trim().toUpperCase()).filter(Boolean)))
+                : [];
+            config.allowedDashboardRoles = sanitized.length > 0 ? sanitized : ['ADMIN'];
+        }
 
         const saved = await this.configRepo.save(config);
 

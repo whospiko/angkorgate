@@ -55,6 +55,7 @@ export const UpdateBrandingSchema = z.object({
     .optional()
     .or(z.literal("")),
   footerText: z.string().trim().max(255).optional(),
+  allowedDashboardRoles: z.array(z.string()).optional(),
 })
 
 export type InitialSetupFormData = z.infer<typeof InitialSetupSchema>

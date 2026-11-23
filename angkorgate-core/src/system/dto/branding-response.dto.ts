@@ -23,6 +23,9 @@ export class BrandingResponseDto {
     @ApiPropertyOptional({ description: 'Footer copyright or credit text' })
     footerText?: string | null;
 
+    @ApiProperty({ description: 'Allowed role codes permitted to access the administrative dashboard', example: ['ADMIN'], isArray: true })
+    allowedDashboardRoles: string[];
+
     static fromEntity(config: SystemConfig): BrandingResponseDto {
         return {
             appName: config.appName,
@@ -32,6 +35,9 @@ export class BrandingResponseDto {
             organizationName: config.organizationName ?? null,
             supportEmail: config.supportEmail ?? null,
             footerText: config.footerText ?? null,
+            allowedDashboardRoles: (config.allowedDashboardRoles && config.allowedDashboardRoles.length > 0)
+                ? config.allowedDashboardRoles
+                : ['ADMIN'],
         };
     }
 }

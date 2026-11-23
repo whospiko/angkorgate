@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   RiCommandLine,
   RiUpload2Line,
@@ -16,16 +17,19 @@ import {
   RiLoader4Line,
   RiLayoutLine,
   RiSparklingLine,
+  RiShieldUserLine,
 } from "@remixicon/react"
 import { updateBrandingAction } from "../server/system-actions"
 import type { BrandingConfig, BrandingActionResult } from "../types/branding.types"
+import type { Role } from "@/features/rbac/types/rbac.types"
 import { useBranding } from "./branding-provider"
 
 export interface ContentManagementFormProps {
   initialBranding: BrandingConfig
+  allRoles?: Role[]
 }
 
-export function ContentManagementForm({ initialBranding }: ContentManagementFormProps) {
+export function ContentManagementForm({ initialBranding, allRoles }: ContentManagementFormProps) {
   const { branding, updateBranding } = useBranding()
 
   const [appName, setAppName] = React.useState(branding.appName || initialBranding.appName || "AngkorGate")
@@ -35,6 +39,49 @@ export function ContentManagementForm({ initialBranding }: ContentManagementForm
   const [organizationName, setOrganizationName] = React.useState(branding.organizationName || initialBranding.organizationName || "")
   const [supportEmail, setSupportEmail] = React.useState(branding.supportEmail || initialBranding.supportEmail || "")
   const [footerText, setFooterText] = React.useState(branding.footerText || initialBranding.footerText || "")
+
+  const [selectedDashboardRoles, setSelectedDashboardRoles] = React.useState<string[]>(
+    branding.allowedDashboardRoles || initialBranding.allowedDashboardRoles || ["ADMIN"]
+  )
+
+  const availableRoles: Array<{ code: string; name: string; description?: string | null }> = React.useMemo(() => {
+    if (allRoles && allRoles.length > 0) {
+      const hasAdmin = allRoles.some((r) => r.code === "ADMIN")
+      const list = allRoles.map((r) => ({
+        code: r.code,
+        name: r.name,
+        description: r.description,
+      }))
+      if (!hasAdmin) {
+        list.unshift({
+          code: "ADMIN",
+          name: "Administrator",
+          description: "Full system administration & developer config",
+        })
+      }
+      return list
+    }
+    return [
+      { code: "ADMIN", name: "Administrator", description: "Full system administration & developer config" },
+      { code: "MANAGER", name: "Operations Manager", description: "Operations and management oversight" },
+      { code: "AUDITOR", name: "Security Auditor", description: "Audit trails and compliance reviewer" },
+      { code: "CUSTOMER", name: "Customer User", description: "End-user customer identity account" },
+    ]
+  }, [allRoles])
+
+  const handleToggleRole = (roleCode: string) => {
+    setSelectedDashboardRoles((prev) => {
+      if (prev.includes(roleCode)) {
+        if (prev.length <= 1) {
+          alert("At least one role must remain authorized to access the dashboard.")
+          return prev
+        }
+        return prev.filter((r) => r !== roleCode)
+      } else {
+        return [...prev, roleCode]
+      }
+    })
+  }
 
   const [state, formAction, isPending] = useActionState(
     async (prev: BrandingActionResult | null, formData: FormData) => {
@@ -235,6 +282,76 @@ export function ContentManagementForm({ initialBranding }: ContentManagementForm
                   />
                 </div>
 
+                {/* Dashboard Role Authorization (Multi-role support) */}
+                <div className="pt-4 border-t border-border/50 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="font-heading text-sm font-semibold flex items-center gap-2">
+                        <RiShieldUserLine className="size-4 text-primary" />
+                        Console Dashboard Access Roles
+                      </Label>
+                      <p className="font-mono text-xs text-muted-foreground">
+                        Configure which roles can access and manage this console. Multi-role supported.
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="font-mono text-xs">
+                      {selectedDashboardRoles.length} Allowed
+                    </Badge>
+                  </div>
+
+                  <div className="rounded-lg border border-border/50 overflow-hidden divide-y divide-border/40 font-mono text-xs">
+                    {availableRoles.map((role) => {
+                      const isChecked = selectedDashboardRoles.includes(role.code)
+                      return (
+                        <div
+                          key={role.code}
+                          onClick={() => handleToggleRole(role.code)}
+                          className={`flex items-center justify-between p-3 hover:bg-muted/30 cursor-pointer transition-colors ${
+                            isChecked ? "bg-primary/5" : ""
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Checkbox
+                              checked={isChecked}
+                              onCheckedChange={() => handleToggleRole(role.code)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <div>
+                              <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                                <span>{role.code}</span>
+                                {role.code === "ADMIN" && (
+                                  <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5">
+                                    DEFAULT
+                                  </Badge>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-muted-foreground font-sans block">
+                                {role.name || role.description || "System Access Role"}
+                              </span>
+                            </div>
+                          </div>
+                          <Badge variant={isChecked ? "outline" : "secondary"} className="text-[10px]">
+                            {isChecked ? "Authorized" : "Blocked"}
+                          </Badge>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {selectedDashboardRoles.map((roleCode) => (
+                    <input
+                      key={roleCode}
+                      type="hidden"
+                      name="allowedDashboardRoles"
+                      value={roleCode}
+                    />
+                  ))}
+
+                  <p className="font-mono text-[11px] text-muted-foreground">
+                    Users with roles not selected above (e.g. CUSTOMER) are blocked on login and denied access to all /dashboard routes.
+                  </p>
+                </div>
+
                 <div className="pt-2">
                   <Button type="submit" disabled={isPending} className="gap-2">
                     {isPending ? (
@@ -245,7 +362,7 @@ export function ContentManagementForm({ initialBranding }: ContentManagementForm
                     ) : (
                       <>
                         <RiCheckLine className="size-4" />
-                        Save Branding Changes
+                        Save Branding & Access Configuration
                       </>
                     )}
                   </Button>
@@ -310,6 +427,20 @@ export function ContentManagementForm({ initialBranding }: ContentManagementForm
                   <p className="font-mono text-xs text-muted-foreground">
                     {appDescription || "Enter your credentials to access the console"}
                   </p>
+                </div>
+              </div>
+
+              {/* Console Access Roles Preview */}
+              <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-1.5 font-mono text-xs">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">
+                  Authorized Console Roles
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {selectedDashboardRoles.map((r) => (
+                    <Badge key={r} variant="outline" className="text-[10px] bg-card border-primary/30">
+                      {r}
+                    </Badge>
+                  ))}
                 </div>
               </div>
 

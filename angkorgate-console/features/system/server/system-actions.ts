@@ -224,6 +224,8 @@ export async function updateBrandingAction(
   _prevState: BrandingActionResult | null,
   formData: FormData
 ): Promise<BrandingActionResult> {
+  const allowedRolesRaw = formData.getAll("allowedDashboardRoles").map(String).filter(Boolean)
+
   const rawData = {
     appName: formData.get("appName"),
     appDescription: formData.get("appDescription") || undefined,
@@ -232,6 +234,7 @@ export async function updateBrandingAction(
     organizationName: formData.get("organizationName") || undefined,
     supportEmail: formData.get("supportEmail") || undefined,
     footerText: formData.get("footerText") || undefined,
+    allowedDashboardRoles: allowedRolesRaw.length > 0 ? allowedRolesRaw : undefined,
   }
 
   const result = UpdateBrandingSchema.safeParse(rawData)
