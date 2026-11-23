@@ -30,6 +30,8 @@ import {
   RiLockLine,
   RiEyeLine,
   RiEyeOffLine,
+  RiAlertLine,
+  RiSearchLine,
 } from "@remixicon/react"
 import { createAppAction } from "../server/apps-actions"
 import type { Scope } from "@/features/scopes"
@@ -68,6 +70,7 @@ export function CreateClientWizard({ availableScopes = [] }: CreateClientWizardP
   const [selectedScopeIds, setSelectedScopeIds] = useState<string[]>(
     availableScopes.filter((s) => s.isDefault).map((s) => s.id)
   )
+  const [scopeFilter, setScopeFilter] = useState("")
 
   // JSON Import Dialog
   const [importOpen, setImportOpen] = useState(false)
@@ -151,45 +154,51 @@ export function CreateClientWizard({ availableScopes = [] }: CreateClientWizardP
     setLoading(true)
     setError(null)
 
-    const parseList = (text: string) =>
-      text
-        .split(/[\n,]/)
-        .map((s) => s.trim())
-        .filter(Boolean)
+    try {
+      const parseList = (text: string) =>
+        text
+          .split(/[\n,]/)
+          .map((s) => s.trim())
+          .filter(Boolean)
 
-    const res = await createAppAction({
-      appCode: appCode.trim(),
-      name: name.trim(),
-      description: description.trim() || undefined,
-      rootUrl: rootUrl.trim() || undefined,
-      homeUrl: homeUrl.trim() || undefined,
-      validRedirectUris: parseList(redirectUris),
-      validPostLogoutRedirectUris: parseList(postLogoutUris),
-      webOrigins: parseList(webOrigins),
-      isPublicClient,
-      standardFlowEnabled,
-      implicitFlowEnabled: false,
-      directAccessGrantsEnabled,
-      serviceAccountsEnabled,
-      requirePkce,
-      scopeIds: selectedScopeIds,
-      oauthEnabled: true,
-      enabledProviders: ["google", "apple"],
-      passwordLoginEnabled: true,
-      registrationEnabled: true,
-      emailVerificationRequired: true,
-    })
-
-    setLoading(false)
-    if (res.success && res.data) {
-      setCreatedData({
-        appCode: res.data.appCode,
-        name: res.data.name,
-        clientSecret: res.data.clientSecret,
-        isPublic: res.data.isPublicClient,
+      const res = await createAppAction({
+        appCode: appCode.trim(),
+        name: name.trim(),
+        description: description.trim() || undefined,
+        rootUrl: rootUrl.trim() || undefined,
+        homeUrl: homeUrl.trim() || undefined,
+        validRedirectUris: parseList(redirectUris),
+        validPostLogoutRedirectUris: parseList(postLogoutUris),
+        webOrigins: parseList(webOrigins),
+        isPublicClient,
+        standardFlowEnabled,
+        implicitFlowEnabled: false,
+        directAccessGrantsEnabled,
+        serviceAccountsEnabled,
+        requirePkce,
+        scopeIds: selectedScopeIds,
+        oauthEnabled: true,
+        enabledProviders: ["google", "apple"],
+        passwordLoginEnabled: true,
+        registrationEnabled: true,
+        emailVerificationRequired: true,
       })
-    } else {
-      setError(res.message || "Failed to register client application")
+
+      if (res.success && res.data) {
+        setCreatedData({
+          appCode: res.data.appCode,
+          name: res.data.name,
+          clientSecret: res.data.clientSecret,
+          isPublic: res.data.isPublicClient,
+        })
+      } else {
+        setError(res.message || "Failed to register client application")
+      }
+    } catch (err: any) {
+      console.error("Client registration error:", err)
+      setError(err?.message || "An unexpected error occurred while registering client.")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -209,6 +218,7 @@ export function CreateClientWizard({ availableScopes = [] }: CreateClientWizardP
     setPostLogoutUris("")
     setWebOrigins("")
     setSelectedScopeIds(availableScopes.filter((s) => s.isDefault).map((s) => s.id))
+    setScopeFilter("")
     setCreatedData(null)
     setError(null)
   }
@@ -323,18 +333,18 @@ export function CreateClientWizard({ availableScopes = [] }: CreateClientWizardP
             // Wizard Flow
             <div>
               <DialogHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between pr-8">
                   <DialogTitle className="font-heading text-lg">Register Client Application</DialogTitle>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="font-mono text-xs gap-1 text-muted-foreground hover:text-foreground"
+                    className="font-mono text-xs gap-1 text-muted-foreground hover:text-foreground shrink-0"
                     onClick={() => setImportOpen(true)}
                   >
                     <RiUploadCloudLine className="size-3.5" /> Import JSON
                   </Button>
                 </div>
-                <DialogDescription className="font-mono text-xs">
+                <DialogDescription className="font-mono text-xs text-muted-foreground">
                   Create an OpenID Connect & OAuth 2.0 client configuration.
                 </DialogDescription>
               </DialogHeader>
@@ -568,61 +578,95 @@ export function CreateClientWizard({ availableScopes = [] }: CreateClientWizardP
                     Select the scopes this client is authorized to request. Scopes filter which user claims and RBAC roles are embedded in the access and ID tokens.
                   </div>
 
-                  <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                  {/* Scopes Filter */}
+                  <div className="relative">
+                    <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground/60" />
+                    <Input
+                      value={scopeFilter}
+                      onChange={(e) => setScopeFilter(e.target.value)}
+                      placeholder="Filter scopes by name or claim..."
+                      className="pl-9 text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1.5 pt-1">
                     {availableScopes.length === 0 ? (
                       <p className="text-muted-foreground py-4 text-center">No custom scopes found. Default system scopes will apply.</p>
                     ) : (
-                      availableScopes.map((scope) => {
-                        const isSelected = selectedScopeIds.includes(scope.id)
-                        return (
-                          <div
-                            key={scope.id}
-                            onClick={() => toggleScope(scope.id)}
-                            className={`flex items-start justify-between p-2.5 rounded-lg border cursor-pointer select-none transition-colors ${
-                              isSelected
-                                ? "border-primary/50 bg-primary/5"
-                                : "border-border/50 hover:bg-muted/30"
-                            }`}
-                          >
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-foreground">{scope.name}</span>
-                                {scope.isDefault && (
-                                  <Badge variant="outline" className="text-[10px] font-mono py-0">
-                                    Default
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-muted-foreground font-sans line-clamp-1">
-                                {scope.description || scope.displayName}
-                              </p>
-                              {scope.claims && scope.claims.length > 0 && (
-                                <div className="flex gap-1 flex-wrap pt-0.5">
-                                  {scope.claims.map((claim) => (
-                                    <span
-                                      key={claim}
-                                      className="text-[10px] bg-muted px-1.5 py-0.2 rounded border border-border/40"
-                                    >
-                                      {claim}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
+                      availableScopes
+                        .filter((s) => {
+                          if (!scopeFilter) return true
+                          const q = scopeFilter.toLowerCase()
+                          return (
+                            s.name.toLowerCase().includes(q) ||
+                            (s.displayName && s.displayName.toLowerCase().includes(q)) ||
+                            (s.description && s.description.toLowerCase().includes(q)) ||
+                            s.claims?.some((c) => c.toLowerCase().includes(q))
+                          )
+                        })
+                        .map((scope) => {
+                          const isSelected = selectedScopeIds.includes(scope.id)
+                          return (
                             <div
-                              className={`size-4 rounded border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                              key={scope.id}
+                              onClick={() => toggleScope(scope.id)}
+                              className={`flex items-start justify-between p-3 rounded-lg border cursor-pointer select-none transition-colors ${
                                 isSelected
-                                  ? "bg-primary border-primary text-primary-foreground"
-                                  : "border-muted-foreground/40"
+                                  ? "border-primary/50 bg-primary/5"
+                                  : "border-border/50 hover:bg-muted/30"
                               }`}
                             >
-                              {isSelected && <RiCheckLine className="size-3" />}
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold text-foreground font-mono">{scope.name}</span>
+                                  {scope.displayName && scope.displayName !== scope.name && (
+                                    <span className="text-muted-foreground text-[11px] font-sans">
+                                      ({scope.displayName})
+                                    </span>
+                                  )}
+                                  {scope.isDefault && (
+                                    <Badge variant="outline" className="text-[10px] font-mono py-0">
+                                      Default
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-muted-foreground font-sans line-clamp-1">
+                                  {scope.description || scope.displayName}
+                                </p>
+                                {scope.claims && scope.claims.length > 0 && (
+                                  <div className="flex gap-1 flex-wrap pt-0.5">
+                                    {scope.claims.map((claim) => (
+                                      <span
+                                        key={claim}
+                                        className="text-[10px] bg-muted px-1.5 py-0.2 rounded border border-border/40 font-mono"
+                                      >
+                                        {claim}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <div
+                                className={`size-4 rounded border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                                  isSelected
+                                    ? "bg-primary border-primary text-primary-foreground"
+                                    : "border-muted-foreground/40 bg-background"
+                                }`}
+                              >
+                                {isSelected && <RiCheckLine className="size-3" />}
+                              </div>
                             </div>
-                          </div>
-                        )
-                      })
+                          )
+                        })
                     )}
                   </div>
+                </div>
+              )}
+
+              {error && (
+                <div className="font-mono text-xs text-destructive bg-destructive/10 p-2.5 rounded-md my-2 border border-destructive/20 flex items-start gap-2">
+                  <RiAlertLine className="size-4 shrink-0 mt-0.5" />
+                  <span>{error}</span>
                 </div>
               )}
 

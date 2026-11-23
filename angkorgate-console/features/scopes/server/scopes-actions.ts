@@ -1,14 +1,17 @@
 "use server"
 
-import "server-only"
 import { revalidatePath } from "next/cache"
-import { apiClient } from "@/lib/api-client"
+import { redirect } from "next/navigation"
+import { apiClient, ApiError } from "@/lib/api-client"
 import type { Scope, CreateScopeInput } from "../types/scopes.types"
 
 export async function getScopes(): Promise<Scope[]> {
   try {
     return await apiClient.get<Scope[]>("/admin/scopes")
   } catch (error) {
+    if (error instanceof ApiError && error.statusCode === 401) {
+      redirect("/login?unauthorized=1&redirect=/apps")
+    }
     console.error("Failed to fetch scopes:", error)
     return []
   }
