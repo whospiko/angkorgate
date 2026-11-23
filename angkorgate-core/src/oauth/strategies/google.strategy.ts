@@ -20,12 +20,24 @@ export class GoogleStrategy extends PassportStrategy(Strategy, GOOGLE_STRATEGY) 
         // Passport requires non-empty strings — this only registers the strategy
         // when we actually call new GoogleStrategy(). The module handles the gate.
         super({
-            clientID: clientId,
-            clientSecret,
+            clientID: clientId || 'placeholder-google-client-id',
+            clientSecret: clientSecret || 'placeholder-google-client-secret',
             callbackURL: callbackUrl,
             scope: ['email', 'profile'],
             state: false, // Required for /link flow to preserve state through Google
         });
+    }
+
+    /**
+     * Synchronize strategy credentials dynamically with latest DB config
+     */
+    updateCredentials(clientId: string, clientSecret?: string | null): void {
+        if ((this as any)._oauth2) {
+            (this as any)._oauth2._clientId = clientId;
+            if (clientSecret) {
+                (this as any)._oauth2._clientSecret = clientSecret;
+            }
+        }
     }
 
     async validate(

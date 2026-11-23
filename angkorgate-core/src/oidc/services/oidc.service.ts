@@ -51,6 +51,14 @@ export class OidcService implements OnModuleInit {
 
             cookies: {
                 keys: [cookieSecret],
+                short: {
+                    path: '/',
+                    sameSite: 'lax',
+                },
+                long: {
+                    path: '/',
+                    sameSite: 'lax',
+                },
             },
 
             clients: staticClients,
@@ -119,6 +127,8 @@ export class OidcService implements OnModuleInit {
                 'permissions',
                 'offline_access',
             ],
+
+            conformIdTokenClaims: false,
 
             features: {
                 devInteractions: { enabled: false },

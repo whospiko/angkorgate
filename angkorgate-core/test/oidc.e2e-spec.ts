@@ -80,6 +80,7 @@ describe('OIDC Protocol & Provider (e2e)', () => {
                     appCode: 'clinic-api',
                     name: 'Clinic Backend API',
                     clientSecret: 'super-secret-api-key',
+                    serviceAccountsEnabled: true,
                     allowedRedirectUrls: ['http://localhost:5173/callback'],
                 })
                 .expect(201);

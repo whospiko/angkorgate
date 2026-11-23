@@ -1,9 +1,38 @@
 import { Button } from "@/components/ui/button"
 
-export function OAuthProviders() {
+interface OAuthProvidersProps {
+  interaction?: string | null
+  redirect?: string | null
+}
+
+export function OAuthProviders({ interaction, redirect }: OAuthProvidersProps) {
+  const coreUrl =
+    process.env.NEXT_PUBLIC_CORE_API_URL || "http://localhost:8080"
+
+  const params = new URLSearchParams()
+  if (interaction) {
+    params.set("interaction", interaction)
+  } else {
+    // When signing in directly to AngkorGate Console:
+    // Route through /auth/callback so the console exchanges the ticket for session cookies
+    const callbackTarget = redirect && redirect.startsWith("/") ? redirect : "/dashboard"
+    const consoleOrigin =
+      typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"
+    const callbackUrl = `${consoleOrigin}/auth/callback?redirect=${encodeURIComponent(callbackTarget)}`
+    params.set("redirect", callbackUrl)
+  }
+
+  const queryString = params.toString() ? `?${params.toString()}` : ""
+  const googleAuthUrl = `${coreUrl}/auth/oauth/google${queryString}`
+
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <Button variant="outline" type="button" className="font-mono text-xs">
+      <Button
+        variant="outline"
+        type="button"
+        disabled
+        className="font-mono text-xs opacity-50 cursor-not-allowed"
+      >
         <svg
           className="size-4 mr-1.5"
           xmlns="http://www.w3.org/2000/svg"
@@ -16,7 +45,12 @@ export function OAuthProviders() {
         </svg>
         Apple
       </Button>
-      <Button variant="outline" type="button" className="font-mono text-xs">
+      <Button
+        variant="outline"
+        type="button"
+        render={<a href={googleAuthUrl} />}
+        className="font-mono text-xs"
+      >
         <svg
           className="size-4 mr-1.5"
           xmlns="http://www.w3.org/2000/svg"

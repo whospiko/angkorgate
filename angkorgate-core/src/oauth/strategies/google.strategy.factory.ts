@@ -12,8 +12,6 @@ export const GoogleStrategyProvider: Provider = {
     inject: [ConfigService],
     useFactory: (config: ConfigService) => {
         if (config.get<boolean>('oauth.enabled') !== true) return null;
-        const clientId = config.get<string>('oauth.google.clientId');
-        if (!clientId) return null;
         return new GoogleStrategy(config);
     },
 };

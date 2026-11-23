@@ -24,6 +24,7 @@ import { OauthTicketService } from '../services/oauth-ticket.service';
 import { OauthRedirectService } from '../services/oauth-redirect.service';
 import { GoogleOauthGuard } from '../guards/google-oauth.guard';
 import { OauthProfile } from '../interfaces/oauth-profile.interface';
+import { OidcService } from '../../oidc/services/oidc.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { SkipTransform } from '../../common/decorators/skip-transform.decorator';
@@ -43,6 +44,7 @@ export class OauthAuthController {
         private readonly login: OauthLoginService,
         private readonly redirects: OauthRedirectService,
         private readonly tickets: OauthTicketService,
+        private readonly oidcService: OidcService,
     ) { }
 
     /** Public: list enabled providers for the caller's app. */
@@ -85,12 +87,14 @@ export class OauthAuthController {
     @UseGuards(GoogleOauthGuard)
     @SkipTransform()
     @ApiOperation({ summary: 'Handle OAuth callback from Google and redirect with ticket' })
+    @ApiQuery({ name: 'state', required: false, description: 'OAuth state token' })
     @ApiQuery({ name: 'redirect', required: false, description: 'Frontend redirect URL' })
     @ApiQuery({ name: 'mode', required: false, enum: ['ticket', 'tokens'], description: 'Auth token dispatch mode' })
     @ApiResponse({ status: 302, description: 'Redirect to application frontend with ticket or tokens' })
     async googleCallback(
         @Req() req: Request,
         @Res() res: Response,
+        @Query('state') state?: string,
         @Query('redirect') redirect?: string,
         @Query('mode') mode?: 'ticket' | 'tokens',
     ) {
@@ -104,13 +108,47 @@ export class OauthAuthController {
             userAgent: req.headers['user-agent']?.toString(),
         });
 
+        // 1. Check if an active OIDC interaction session is embedded in state
+        let interactionUid: string | undefined;
+        let stateRedirect: string | undefined;
+        if (state) {
+            try {
+                const parsed = JSON.parse(
+                    Buffer.from(state, 'base64url').toString('utf8'),
+                );
+                if (typeof parsed === 'object' && parsed !== null) {
+                    interactionUid = parsed.interaction;
+                    stateRedirect = parsed.redirect;
+                }
+            } catch {
+                // Non-JSON or plain state token
+            }
+        }
+
+        if (interactionUid) {
+            const interactionResult = {
+                login: {
+                    accountId: result.userId,
+                    remember: true,
+                },
+            };
+            return await this.oidcService.oidc.interactionFinished(
+                req,
+                res,
+                interactionResult,
+                { mergeWithLastSubmission: false },
+            );
+        }
+
+        // 2. Direct Console / App login flow
         const tokens = result.tokens as {
             accessToken: string;
             refreshToken: string;
         };
 
+        const effectiveRedirect = redirect || stateRedirect;
         const targetBase = this.redirects.resolve(
-            redirect,
+            effectiveRedirect,
             (req as any).appContext ?? null,
         );
 

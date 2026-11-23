@@ -14,6 +14,7 @@ import { UsersModule } from '../users/users.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { CustomersModule } from '../customers/customers.module';
 import { AuthModule } from '../auth/auth.module';
+import { OidcModule } from '../oidc/oidc.module';
 import { OauthAccountsService } from './services/oauth-accounts.service';
 import { OauthRedirectService } from './services/oauth-redirect.service';
 import { OauthTicketService } from './services/oauth-ticket.service';
@@ -26,6 +27,7 @@ import { OauthTicket } from './entities/oauth-ticket.entity';
         RbacModule,
         CustomersModule,
         AuthModule, // for issueTokensForUser
+        OidcModule,
     ],
     controllers: [OauthAuthController, OauthAdminController],
     providers: [

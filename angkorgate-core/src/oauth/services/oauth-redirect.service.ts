@@ -23,15 +23,26 @@ export class OauthRedirectService {
         app: AppSetting | null,
     ): string {
         const fallback =
-            this.config.get<string>('oauth.webUrl') ?? 'http://localhost:5173';
+            this.config.get<string>('CONSOLE_URL') ??
+            this.config.get<string>('APP_WEB_URL') ??
+            this.config.get<string>('oauth.webUrl') ??
+            'http://localhost:3000';
 
         if (!redirect) return fallback;
 
         let parsed: URL;
-        try {
-            parsed = new URL(redirect);
-        } catch {
-            throw new ForbiddenException('Invalid redirect URL');
+        if (redirect.startsWith('/')) {
+            try {
+                parsed = new URL(redirect, fallback);
+            } catch {
+                throw new ForbiddenException('Invalid redirect URL');
+            }
+        } else {
+            try {
+                parsed = new URL(redirect);
+            } catch {
+                throw new ForbiddenException('Invalid redirect URL');
+            }
         }
 
         const isDev = this.config.get<string>('NODE_ENV') !== 'production';
@@ -40,6 +51,19 @@ export class OauthRedirectService {
         }
 
         if (!app) {
+            const consoleUrl =
+                this.config.get<string>('CONSOLE_URL') ||
+                this.config.get<string>('APP_WEB_URL');
+            if (consoleUrl) {
+                try {
+                    const consoleParsed = new URL(consoleUrl);
+                    if (parsed.origin === consoleParsed.origin) {
+                        return parsed.toString();
+                    }
+                } catch {
+                    // Ignore malformed console URL
+                }
+            }
             throw new ForbiddenException(
                 'Redirect not allowed: no app context and app not whitelisted',
             );

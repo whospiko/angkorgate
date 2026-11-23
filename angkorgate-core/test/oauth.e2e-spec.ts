@@ -49,6 +49,20 @@ describe('OAuth (e2e)', () => {
         expect(res.body.providers).toContainEqual({ code: 'google', name: 'Google' });
     });
 
+    it('redirects to Google using dynamic client_id from database', async () => {
+        await dataSource.query(
+            `INSERT INTO oauth_providers (code, name, is_active, client_id, client_secret)
+             VALUES ('google', 'Google', true, 'dynamic-google-id-12345', 'secret-xyz')`,
+        );
+
+        const res = await request(app.getHttpServer())
+            .get('/auth/oauth/google')
+            .expect(302);
+
+        expect(res.header.location).toContain('accounts.google.com');
+        expect(res.header.location).toContain('client_id=dynamic-google-id-12345');
+    });
+
     it('404s when provider not active', async () => {
         await dataSource.query(
             `INSERT INTO oauth_providers (code, name, is_active, client_id)

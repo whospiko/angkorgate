@@ -306,7 +306,7 @@ export function LoginForm({
 
           <FieldSeparator className="font-mono text-xs">Or continue with</FieldSeparator>
 
-          <OAuthProviders />
+          <OAuthProviders interaction={interactionParam} redirect={redirectParam} />
         </FieldGroup>
       </form>
 

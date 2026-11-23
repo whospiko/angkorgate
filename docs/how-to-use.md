@@ -32,7 +32,16 @@ This document is the definitive technical reference and hands-on testing guide f
    - [Local Authentication & Session Protection](#local-authentication--session-protection)
    - [Brute-Force Protection & Account Lockouts](#brute-force-protection--account-lockouts)
    - [TOTP 2FA & Emergency Backup Codes](#totp-2fa--emergency-backup-codes)
-8. [Feature 6: External Social Identity Providers](#8-feature-6-external-social-identity-providers)
+8. [Feature 6: External Social Identity Providers & Federated OIDC Brokering](#8-feature-6-external-social-identity-providers--federated-oidc-brokering)
+   - [The Identity Brokering Concept](#the-identity-brokering-concept)
+   - [Architecture & Sequence Flows](#architecture--sequence-flows)
+     - [Flow A: Downstream App OIDC Brokering](#flow-a-downstream-app-oidc-brokering)
+     - [Flow B: Direct AngkorGate Console Login](#flow-b-direct-angkorgate-console-login)
+   - [Step-by-Step Google Cloud Console Setup](#step-by-step-google-cloud-console-setup)
+   - [Configuring AngkorGate Console](#configuring-angkorgate-console)
+   - [Dynamic Strategy Synchronization Engine](#dynamic-strategy-synchronization-engine)
+   - [Single-Use Ticket Redemption & Root Session Scoping](#single-use-ticket-redemption--root-session-scoping)
+   - [End-to-End Testing & Verification Guide](#end-to-end-testing--verification-guide)
 9. [Feature 7: System Monitoring, Distributed Cache & Audit Trail](#9-feature-7-system-monitoring-distributed-cache--audit-trail)
 10. [Developer CLI Testing Playbook (cURL Commands)](#10-developer-cli-testing-playbook-curl-commands)
 11. [Database Schema Reference](#11-database-schema-reference)
@@ -369,12 +378,171 @@ In addition to role hierarchies, AngkorGate supports user-level exception overri
 
 ---
 
-## 8. Feature 6: External Social Identity Providers
+## 8. Feature 6: External Social Identity Providers & Federated OIDC Brokering
 
-AngkorGate enables federated identity at **Console > OAuth Providers** (`http://localhost:3000/oauth-providers`):
-- **Supported Providers:** Google, Apple (extensible to GitHub, Microsoft Azure AD).
-- **Zero-Code Console Config:** Toggle providers ON/OFF and input Client ID, Client Secret, and Scopes directly in the dashboard.
-- **Automatic Account Linking:** When a user logs in via Google with an email matching an existing local account, AngkorGate securely links the identity without creating duplicate user records.
+AngkorGate acts as a complete **Federated Identity Broker** and OIDC Provider, configured at **Console > OAuth Providers** (`http://localhost:3000/oauth-providers`).
+
+### The Identity Brokering Concept
+When developers build modern web applications, mobile apps, or microservices behind AngkorGate:
+- **Zero Third-Party SDKs in Downstream Apps:** Downstream developers **do not** need to install Google/Apple SDKs, register OAuth apps with Google for each service, or handle complex external tokens.
+- **Single Standard Integration:** Downstream apps only integrate with AngkorGate via standard OpenID Connect 1.0 (`/oidc/auth`).
+- **Unified Identity & Central RBAC:** When a user signs in via Google, AngkorGate authenticates the identity, creates or links the local user record, attaches configured organization roles/permissions, and mints standard RS256-signed AngkorGate tokens (`id_token`, `access_token`) for the downstream app.
+
+---
+
+### Architecture & Sequence Flows
+
+AngkorGate supports two distinct Google OAuth journeys:
+
+#### Flow A: Downstream App OIDC Brokering (Federated Sign-In)
+When a third-party application or client initiates an OIDC authorization code flow:
+
+```
+[Downstream App]              [AngkorGate Core]               [AngkorGate Console]             [Google Identity]
+      |                               |                                |                               |
+      | 1. GET /oidc/auth             |                                |                               |
+      |------------------------------>|                                |                               |
+      |                               | 2. 303 Redirect to Login       |                               |
+      |                               |    /login?interaction=<uid>    |                               |
+      |                               |------------------------------->|                               |
+      |                               |                                |                               |
+      |                               | 3. Click "Google" button       |                               |
+      |                               |    GET /auth/oauth/google      |                               |
+      |                               |    ?interaction=<uid>          |                               |
+      |                               |<-------------------------------|                               |
+      |                               |                                                                |
+      |                               | 4. 302 Redirect to Google OAuth Consent                        |
+      |                               |--------------------------------------------------------------->|
+      |                               |                                                                |
+      |                               | 5. Google Callback with Auth Code                              |
+      |                               |<---------------------------------------------------------------|
+      |                               |                                                                |
+      |                               | 6. Exchange code -> fetch Google Profile                       |
+      |                               |    Create / Link local user account                            |
+      |                               |    Call oidc.interactionFinished(req, res, { login })          |
+      |                               |                                                                |
+      | 7. 303 Redirect to Downstream Callback with AngkorGate Code                                    |
+      |    https://downstream-app.com/callback?code=AGT_CODE&state=...                                |
+      |<------------------------------|                                                                |
+      |                               |                                                                |
+      | 8. POST /oidc/token           |                                                                |
+      |------------------------------>|                                                                |
+      | 9. 200 OK (AngkorGate Access Token & ID Token with user claims)                                |
+      |<------------------------------|                                                                |
+```
+
+#### Flow B: Direct AngkorGate Console Login (Administrative Sign-In)
+When an administrator logs directly into AngkorGate Console (`http://localhost:3000/login`):
+
+```
+[Admin Browser]                [AngkorGate Console]            [AngkorGate Core]              [Google Identity]
+      |                                |                               |                               |
+      | 1. Click "Google" on /login    |                               |                               |
+      |------------------------------->|                               |                               |
+      |                                | 2. Redirect to Core           |                               |
+      |                                |    GET /auth/oauth/google     |                               |
+      |                                |    ?redirect=/auth/callback   |                               |
+      |                                |------------------------------>|                               |
+      |                                |                               | 3. Redirect to Google Consent |
+      |                                |                               |------------------------------>|
+      |                                |                               |                               |
+      |                                |                               | 4. Google Callback            |
+      |                                |                               |<------------------------------|
+      |                                |                               | 5. Verify & Issue Ticket      |
+      |                                | 6. Redirect to Console        |    (Single-use, 60s TTL)      |
+      |                                |    /auth/callback?ticket=TKT  |                               |
+      |                                |<------------------------------|                               |
+      |                                |                               |                               |
+      |                                | 7. POST /auth/oauth/ticket    |                               |
+      |                                |------------------------------>|                               |
+      |                                | 8. 200 OK { accessToken, ... }|                               |
+      |                                |<------------------------------|                               |
+      |                                |                               |                               |
+      |                                | 9. Verify Role (ADMIN) & Set HTTP-Only Session Cookies        |
+      | 10. Redirect to /dashboard     |    angkorgate_token, angkorgate_refresh_token, angkorgate_user |
+      |<-------------------------------|                                                               |
+```
+
+---
+
+### Step-by-Step Google Cloud Console Setup
+
+1. Open [Google Cloud Console Credentials](https://console.cloud.google.com/apis/credentials).
+2. Click **"+ Create Credentials"** > **"OAuth client ID"**.
+3. Select **Application type:** `Web application`.
+4. Configure URIs:
+   - **Name:** `AngkorGate Auth Engine`
+   - **Authorized JavaScript origins:**
+     ```
+     http://localhost:3000
+     ```
+   - **Authorized redirect URIs:**
+     ```
+     http://localhost:8080/auth/oauth/google/callback
+     ```
+5. Click **"Save"**. Copy the generated **Client ID** and **Client Secret**.
+
+---
+
+### Configuring AngkorGate Console
+
+1. Navigate to **Console > OAuth Identity Providers** (`http://localhost:3000/oauth-providers`).
+2. Click **"+ Add Provider"** or edit the existing **Google** entry.
+3. Fill in the credentials:
+   - **Provider:** `Google`
+   - **Client ID:** `your-client-id.apps.googleusercontent.com`
+   - **Client Secret:** `GOCSPX-your-secret`
+   - **Scopes:** `openid email profile`
+   - **Status:** `Active`
+4. Click **"Save Provider"**.
+
+---
+
+### Dynamic Strategy Synchronization Engine
+
+Traditional NestJS / Passport architectures require a server restart when OAuth environment variables change. AngkorGate implements a zero-downtime dynamic strategy reload pattern:
+- **`GoogleOauthGuard`**: Intercepts every incoming `/auth/oauth/google*` request.
+- **Real-Time Strategy Refresh**: Reads the latest active credentials from the `oauth_providers` PostgreSQL table via `OauthConfigService`.
+- **Hot Replacement**: Unregisters and re-instantiates `GoogleStrategy` in `passport` on the fly. You can rotate Google Client Secrets in the Console without restarting the backend process!
+
+---
+
+### Single-Use Ticket Redemption & Root Session Scoping
+
+To ensure bulletproof enterprise security:
+1. **OIDC Root Cookie Scoping**:
+   OIDC provider session cookies (`_session`, `_session.legacy`) are configured in `OidcService` with:
+   - `path: '/'` (root scoped so interaction state is accessible across `/oidc` and `/login`)
+   - `sameSite: 'lax'`
+2. **Safe Token Dispatch (Ticket Mode)**:
+   Tokens are never exposed in URL query parameters. Instead:
+   - Core issues an ephemeral, single-use `ticket` (60-second TTL) stored in distributed cache.
+   - Frontend console redeems the ticket server-side via `POST /auth/oauth/ticket`.
+3. **Response Envelope Unwrapping**:
+   All core API endpoints are wrapped by `TransformInterceptor` (`{ success: true, statusCode: 200, data: ... }`). The console route handler seamlessly unwraps the payload using `apiClient`.
+4. **Direct Redirect Cookie Binding**:
+   In Next.js App Router route handlers (`app/auth/callback/route.ts`), cookies must be directly bound to the `NextResponse.redirect(...)` object to prevent cookie loss during 302/307 redirects.
+
+---
+
+### End-to-End Testing & Verification Guide
+
+#### Test 1: Testing Federated OIDC Login via OIDC Debugger
+1. Open [https://oidcdebugger.com/](https://oidcdebugger.com/).
+2. Set Authorize URI to `http://localhost:8080/oidc/auth`, Client ID to `demo-app`, and Redirect URI to `https://oidcdebugger.com/debug`.
+3. Click **"Send Request"**.
+4. You will be redirected to `http://localhost:3000/login?interaction=<uid>`.
+5. Click **"Continue with Google"**.
+6. Select your Google account and grant consent.
+7. Google redirects to AngkorGate Core -> AngkorGate automatically finalizes the OIDC interaction -> redirects back to `https://oidcdebugger.com/debug?code=AGT_CODE...`.
+8. Click **"Exchange code"** on OIDC Debugger. Both `access_token` and `id_token` are successfully issued with your Google-authenticated user identity!
+
+#### Test 2: Testing Direct Console Admin Sign-In
+1. Ensure your user email has the `ADMIN` role in AngkorGate (e.g. `hengkakada899@gmail.com`).
+2. Navigate to `http://localhost:3000/login`.
+3. Click **"Google"**.
+4. Select your authorized Google account.
+5. AngkorGate verifies your account, validates the `ADMIN` role, sets `angkorgate_token`, and seamlessly redirects you to **`http://localhost:3000/dashboard`**.
 
 ---
 
@@ -494,3 +662,6 @@ Key tables managed by AngkorGate in PostgreSQL:
 | **`PKCE verification failed`** | Missing or incorrect `code_verifier` at token exchange. | Ensure PKCE (SHA-256) is checked in your test client and the unhashed verifier is passed to `/oidc/token`. |
 | **Redirected to port 5173 instead of 3000** | `CONSOLE_URL` defaulted to 5173 in `.env`. | Set `CONSOLE_URL=http://localhost:3000` and `APP_WEB_URL=http://localhost:3000` in `angkorgate-core/.env`. |
 | **401 Unauthorized accessing `/users` or `/admin/apps`** | Admin JWT token expired or missing in request header. | Re-authenticate via `/auth/login` to obtain a fresh Bearer token or sign in again via the Console UI. |
+| **`Error 401: deleted_client` on Google consent** | Google OAuth Client ID deleted in Google Cloud Console or mismatched. | Create fresh OAuth 2.0 Web Client credentials in Google Cloud Console, ensure redirect URI is `http://localhost:8080/auth/oauth/google/callback`, and update provider in AngkorGate Console. |
+| **`403 Forbidden: Invalid redirect URL`** | Relative redirect path (e.g. `/dashboard`) rejected by validator. | `OauthRedirectService` supports relative URLs against `CONSOLE_URL` / `APP_WEB_URL` and whitelisted console origins. |
+| **`401 UNAUTHORIZED` bouncing to `/login?redirect=/dashboard&unauthorized=1`** | Session cookies not attached to `NextResponse.redirect` or user lacks `ADMIN` role. | Next.js route handlers must attach cookies directly via `response.cookies.set(...)`. Ensure the user has role `ADMIN` in PostgreSQL (`user_roles` table). |
