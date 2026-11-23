@@ -59,7 +59,7 @@ export default function RootLayout({
       suppressHydrationWarning
       className={cn("dark antialiased", ggSans.variable, jetbrainsMono.variable)}
     >
-      <body className="font-sans">
+      <body className="font-sans" suppressHydrationWarning>
         <ThemeProvider>
           <TooltipProvider>{children}</TooltipProvider>
         </ThemeProvider>

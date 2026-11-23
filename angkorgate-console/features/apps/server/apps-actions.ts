@@ -1,10 +1,9 @@
 "use server"
 
-import "server-only"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { apiClient, ApiError } from "@/lib/api-client"
-import type { AppSetting, CreateAppInput } from "../types/apps.types"
+import type { AppSetting, CreateAppInput, UpdateAppInput } from "../types/apps.types"
 
 export async function getApps(): Promise<AppSetting[]> {
   try {
@@ -39,6 +38,19 @@ export async function createAppAction(
   }
 }
 
+export async function updateAppAction(
+  code: string,
+  input: UpdateAppInput
+): Promise<{ success: boolean; message?: string; data?: AppSetting }> {
+  try {
+    const updated = await apiClient.patch<AppSetting>(`/admin/apps/${encodeURIComponent(code)}`, input)
+    revalidatePath("/apps")
+    return { success: true, data: updated }
+  } catch (error: any) {
+    return { success: false, message: error.message || "Failed to update application" }
+  }
+}
+
 export async function deleteAppAction(
   code: string
 ): Promise<{ success: boolean; message?: string }> {
@@ -69,15 +81,42 @@ export async function toggleAppFeatureAction(
 }
 
 export async function regenerateSecretAction(
-  code: string
-): Promise<{ success: boolean; clientSecret?: string; message?: string }> {
+  code: string,
+  gracePeriodHours: number = 24
+): Promise<{
+  success: boolean
+  clientSecret?: string
+  secondaryClientSecret?: string | null
+  secondarySecretExpiresAt?: string | null
+  message?: string
+}> {
   try {
-    const res = await apiClient.post<{ clientSecret: string }>(
-      `/admin/apps/${encodeURIComponent(code)}/regenerate-secret`
-    )
+    const res = await apiClient.post<{
+      clientSecret: string
+      secondaryClientSecret?: string | null
+      secondarySecretExpiresAt?: string | null
+    }>(`/admin/apps/${encodeURIComponent(code)}/regenerate-secret?gracePeriodHours=${gracePeriodHours}`)
     revalidatePath("/apps")
-    return { success: true, clientSecret: res.clientSecret }
+    return {
+      success: true,
+      clientSecret: res.clientSecret,
+      secondaryClientSecret: res.secondaryClientSecret,
+      secondarySecretExpiresAt: res.secondarySecretExpiresAt,
+    }
   } catch (error: any) {
     return { success: false, message: error.message || "Failed to regenerate secret" }
+  }
+}
+
+export async function updateAppScopesAction(
+  code: string,
+  scopeIds: string[]
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    await apiClient.put(`/admin/apps/${encodeURIComponent(code)}/scopes`, { scopeIds })
+    revalidatePath("/apps")
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, message: error.message || "Failed to update scopes" }
   }
 }
