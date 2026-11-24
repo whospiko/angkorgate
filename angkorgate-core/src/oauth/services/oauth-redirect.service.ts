@@ -26,7 +26,7 @@ export class OauthRedirectService {
             this.config.get<string>('CONSOLE_URL') ??
             this.config.get<string>('APP_WEB_URL') ??
             this.config.get<string>('oauth.webUrl') ??
-            'http://localhost:3000';
+            'http://localhost:4000';
 
         if (!redirect) return fallback;
 

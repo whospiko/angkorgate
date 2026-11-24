@@ -35,7 +35,7 @@ export class OidcService implements OnModuleInit {
                 client_id: envClientId,
                 client_name: 'Default Client Application',
                 client_secret: envSecret,
-                redirect_uris: ['http://localhost:5173/callback', 'http://localhost:3000/callback'],
+                redirect_uris: ['http://localhost:5173/callback', 'http://localhost:4000/callback', 'http://localhost:3000/callback'],
                 grant_types: ['authorization_code', 'refresh_token', 'client_credentials'],
                 response_types: ['code'],
                 token_endpoint_auth_method: envSecret ? 'client_secret_basic' : 'none',

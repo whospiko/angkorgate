@@ -206,9 +206,9 @@ export class DevBootstrapService {
                 directAccessGrantsEnabled: true,
                 serviceAccountsEnabled: true,
                 requirePkce: true,
-                validRedirectUris: ['http://localhost:5173/callback', 'http://localhost:3000/callback'],
-                validPostLogoutRedirectUris: ['http://localhost:5173', 'http://localhost:3000'],
-                webOrigins: ['http://localhost:5173', 'http://localhost:3000'],
+                validRedirectUris: ['http://localhost:4000/callback', 'http://localhost:3000/callback', 'http://localhost:5173/callback'],
+                validPostLogoutRedirectUris: ['http://localhost:4000', 'http://localhost:3000', 'http://localhost:5173'],
+                webOrigins: ['http://localhost:4000', 'http://localhost:3000', 'http://localhost:5173'],
                 allowedScopes: defaultScopes,
             });
             await appRepo.save(clinicApp);
@@ -227,9 +227,9 @@ export class DevBootstrapService {
                 directAccessGrantsEnabled: false,
                 serviceAccountsEnabled: false,
                 requirePkce: true,
-                validRedirectUris: ['http://localhost:3000/callback', 'http://localhost:5173/callback'],
-                validPostLogoutRedirectUris: ['http://localhost:3000', 'http://localhost:5173'],
-                webOrigins: ['http://localhost:3000', 'http://localhost:5173'],
+                validRedirectUris: ['http://localhost:4000/callback', 'http://localhost:3000/callback', 'http://localhost:5173/callback'],
+                validPostLogoutRedirectUris: ['http://localhost:4000', 'http://localhost:3000', 'http://localhost:5173'],
+                webOrigins: ['http://localhost:4000', 'http://localhost:3000', 'http://localhost:5173'],
                 allowedScopes: defaultScopes,
             });
             await appRepo.save(consoleApp);
@@ -344,7 +344,7 @@ export class DevBootstrapService {
             const pad = Math.max(0, W - 15 - text.length);
             adminLine = `${cyan}║  👤 Dev Admin: ${yellow}${text}${cyan}${' '.repeat(pad)}║${reset}`;
 
-            const hint = 'http://localhost:3000/setup';
+            const hint = 'http://localhost:4000/setup';
             const hintPad = Math.max(0, W - 23 - hint.length);
             setupLine = `\n${cyan}║  👉 ${bold}First-time Setup:${reset} ${green}${hint}${cyan}${' '.repeat(hintPad)}║${reset}`;
         }
