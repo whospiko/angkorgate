@@ -1,3 +1,4 @@
+import { colTimestamptz, colArrayText } from '../../common/utils/db-types.util';
 import {
     Column,
     CreateDateColumn,
@@ -30,7 +31,7 @@ export class AppSetting {
     @Column({ name: 'secondary_client_secret', type: 'varchar', length: 255, nullable: true })
     secondaryClientSecret?: string | null;
 
-    @Column({ name: 'secondary_secret_expires_at', type: 'timestamptz', nullable: true })
+    @Column({ name: 'secondary_secret_expires_at', type: colTimestamptz(), nullable: true })
     secondarySecretExpiresAt?: Date | null;
 
     @Column({ name: 'oauth_enabled', type: 'boolean', default: false })
@@ -59,13 +60,13 @@ export class AppSetting {
     @Column({ name: 'home_url', type: 'varchar', length: 255, nullable: true })
     homeUrl?: string | null;
 
-    @Column({ name: 'valid_redirect_uris', type: 'text', array: true, default: '{}' })
+    @Column(colArrayText('valid_redirect_uris'))
     validRedirectUris: string[];
 
-    @Column({ name: 'valid_post_logout_redirect_uris', type: 'text', array: true, default: '{}' })
+    @Column(colArrayText('valid_post_logout_redirect_uris'))
     validPostLogoutRedirectUris: string[];
 
-    @Column({ name: 'web_origins', type: 'text', array: true, default: '{}' })
+    @Column(colArrayText('web_origins'))
     webOrigins: string[];
 
     // Capability settings (OIDC & OAuth 2.0 flows)
@@ -100,9 +101,9 @@ export class AppSetting {
     })
     allowedScopes: Scope[];
 
-    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;
 
-    @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+    @UpdateDateColumn({ name: 'updated_at', type: colTimestamptz() })
     updatedAt: Date;
 }

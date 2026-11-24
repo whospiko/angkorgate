@@ -1,10 +1,13 @@
 export default () => ({
     database: {
+        type: process.env.DB_TYPE || (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'test' ? 'postgres' : 'sqlite'),
+        sqliteStorage: process.env.DB_SQLITE_DATABASE ?? './dev.sqlite',
         host: process.env.DB_HOST,
         port: parseInt(process.env.DB_PORT ?? '5432', 10),
         username: process.env.DB_USERNAME,
         password: process.env.DB_PASSWORD,
         name: process.env.DB_NAME,
+        logging: process.env.DB_LOGGING === 'true',
     },
     redis: {
         enabled: process.env.REDIS_ENABLED === 'true',

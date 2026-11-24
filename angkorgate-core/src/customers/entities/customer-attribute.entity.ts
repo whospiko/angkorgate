@@ -1,3 +1,4 @@
+import { colTimestamptz } from '../../common/utils/db-types.util';
 import {
     Column,
     CreateDateColumn,
@@ -38,9 +39,9 @@ export class CustomerAttribute {
     @Column({ type: 'jsonb' })
     value: unknown; // "O+" | 1000 | true | ["peanuts"] | {...}
 
-    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;
 
-    @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+    @UpdateDateColumn({ name: 'updated_at', type: colTimestamptz() })
     updatedAt: Date;
 }

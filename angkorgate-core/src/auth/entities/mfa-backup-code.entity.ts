@@ -1,3 +1,4 @@
+import { colTimestamptz } from '../../common/utils/db-types.util';
 import {
     Column,
     CreateDateColumn,
@@ -26,9 +27,9 @@ export class MfaBackupCode {
     @Column({ name: 'code_hash', type: 'text' })
     codeHash: string;
 
-    @Column({ name: 'used_at', type: 'timestamptz', nullable: true })
+    @Column({ name: 'used_at', type: colTimestamptz(), nullable: true })
     usedAt: Date | null;
 
-    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;
 }

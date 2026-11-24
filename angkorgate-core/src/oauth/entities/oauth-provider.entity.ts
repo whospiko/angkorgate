@@ -1,3 +1,4 @@
+import { colTimestamptz } from '../../common/utils/db-types.util';
 import {
     Column,
     CreateDateColumn,
@@ -32,9 +33,9 @@ export class OauthProvider {
     @Column({ name: 'extra_config', type: 'jsonb', nullable: true })
     extraConfig: Record<string, unknown> | null; // Apple teamId, keyId, etc.
 
-    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;
 
-    @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+    @UpdateDateColumn({ name: 'updated_at', type: colTimestamptz() })
     updatedAt: Date;
 }

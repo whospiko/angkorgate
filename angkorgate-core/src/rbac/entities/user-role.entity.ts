@@ -1,3 +1,4 @@
+import { colTimestamptz } from '../../common/utils/db-types.util';
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryColumn } from "typeorm";
 import { User } from "../../users/entities/user.entity";
 import { Role } from "./role.entity";
@@ -10,7 +11,7 @@ export class UserRole {
     @PrimaryColumn({ name: 'role_id', type: 'uuid' })
     roleId: string;
 
-    @CreateDateColumn({ name: 'assigned_at', type: 'timestamptz' })
+    @CreateDateColumn({ name: 'assigned_at', type: colTimestamptz() })
     assignedAt: Date;
 
     @Column({ name: 'assigned_by', type: 'uuid', nullable: true })

@@ -1,3 +1,4 @@
+import { colTimestamptz, colCitext } from '../../common/utils/db-types.util';
 import {
     Column,
     CreateDateColumn,
@@ -53,7 +54,7 @@ export class Customer {
     @Column({ type: 'varchar', length: 20, nullable: true })
     phone: string | null;
 
-    @Column({ type: 'citext', nullable: true })
+    @Column({ type: colCitext(), nullable: true })
     email: string | null;
 
     @Column({ type: 'text', nullable: true })
@@ -68,10 +69,10 @@ export class Customer {
     @Column({ type: 'varchar', length: 20, default: 'ACTIVE' })
     status: CustomerStatus;
 
-    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;
 
-    @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+    @UpdateDateColumn({ name: 'updated_at', type: colTimestamptz() })
     updatedAt: Date;
 
     @OneToMany(() => CustomerContact, (c) => c.customer)

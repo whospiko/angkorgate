@@ -1,3 +1,4 @@
+import { colTimestamptz } from '../../common/utils/db-types.util';
 import {
     Column,
     CreateDateColumn,
@@ -26,7 +27,7 @@ export class Department {
     @Column({ name: 'is_active', type: 'boolean', default: true })
     isActive: boolean;
 
-    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;
 
     @OneToMany(() => EmployeePosition, (p) => p.department)

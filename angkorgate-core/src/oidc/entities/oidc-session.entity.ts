@@ -1,3 +1,4 @@
+import { colTimestamptz } from '../../common/utils/db-types.util';
 import { Entity, PrimaryColumn, Column, CreateDateColumn, Index } from 'typeorm';
 
 @Entity('oidc_sessions')
@@ -25,12 +26,12 @@ export class OidcSession {
     uid?: string | null;
 
     @Index()
-    @Column({ name: 'expires_at', type: 'timestamptz' })
+    @Column({ name: 'expires_at', type: colTimestamptz() })
     expiresAt: Date;
 
-    @Column({ name: 'consumed_at', type: 'timestamptz', nullable: true })
+    @Column({ name: 'consumed_at', type: colTimestamptz(), nullable: true })
     consumedAt?: Date | null;
 
-    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;
 }

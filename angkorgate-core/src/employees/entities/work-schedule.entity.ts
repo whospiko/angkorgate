@@ -1,3 +1,4 @@
+import { colTimestamptz } from '../../common/utils/db-types.util';
 import {
     Check,
     Column,
@@ -45,6 +46,6 @@ export class WorkSchedule {
     @Column({ name: 'is_active', type: 'boolean', default: true })
     isActive: boolean;
 
-    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;
 }

@@ -1,3 +1,4 @@
+import { colTimestamptz } from '../../common/utils/db-types.util';
 import {
     Column,
     CreateDateColumn,
@@ -25,12 +26,12 @@ export class OauthTicket {
     @Column({ name: 'provider', type: 'varchar', length: 50 })
     provider: string;
 
-    @Column({ name: 'expires_at', type: 'timestamptz' })
+    @Column({ name: 'expires_at', type: colTimestamptz() })
     expiresAt: Date;
 
-    @Column({ name: 'used_at', type: 'timestamptz', nullable: true })
+    @Column({ name: 'used_at', type: colTimestamptz(), nullable: true })
     usedAt: Date | null;
 
-    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;
 }

@@ -10,9 +10,12 @@
     "deploy": "nest deploy",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:dev": "./node_modules/.bin/cross-env DB_TYPE=sqlite CREATE_DEV_ADMIN=true nest start --watch",
+    "start:dev:memory": "./node_modules/.bin/cross-env DB_TYPE=sqlite DB_SQLITE_DATABASE=:memory: CREATE_DEV_ADMIN=false nest start --watch",
+    "start:dev:postgres": "./node_modules/.bin/cross-env DB_TYPE=postgres CREATE_DEV_ADMIN=false nest start --watch",
+    "start:dev-postgres": "./node_modules/.bin/cross-env DB_TYPE=postgres CREATE_DEV_ADMIN=false nest start --watch",
+    "start:debug": "./node_modules/.bin/cross-env DB_TYPE=sqlite nest start --debug --watch",
+    "start:prod": "./node_modules/.bin/cross-env DB_TYPE=postgres node dist/main",
     "lint": "./node_modules/.bin/oxlint --type-aware src/ test/",
     "typeorm": "./node_modules/.bin/typeorm-ts-node-commonjs -d src/database/data-source.ts",
     "migration:generate": "npm run typeorm -- migration:generate",
@@ -22,10 +25,12 @@
     "test:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --watch",
     "test:cov": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --coverage",
     "test:debug": "node --inspect-brk --experimental-vm-modules -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-e2e.json --runInBand",
-    "test:e2e:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-e2e.json --watch --runInBand",
+    "test:e2e": "./node_modules/.bin/cross-env DB_TYPE=postgres node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-e2e.json --runInBand",
+    "test:e2e:watch": "./node_modules/.bin/cross-env DB_TYPE=postgres node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-e2e.json --watch --runInBand",
     "test:all": "npm run test && npm run test:e2e",
-    "smoke": "./node_modules/.bin/ts-node -r tsconfig-paths/register test/smoke-test.ts"
+    "smoke": "./node_modules/.bin/cross-env DB_TYPE=postgres ./node_modules/.bin/ts-node -r tsconfig-paths/register test/smoke-test.ts",
+    "smoke:postgres": "./node_modules/.bin/cross-env DB_TYPE=postgres ./node_modules/.bin/ts-node -r tsconfig-paths/register test/smoke-test.ts",
+    "smoke:sqlite": "./node_modules/.bin/cross-env DB_TYPE=sqlite DB_SQLITE_DATABASE=:memory: ./node_modules/.bin/ts-node -r tsconfig-paths/register test/smoke-test.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
@@ -39,6 +44,7 @@
     "@nestjs/throttler": "^6.7.1",
     "@nestjs/typeorm": "^12.0.2",
     "bcrypt": "^6.0.0",
+    "better-sqlite3": "^12.11.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "ioredis": "^5.11.1",
@@ -63,6 +69,7 @@
     "@nestjs/testing": "^12.5.1",
     "@testcontainers/postgresql": "^12.2.1",
     "@types/bcrypt": "^6.0.0",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/express": "^5.0.0",
     "@types/ioredis": "^4.28.10",
     "@types/jest": "^30.0.0",
@@ -74,6 +81,7 @@
     "@types/passport-jwt": "^4.0.1",
     "@types/qrcode": "^1.5.6",
     "@types/supertest": "^7.2.1",
+    "cross-env": "^10.1.0",
     "jest": "^30.5.2",
     "jest-junit": "^17.0.0",
     "oxlint": "^1.58.0",
@@ -94,6 +102,7 @@
   },
   "allowScripts": {
     "@scarf/scarf": false,
-    "@parcel/watcher@2.6.0": true
+    "@parcel/watcher@2.6.0": true,
+    "better-sqlite3": true
   }
 }

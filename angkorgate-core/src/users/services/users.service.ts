@@ -4,9 +4,12 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, IsNull, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '../entities/user.entity';
+import { Employee } from '../../employees/entities/employee.entity';
+import { Customer } from '../../customers/entities/customer.entity';
+import { RefreshToken } from '../../auth/entities/refresh-token.entity';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
 import { UserResponseDto } from '../dto/user-response.dto';
@@ -184,21 +187,15 @@ export class UsersService {
 
         await this.dataSource.transaction(async (manager) => {
             // Unlink linked employee if present
-            await manager.query(
-                `UPDATE employees SET user_id = NULL WHERE user_id = $1`,
-                [id],
-            );
+            await manager.getRepository(Employee).update({ userId: id }, { userId: null });
 
             // Unlink linked customer if present
-            await manager.query(
-                `UPDATE customers SET user_id = NULL WHERE user_id = $1`,
-                [id],
-            );
+            await manager.getRepository(Customer).update({ userId: id }, { userId: null });
 
             // Invalidate refresh tokens for security
-            await manager.query(
-                `UPDATE refresh_tokens SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`,
-                [id],
+            await manager.getRepository(RefreshToken).update(
+                { userId: id, revokedAt: IsNull() },
+                { revokedAt: new Date() },
             );
 
             // Soft-delete user

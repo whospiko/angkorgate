@@ -45,6 +45,34 @@
 
 ---
 
+## 🚀 Quick Start (Keycloak-Grade Dev Mode)
+
+AngkorGate Core features a zero-configuration embedded developer mode powered by `better-sqlite3`, just like Keycloak's `start-dev`. No Docker or PostgreSQL installation needed to get started:
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Start in zero-config dev mode (SQLite + auto-seeded default admin & client apps)
+npm run start:dev
+
+# Or run with pure in-memory database:
+npm run start:dev:memory
+
+# Or run with production PostgreSQL (requires running Postgres instance):
+npm run start:dev-postgres
+```
+
+On first boot in dev mode, AngkorGate automatically creates and seeds:
+- **Default Admin Account**: `admin@angkorgate.local` / `AdminPass123!`
+- **Default OIDC Client App**: `clinic-app` (`your-secret-key`)
+- **Default SPA Console App**: `angkorgate-console` (public client with PKCE)
+- **Standard OIDC Scopes & RBAC Roles**: (`openid`, `profile`, `email`, `roles`, etc.)
+- **Swagger UI**: Accessible at [http://localhost:8080/api](http://localhost:8080/api)
+- **OIDC Discovery**: [http://localhost:8080/oidc/.well-known/openid-configuration](http://localhost:8080/oidc/.well-known/openid-configuration)
+
+---
+
 ## ⚙️ Environment Variables
 
 Add the following to your `.env` configuration:

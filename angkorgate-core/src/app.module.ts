@@ -23,6 +23,8 @@ import { SystemModule } from './system/system.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { AppContextMiddleware } from './apps/middleware/app-context.middleware';
 import { OauthConfigService } from './oauth/services/oauth-config.service';
+import { DevBootstrapService } from './system/services/dev-bootstrap.service';
+import { isSqlite } from './common/utils/db-types.util';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
@@ -33,16 +35,29 @@ import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get('database.host'),
-        port: config.get<number>('database.port'),
-        username: config.get('database.username'),
-        password: config.get('database.password'),
-        database: config.get('database.name'),
-        autoLoadEntities: true,
-        synchronize: false, // we use migrations
-      }),
+      useFactory: (config: ConfigService) => {
+        const dbType = config.get<string>('database.type') || (isSqlite() ? 'sqlite' : 'postgres');
+        if (dbType === 'sqlite') {
+          return {
+            type: 'better-sqlite3',
+            database: config.get<string>('database.sqliteStorage') || './dev.sqlite',
+            autoLoadEntities: true,
+            synchronize: true, // auto create schema on dev boot
+            logging: config.get<boolean>('database.logging') ?? false,
+          };
+        }
+        return {
+          type: 'postgres',
+          host: config.get('database.host'),
+          port: config.get<number>('database.port'),
+          username: config.get('database.username'),
+          password: config.get('database.password'),
+          database: config.get('database.name'),
+          autoLoadEntities: true,
+          synchronize: false, // we use migrations for PostgreSQL
+          logging: config.get<boolean>('database.logging') ?? false,
+        };
+      },
     }),
     ThrottlerModule.forRoot([
       { name: 'default', ttl: 60_000, limit: 60 }, // global default: 60 req/min/IP
@@ -72,7 +87,10 @@ import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
   controllers: [AppController],
 })
 export class AppModule implements NestModule, OnApplicationBootstrap {
-  constructor(private readonly oauthConfig: OauthConfigService) { }
+  constructor(
+    private readonly oauthConfig: OauthConfigService,
+    private readonly devBootstrap: DevBootstrapService,
+  ) { }
 
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(RequestIdMiddleware).forRoutes('*');
@@ -80,6 +98,7 @@ export class AppModule implements NestModule, OnApplicationBootstrap {
   }
 
   async onApplicationBootstrap() {
+    await this.devBootstrap.bootstrap();
     await this.oauthConfig.seedFromEnv();
   }
 }

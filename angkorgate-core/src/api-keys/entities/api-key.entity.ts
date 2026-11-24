@@ -1,3 +1,4 @@
+import { colTimestamptz } from '../../common/utils/db-types.util';
 import {
     Column,
     CreateDateColumn,
@@ -82,18 +83,18 @@ export class ApiKey {
     @Column({ name: 'rate_limit', type: 'int', default: 120 })
     rateLimit: number;
 
-    @Column({ name: 'expires_at', type: 'timestamptz', nullable: true })
+    @Column({ name: 'expires_at', type: colTimestamptz(), nullable: true })
     expiresAt: Date | null;
 
-    @Column({ name: 'last_used_at', type: 'timestamptz', nullable: true })
+    @Column({ name: 'last_used_at', type: colTimestamptz(), nullable: true })
     lastUsedAt: Date | null;
 
     @Column({ name: 'total_requests', type: 'bigint', default: 0 })
     totalRequests: number;
 
-    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;
 
-    @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+    @UpdateDateColumn({ name: 'updated_at', type: colTimestamptz() })
     updatedAt: Date;
 }

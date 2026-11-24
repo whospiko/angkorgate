@@ -1,10 +1,18 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
-import { DataSource } from 'typeorm';
+import { DataSource, IsNull } from 'typeorm';
 import request from 'supertest';
 import { ValidationPipe } from '@nestjs/common';
 import { generate } from 'otplib';
 import { CacheService } from '../src/cache/cache.service';
+import { User } from '../src/users/entities/user.entity';
+import { Role } from '../src/rbac/entities/role.entity';
+import { UserRole } from '../src/rbac/entities/user-role.entity';
+import { Department } from '../src/employees/entities/department.entity';
+import { JobTitle } from '../src/employees/entities/job-title.entity';
+import { OauthProvider } from '../src/oauth/entities/oauth-provider.entity';
+import { AppSetting } from '../src/apps/entities/app-setting.entity';
+import { EmailChangeToken } from '../src/auth/entities/email-change-token.entity';
 
 // ANSI colors for pretty console output
 const c = {
@@ -47,11 +55,13 @@ async function runSmokeTest() {
 
     const http = app.getHttpServer();
     const dataSource = app.get(DataSource);
-    await dataSource.runMigrations();
+    if (dataSource.options.type === 'postgres') {
+        await dataSource.runMigrations();
+    }
 
     // Helper to bypass email verification steps in tests
     const verifyUserInDb = async (email: string) => {
-        await dataSource.query(`UPDATE users SET is_email_verified = true WHERE email = $1`, [email]);
+        await dataSource.getRepository(User).update({ email }, { isEmailVerified: true });
     };
 
     try {
@@ -71,17 +81,24 @@ async function runSmokeTest() {
         const bcrypt = require('bcrypt');
         const hash = await bcrypt.hash(adminPass, 4);
 
-        const [adminUser] = await dataSource.query(
-            `INSERT INTO users (email, password_hash, is_active, is_email_verified) 
-       VALUES ($1, $2, true, true) RETURNING id`,
-            [adminEmail, hash]
-        );
+        const userRepo = dataSource.getRepository(User);
+        const userRoleRepo = dataSource.getRepository(UserRole);
+        const roleRepo = dataSource.getRepository(Role);
 
-        await dataSource.query(
-            `INSERT INTO user_roles (user_id, role_id) 
-       SELECT $1, id FROM roles WHERE code = 'ADMIN'`,
-            [adminUser.id]
-        );
+        const adminUser = await userRepo.save(userRepo.create({
+            email: adminEmail,
+            passwordHash: hash,
+            isActive: true,
+            isEmailVerified: true,
+        }));
+
+        const adminRole = await roleRepo.findOne({ where: { code: 'ADMIN' } });
+        if (adminRole) {
+            await userRoleRepo.save(userRoleRepo.create({
+                userId: adminUser.id,
+                roleId: adminRole.id,
+            }));
+        }
 
         const adminLogin = await request(http)
             .post('/auth/login')
@@ -159,15 +176,24 @@ async function runSmokeTest() {
         logSection('5. Employees Module (Clinic / Hotel / POS)');
         // ══════════════════════════════════════════════════════════════════
         // 1. Seed a department and job title
-        await dataSource.query(`INSERT INTO departments (code, name) VALUES ('TEST_DEPT', 'Test Department') ON CONFLICT DO NOTHING`);
-        await dataSource.query(`INSERT INTO job_titles (code, name, category) VALUES ('TEST_TITLE', 'Test Title', 'GENERAL') ON CONFLICT DO NOTHING`);
+        const deptRepo = dataSource.getRepository(Department);
+        const titleRepo = dataSource.getRepository(JobTitle);
+
+        if (!await deptRepo.findOne({ where: { code: 'TEST_DEPT' } })) {
+            await deptRepo.save(deptRepo.create({ code: 'TEST_DEPT', name: 'Test Department' }));
+        }
+        if (!await titleRepo.findOne({ where: { code: 'TEST_TITLE' } })) {
+            await titleRepo.save(titleRepo.create({ code: 'TEST_TITLE', name: 'Test Title' }));
+        }
 
         // 2. Create employee
         const empEmail = `smoke-emp-${Date.now()}@test.com`;
-        const [empUser] = await dataSource.query(
-            `INSERT INTO users (email, password_hash, is_active, is_email_verified) VALUES ($1, 'hash', true, true) RETURNING id`,
-            [empEmail]
-        );
+        const empUser = await userRepo.save(userRepo.create({
+            email: empEmail,
+            passwordHash: 'hash',
+            isActive: true,
+            isEmailVerified: true,
+        }));
 
         const empRes = await request(http)
             .post('/employees')
@@ -250,10 +276,13 @@ async function runSmokeTest() {
         const knownRawToken = `smoke-test-token-${Date.now()}-${crypto.randomBytes(8).toString('hex')}`;
         const knownHash = crypto.createHash('sha256').update(knownRawToken).digest('hex');
 
-        await dataSource.query(
-            `UPDATE email_change_tokens SET token_hash = $1 WHERE user_id = (SELECT id FROM users WHERE email = $2) AND used_at IS NULL`,
-            [knownHash, custEmail]
-        );
+        const custUserRecord = await userRepo.findOne({ where: { email: custEmail } });
+        if (custUserRecord) {
+            await dataSource.getRepository(EmailChangeToken).update(
+                { userId: custUserRecord.id, usedAt: IsNull() },
+                { tokenHash: knownHash }
+            );
+        }
 
         // 3. Confirm change
         const changeConfirm = await request(http)
@@ -271,8 +300,8 @@ async function runSmokeTest() {
         logSection('8. OAuth Configuration & Gates');
         // ══════════════════════════════════════════════════════════════════
         // Ensure clean state for repeatable smoke tests
-        await dataSource.query(`DELETE FROM app_settings WHERE app_code = 'smoke-app'`);
-        await dataSource.query(`DELETE FROM oauth_providers WHERE code = 'google'`);
+        await dataSource.getRepository(AppSetting).delete({ appCode: 'smoke-app' });
+        await dataSource.getRepository(OauthProvider).delete({ code: 'google' });
 
         const providerRes = await request(http)
             .post('/admin/oauth/providers')
@@ -323,7 +352,7 @@ async function runSmokeTest() {
         const oidcClientSecret = 'smoke-secret-key-at-least-32chars';
         const oidcRedirectUri = 'http://localhost:5173/callback';
 
-        await dataSource.query(`DELETE FROM app_settings WHERE app_code = $1`, [oidcClientCode]);
+        await dataSource.getRepository(AppSetting).delete({ appCode: oidcClientCode });
 
         const oidcAppRes = await request(http)
             .post('/admin/apps')
@@ -333,6 +362,7 @@ async function runSmokeTest() {
                 name: 'Smoke OIDC Client App',
                 clientSecret: oidcClientSecret,
                 allowedRedirectUrls: [oidcRedirectUri],
+                serviceAccountsEnabled: true,
             });
         assert('Register OIDC client app with secret & redirect URI', oidcAppRes.status === 201, { status: oidcAppRes.status, body: oidcAppRes.body });
 
@@ -606,9 +636,9 @@ async function runSmokeTest() {
         assert('Users /users/:id/reset-password resets password and returns 204', resetPassRes.status === 204);
 
         // 6. RBAC: /rbac/roles/:id/permissions
-        const [adminRoleRow] = await dataSource.query(`SELECT id FROM roles WHERE code = 'ADMIN'`);
+        const adminRoleRow = await roleRepo.findOne({ where: { code: 'ADMIN' } });
         const rolePermsRes = await request(http)
-            .get(`/rbac/roles/${adminRoleRow.id}/permissions`)
+            .get(`/rbac/roles/${adminRoleRow?.id}/permissions`)
             .set('Authorization', `Bearer ${adminToken}`);
         const rolePermsData = dataOf(rolePermsRes);
         assert('RBAC /rbac/roles/:id/permissions returns role permissions', rolePermsRes.status === 200 && Array.isArray(rolePermsData) && rolePermsData.length > 0);

@@ -1,3 +1,4 @@
+process.env.DB_TYPE = 'postgres';
 import { config } from 'dotenv';
 import { AuditService } from '../src/audit/services/audit.service';
 

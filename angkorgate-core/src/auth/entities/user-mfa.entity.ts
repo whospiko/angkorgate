@@ -1,3 +1,4 @@
+import { colTimestamptz } from '../../common/utils/db-types.util';
 import {
     Column,
     CreateDateColumn,
@@ -29,15 +30,15 @@ export class UserMfa {
     @Column({ name: 'is_enabled', type: 'boolean', default: false })
     isEnabled: boolean;
 
-    @Column({ name: 'enabled_at', type: 'timestamptz', nullable: true })
+    @Column({ name: 'enabled_at', type: colTimestamptz(), nullable: true })
     enabledAt: Date | null;
 
-    @Column({ name: 'last_used_at', type: 'timestamptz', nullable: true })
+    @Column({ name: 'last_used_at', type: colTimestamptz(), nullable: true })
     lastUsedAt: Date | null;
 
-    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;
 
-    @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+    @UpdateDateColumn({ name: 'updated_at', type: colTimestamptz() })
     updatedAt: Date;
 }

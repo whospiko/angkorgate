@@ -1,3 +1,4 @@
+import { colTimestamptz } from '../../common/utils/db-types.util';
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import { RolePermission } from "./role-permission.entity";
 import { UserRole } from "./user-role.entity";
@@ -22,7 +23,7 @@ export class Role {
     @Column({ name: 'is_system', type: 'boolean', default: false })
     isSystem: boolean;
 
-    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;
 
     @OneToMany(() => RolePermission, (rp) => rp.role)

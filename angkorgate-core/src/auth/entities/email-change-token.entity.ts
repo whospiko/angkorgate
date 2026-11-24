@@ -1,3 +1,4 @@
+import { colTimestamptz, colCitext, colInet } from '../../common/utils/db-types.util';
 import {
     Column,
     CreateDateColumn,
@@ -23,22 +24,22 @@ export class EmailChangeToken {
     user: User;
 
     /** The email they want to change TO (not their current one) */
-    @Column({ name: 'new_email', type: 'citext' })
+    @Column({ name: 'new_email', type: colCitext() })
     newEmail: string;
 
     /** Hash of the confirmation token sent to `newEmail` */
     @Column({ name: 'token_hash', type: 'text', unique: true })
     tokenHash: string;
 
-    @Column({ name: 'expires_at', type: 'timestamptz' })
+    @Column({ name: 'expires_at', type: colTimestamptz() })
     expiresAt: Date;
 
-    @Column({ name: 'used_at', type: 'timestamptz', nullable: true })
+    @Column({ name: 'used_at', type: colTimestamptz(), nullable: true })
     usedAt: Date | null;
 
-    @Column({ name: 'requested_ip', type: 'inet', nullable: true })
+    @Column({ name: 'requested_ip', type: colInet(), nullable: true })
     requestedIp: string | null;
 
-    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;
 }

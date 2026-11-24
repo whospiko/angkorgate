@@ -1,3 +1,4 @@
+import { colTimestamptz, colCitext } from '../../common/utils/db-types.util';
 import {
     Column,
     CreateDateColumn,
@@ -12,7 +13,7 @@ export class User {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ type: 'citext', nullable: true })
+    @Column({ type: colCitext(), nullable: true })
     email: string | null;
 
     @Column({ type: 'varchar', length: 20, nullable: true })
@@ -30,24 +31,24 @@ export class User {
     @Column({ name: 'is_phone_verified', type: 'boolean', default: false })
     isPhoneVerified: boolean;
 
-    @Column({ name: 'last_login_at', type: 'timestamptz', nullable: true })
+    @Column({ name: 'last_login_at', type: colTimestamptz(), nullable: true })
     lastLoginAt: Date | null;
 
     @Column({ name: 'failed_attempts', type: 'int', default: 0 })
     failedAttempts: number;
 
-    @Column({ name: 'locked_until', type: 'timestamptz', nullable: true })
+    @Column({ name: 'locked_until', type: colTimestamptz(), nullable: true })
     lockedUntil: Date | null;
 
     @Column({ name: 'must_change_password', type: 'boolean', default: false })
     mustChangePassword: boolean;
 
-    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;
 
-    @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+    @UpdateDateColumn({ name: 'updated_at', type: colTimestamptz() })
     updatedAt: Date;
 
-    @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz', nullable: true })
+    @DeleteDateColumn({ name: 'deleted_at', type: colTimestamptz(), nullable: true })
     deletedAt: Date | null;
 }

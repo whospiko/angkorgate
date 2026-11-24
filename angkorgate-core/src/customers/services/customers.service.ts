@@ -18,6 +18,7 @@ import {
     parseCustomerSequence,
 } from '../utils/customer-code.util';
 import { normalizePagination } from '../../common/utils/pagination.util';
+import { isSqlite } from '../../common/utils/db-types.util';
 
 @Injectable()
 export class CustomersService {
@@ -224,12 +225,18 @@ export class CustomersService {
         return this.repo.manager.transaction(async (em: EntityManager) => {
             const prefix = CUSTOMER_TYPE_PREFIX[type];
 
-            const lastCustomer = await em
+            const qb = em
                 .createQueryBuilder(Customer, 'c')
-                .where('c.customerCode LIKE :p', { p: `${prefix}-%` })
-                .orderBy('CAST(SUBSTRING(c.customerCode FROM 5) AS INT)', 'DESC')
-                .setLock('pessimistic_write')
-                .getOne();
+                .where('c.customerCode LIKE :p', { p: `${prefix}-%` });
+
+            if (!isSqlite()) {
+                qb.orderBy('CAST(SUBSTRING(c.customerCode FROM 5) AS INT)', 'DESC')
+                    .setLock('pessimistic_write');
+            } else {
+                qb.orderBy('c.customerCode', 'DESC');
+            }
+
+            const lastCustomer = await qb.getOne();
 
             const currentMax = lastCustomer ? parseCustomerSequence(lastCustomer.customerCode) : 0;
             const next = currentMax + 1;

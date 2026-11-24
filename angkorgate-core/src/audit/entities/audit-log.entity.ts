@@ -1,3 +1,4 @@
+import { colTimestamptz, colInet, colIdIncrement } from '../../common/utils/db-types.util';
 import {
     Column,
     CreateDateColumn,
@@ -9,7 +10,7 @@ import {
 @Entity('audit_logs')
 @Index('idx_audit_entity', ['entity', 'entityId'])
 export class AuditLog {
-    @PrimaryGeneratedColumn('increment', { type: 'bigint' })
+    @PrimaryGeneratedColumn('increment', colIdIncrement())
     id: string;
 
     @Column({ name: 'actor_id', type: 'uuid', nullable: true })
@@ -30,9 +31,9 @@ export class AuditLog {
     @Column({ name: 'new_value', type: 'jsonb', nullable: true })
     newValue: Record<string, unknown> | null;
 
-    @Column({ name: 'ip_address', type: 'inet', nullable: true })
+    @Column({ name: 'ip_address', type: colInet(), nullable: true })
     ipAddress: string | null;
 
-    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;
 }
