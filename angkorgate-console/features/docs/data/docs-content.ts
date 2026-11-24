@@ -94,8 +94,8 @@ export const DOCS_ARTICLES: DocArticle[] = [
         },
         alert: {
           type: "tip",
-          textEn: "AngkorGate Core runs on NestJS (Port 8080) and AngkorGate Console runs on Next.js 15 (Port 3000), backed by PostgreSQL.",
-          textKm: "AngkorGate Core ដំណើរការលើ NestJS (ច្រក 8080) ហើយ AngkorGate Console ដំណើរការលើ Next.js 15 (ច្រក 3000) ដោយប្រើប្រាស់ PostgreSQL។",
+          textEn: "AngkorGate Core runs on NestJS (Port 8080) and AngkorGate Console runs on Next.js 15 (Port 4000), backed by PostgreSQL.",
+          textKm: "AngkorGate Core ដំណើរការលើ NestJS (ច្រក 8080) ហើយ AngkorGate Console ដំណើរការលើ Next.js 15 (ច្រក 4000) ដោយប្រើប្រាស់ PostgreSQL។",
         },
       },
       {
@@ -116,15 +116,15 @@ export const DOCS_ARTICLES: DocArticle[] = [
           km: "ប្លង់ប្រព័ន្ធ (System Topology)",
         },
         content: {
-          en: "The architecture consists of three core components: the User Agent (Browser/Client Apps), the Core Engine (`:8080`), and the Management Console (`:3000`), connected to PostgreSQL.",
-          km: "ស្ថាបត្យកម្មប្រព័ន្ធរួមមាន ៣ ផ្នែកចម្បង៖ កម្មវិធីអ្នកប្រើ (Browser/Client Apps), ម៉ាស៊ីនស្នូល Core Engine (`:8080`), និងផ្ទាំងគ្រប់គ្រង Console (`:3000`) ដែលភ្ជាប់ទៅកាន់ PostgreSQL។",
+          en: "The architecture consists of three core components: the User Agent (Browser/Client Apps), the Core Engine (`:8080`), and the Management Console (`:4000`), connected to PostgreSQL.",
+          km: "ស្ថាបត្យកម្មប្រព័ន្ធរួមមាន ៣ ផ្នែកចម្បង៖ កម្មវិធីអ្នកប្រើ (Browser/Client Apps), ម៉ាស៊ីនស្នូល Core Engine (`:8080`), និងផ្ទាំងគ្រប់គ្រង Console (`:4000`) ដែលភ្ជាប់ទៅកាន់ PostgreSQL។",
         },
         codeSnippet: {
           language: "text",
           title: "Architecture Flow",
           code: `[Browser / Third-Party Client / OIDC Debugger]
        |
-       +---> [Console :3000] (Next.js 15 UI / Server Actions / Login Form)
+       +---> [Console :4000] (Next.js 15 UI / Server Actions / Login Form)
        |
        +---> [Core :8080] (NestJS OIDC Engine / /oidc/auth / /oidc/token / /oidc/me)
                    |
@@ -218,8 +218,8 @@ npm run start:dev`,
           km: "៣. បើកដំណើរការ AngkorGate Console",
         },
         content: {
-          en: "In a separate terminal, launch the Next.js 15 administrative console on port 3000:",
-          km: "នៅក្នុង terminal មួយទៀត បើកដំណើរការ Next.js 15 Console នៅលើច្រក 3000៖",
+          en: "In a separate terminal, launch the Next.js 15 administrative console on port 4000:",
+          km: "នៅក្នុង terminal មួយទៀត បើកដំណើរការ Next.js 15 Console នៅលើច្រក 4000៖",
         },
         codeSnippet: {
           language: "bash",
@@ -236,8 +236,8 @@ npm run dev`,
           km: "គណនី Admin លំនាំដើម",
         },
         content: {
-          en: "Use these pre-seeded credentials to sign into the Console at http://localhost:3000/login:\n- **Email:** `piko@angkorgate.com`\n- **Password:** `admin1234`\n- **Role:** `ADMIN` (Full System Privileges)",
-          km: "ប្រើប្រាស់គណនីលំនាំដើមខាងក្រោមដើម្បីចូល Console នៅ http://localhost:3000/login៖\n- **អ៊ីមែល (Email):** `piko@angkorgate.com`\n- **ពាក្យសម្ងាត់ (Password):** `admin1234`\n- **តួនាទី (Role):** `ADMIN` (សិទ្ធិពេញលេញ)",
+          en: "Use these pre-seeded credentials to sign into the Console at http://localhost:4000/login:\n- **Email:** `piko@angkorgate.com`\n- **Password:** `admin1234`\n- **Role:** `ADMIN` (Full System Privileges)",
+          km: "ប្រើប្រាស់គណនីលំនាំដើមខាងក្រោមដើម្បីចូល Console នៅ http://localhost:4000/login៖\n- **អ៊ីមែល (Email):** `piko@angkorgate.com`\n- **ពាក្យសម្ងាត់ (Password):** `admin1234`\n- **តួនាទី (Role):** `ADMIN` (សិទ្ធិពេញលេញ)",
         },
       },
     ],
@@ -356,8 +356,8 @@ npm run dev`,
           km: "ជំហានចុះឈ្មោះ ៤ ដំណាក់កាល",
         },
         content: {
-          en: "Navigate to **Console > Client Applications** and click **'+ Register Client'**:\n1. **General:** Set Client ID (`appCode`) and Name.\n2. **Capabilities:** Toggle Client Authentication (Confidential/Public), Standard Flow, Service Accounts, and Require PKCE.\n3. **URLs:** Configure Root URL, Home URL, Valid Redirect URIs (supports wildcards like `http://localhost:3000/*`), and Web Origins (CORS).\n4. **Scopes:** Select scopes authorized for this client.",
-          km: "ចូលទៅកាន់ **Console > Client Applications** រួចចុច **'+ Register Client'**៖\n១. **ទូទៅ (General):** កំណត់ Client ID (`appCode`) និងឈ្មោះកម្មវិធី។\n២. **សមត្ថភាព (Capabilities):** ជ្រើសរើសប្រភេទ Confidential ឬ Public, បើក Standard Flow, Service Accounts, និងកំណត់ PKCE។\n៣. **URLs:** បញ្ចូល Root URL, Valid Redirect URIs (គាំទ្រ wildcards ដូចជា `http://localhost:3000/*`), និង Web Origins (CORS)។\n៤. **Scopes:** ជ្រើសរើស Scopes ដែលអនុញ្ញាតសម្រាប់ Client នេះ។",
+          en: "Navigate to **Console > Client Applications** and click **'+ Register Client'**:\n1. **General:** Set Client ID (`appCode`) and Name.\n2. **Capabilities:** Toggle Client Authentication (Confidential/Public), Standard Flow, Service Accounts, and Require PKCE.\n3. **URLs:** Configure Root URL, Home URL, Valid Redirect URIs (supports wildcards like `http://localhost:4000/*`), and Web Origins (CORS).\n4. **Scopes:** Select scopes authorized for this client.",
+          km: "ចូលទៅកាន់ **Console > Client Applications** រួចចុច **'+ Register Client'**៖\n១. **ទូទៅ (General):** កំណត់ Client ID (`appCode`) និងឈ្មោះកម្មវិធី។\n២. **សមត្ថភាព (Capabilities):** ជ្រើសរើសប្រភេទ Confidential ឬ Public, បើក Standard Flow, Service Accounts, និងកំណត់ PKCE។\n៣. **URLs:** បញ្ចូល Root URL, Valid Redirect URIs (គាំទ្រ wildcards ដូចជា `http://localhost:4000/*`), និង Web Origins (CORS)។\n៤. **Scopes:** ជ្រើសរើស Scopes ដែលអនុញ្ញាតសម្រាប់ Client នេះ។",
         },
       },
       {
@@ -438,8 +438,8 @@ npm run dev`,
           km: "ជំហានប្រតិបត្តិការជាក់ស្តែង",
         },
         content: {
-          en: "Follow these steps to complete an authorization flow:\n1. Click **'Send Request'** at the bottom of OIDC Debugger.\n2. If not previously signed in, the browser navigates to `http://localhost:3000/login?interaction=<uid>`.\n3. Enter `piko@angkorgate.com` / `admin1234` and click **'Sign In'**.\n4. The server finalizes the interaction and posts the authorization code back to `https://oidcdebugger.com/debug`.\n5. Click **'Exchange code'** on OIDC Debugger to view the minted Access Token, ID Token, and decoded claims.",
-          km: "អនុវត្តតាមជំហានខាងក្រោមដើម្បីបញ្ចប់ Flow៖\n១. ចុច **'Send Request'** នៅខាងក្រោម OIDC Debugger។\n២. ប្រសិនបើមិនទាន់បាន Login ទេ Browser នឹងនាំទៅកាន់ `http://localhost:3000/login?interaction=<uid>`។\n៣. បញ្ចូល `piko@angkorgate.com` / `admin1234` រួចចុច **'Sign In'**។\n៤. ប្រព័ន្ធនឹងបញ្ចប់ Interaction ហើយបញ្ជូន Authorization Code ត្រឡប់ទៅ `https://oidcdebugger.com/debug`។\n៥. ចុច **'Exchange code'** នៅលើ OIDC Debugger ដើម្បីមើល Access Token, ID Token និង Claims ដែលទទួលបាន។",
+          en: "Follow these steps to complete an authorization flow:\n1. Click **'Send Request'** at the bottom of OIDC Debugger.\n2. If not previously signed in, the browser navigates to `http://localhost:4000/login?interaction=<uid>`.\n3. Enter `piko@angkorgate.com` / `admin1234` and click **'Sign In'**.\n4. The server finalizes the interaction and posts the authorization code back to `https://oidcdebugger.com/debug`.\n5. Click **'Exchange code'** on OIDC Debugger to view the minted Access Token, ID Token, and decoded claims.",
+          km: "អនុវត្តតាមជំហានខាងក្រោមដើម្បីបញ្ចប់ Flow៖\n១. ចុច **'Send Request'** នៅខាងក្រោម OIDC Debugger។\n២. ប្រសិនបើមិនទាន់បាន Login ទេ Browser នឹងនាំទៅកាន់ `http://localhost:4000/login?interaction=<uid>`។\n៣. បញ្ចូល `piko@angkorgate.com` / `admin1234` រួចចុច **'Sign In'**។\n៤. ប្រព័ន្ធនឹងបញ្ចប់ Interaction ហើយបញ្ជូន Authorization Code ត្រឡប់ទៅ `https://oidcdebugger.com/debug`។\n៥. ចុច **'Exchange code'** នៅលើ OIDC Debugger ដើម្បីមើល Access Token, ID Token និង Claims ដែលទទួលបាន។",
         },
         alert: {
           type: "tip",
@@ -710,8 +710,8 @@ echo "JWT: $ADMIN_TOKEN"`,
           km: "តារាងវិភាគបញ្ហាទូទៅ",
         },
         content: {
-          en: "- **`redirect_uri_mismatch`:** The callback URL sent in query string does not match `valid_redirect_uris` in client settings. Add the exact URL or wildcard pattern.\n- **`Authorization Server policy requires PKCE`:** The client has `Require PKCE: ON` but the request omitted `code_challenge`. Either check 'Use PKCE?' or disable Require PKCE in client settings.\n- **`invalid_client` (401):** The client secret is incorrect or was passed for a public client. Public clients must not send client secrets.\n- **Redirect to port 5173 instead of 3000:** Set `CONSOLE_URL=http://localhost:3000` and `APP_WEB_URL=http://localhost:3000` in `angkorgate-core/.env`.",
-          km: "- **`redirect_uri_mismatch`៖** Callback URL មិនត្រូវគ្នានឹង `valid_redirect_uris` របស់ Client។ សូមបន្ថែម URL ពេញលេញ ឬ Wildcard។\n- **`Authorization Server policy requires PKCE`៖** Client បានកំណត់ `Require PKCE: ON` ប៉ុន្តែមិនបានបញ្ជូន `code_challenge`។ សូមធីក 'Use PKCE?' ឬបិទ Require PKCE លើ Client។\n- **`invalid_client` (401)៖** Client Secret ខុស ឬបានបញ្ជូន Secret មកឱ្យ Public Client។ Public Client មិនត្រូវប្រើ Client Secret ឡើយ។\n- **Redirect ទៅច្រក 5173 ជំនួសឱ្យ 3000៖** សូមកំណត់ `CONSOLE_URL=http://localhost:3000` និង `APP_WEB_URL=http://localhost:3000` ក្នុង `angkorgate-core/.env`។",
+          en: "- **`redirect_uri_mismatch`:** The callback URL sent in query string does not match `valid_redirect_uris` in client settings. Add the exact URL or wildcard pattern.\n- **`Authorization Server policy requires PKCE`:** The client has `Require PKCE: ON` but the request omitted `code_challenge`. Either check 'Use PKCE?' or disable Require PKCE in client settings.\n- **`invalid_client` (401):** The client secret is incorrect or was passed for a public client. Public clients must not send client secrets.\n- **Redirect to port 5173 instead of 4000:** Set `CONSOLE_URL=http://localhost:4000` and `APP_WEB_URL=http://localhost:4000` in `angkorgate-core/.env`.",
+          km: "- **`redirect_uri_mismatch`៖** Callback URL មិនត្រូវគ្នានឹង `valid_redirect_uris` របស់ Client។ សូមបន្ថែម URL ពេញលេញ ឬ Wildcard។\n- **`Authorization Server policy requires PKCE`៖** Client បានកំណត់ `Require PKCE: ON` ប៉ុន្តែមិនបានបញ្ជូន `code_challenge`។ សូមធីក 'Use PKCE?' ឬបិទ Require PKCE លើ Client។\n- **`invalid_client` (401)៖** Client Secret ខុស ឬបានបញ្ជូន Secret មកឱ្យ Public Client។ Public Client មិនត្រូវប្រើ Client Secret ឡើយ។\n- **Redirect ទៅច្រក 5173 ជំនួសឱ្យ 4000៖** សូមកំណត់ `CONSOLE_URL=http://localhost:4000` និង `APP_WEB_URL=http://localhost:4000` ក្នុង `angkorgate-core/.env`។",
         },
       },
       {

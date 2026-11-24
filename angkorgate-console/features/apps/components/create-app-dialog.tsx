@@ -110,7 +110,7 @@ export function CreateAppDialog() {
               <Label htmlFor="redirectUrls">Redirect URIs (comma-separated)</Label>
               <Input
                 id="redirectUrls"
-                placeholder="https://app.example.com/callback, http://localhost:3000/callback"
+                placeholder="https://app.example.com/callback, http://localhost:4000/callback"
                 value={redirectUris}
                 onChange={(e) => setRedirectUris(e.target.value)}
               />

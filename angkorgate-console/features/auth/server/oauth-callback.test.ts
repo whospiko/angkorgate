@@ -6,7 +6,7 @@ import { apiClient } from "@/lib/api-client"
 
 describe("app/auth/callback/route: OAuth Ticket Callback Handler", () => {
   test("redirects to error if ticket is missing", async () => {
-    const req = new NextRequest("http://localhost:3000/auth/callback")
+    const req = new NextRequest("http://localhost:4000/auth/callback")
     const res = await GET(req)
     assert.strictEqual(res.status, 307)
     assert.ok(res.headers.get("location")?.includes("/login?error=missing_ticket"))
@@ -50,7 +50,7 @@ describe("app/auth/callback/route: OAuth Ticket Callback Handler", () => {
         throw new Error(`Unexpected GET: ${path}`)
       }) as any
 
-      const req = new NextRequest("http://localhost:3000/auth/callback?ticket=test-ticket&redirect=%2Fdashboard")
+      const req = new NextRequest("http://localhost:4000/auth/callback?ticket=test-ticket&redirect=%2Fdashboard")
       const res = await GET(req)
 
       assert.strictEqual(res.status, 307)
@@ -103,7 +103,7 @@ describe("app/auth/callback/route: OAuth Ticket Callback Handler", () => {
         throw new Error(`Unexpected GET: ${path}`)
       }) as any
 
-      const req = new NextRequest("http://localhost:3000/auth/callback?ticket=test-ticket&redirect=%2Fdashboard")
+      const req = new NextRequest("http://localhost:4000/auth/callback?ticket=test-ticket&redirect=%2Fdashboard")
       const res = await GET(req)
 
       assert.strictEqual(res.status, 307)

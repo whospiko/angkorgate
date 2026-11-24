@@ -284,7 +284,7 @@ export class OidcStrategy extends PassportStrategy(Strategy, 'oidc') {
       client: new issuer.Client({
         client_id: '${app.appCode}',
         client_secret: '${secretStr}',
-        redirect_uris: ['${(app.validRedirectUris || [])[0] || "http://localhost:3000/callback"}'],
+        redirect_uris: ['${(app.validRedirectUris || [])[0] || "http://localhost:4000/callback"}'],
         response_types: ['code'],
       }),
       params: {

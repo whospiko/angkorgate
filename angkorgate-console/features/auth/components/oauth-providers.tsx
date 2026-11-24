@@ -17,7 +17,7 @@ export function OAuthProviders({ interaction, redirect }: OAuthProvidersProps) {
     // Route through /auth/callback so the console exchanges the ticket for session cookies
     const callbackTarget = redirect && redirect.startsWith("/") ? redirect : "/dashboard"
     const consoleOrigin =
-      typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"
+      typeof window !== "undefined" ? window.location.origin : "http://localhost:4000"
     const callbackUrl = `${consoleOrigin}/auth/callback?redirect=${encodeURIComponent(callbackTarget)}`
     params.set("redirect", callbackUrl)
   }
