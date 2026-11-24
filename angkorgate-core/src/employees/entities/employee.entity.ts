@@ -22,12 +22,12 @@ export class Employee {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ name: 'user_id', type: 'uuid', unique: true })
-    userId: string;
+    @Column({ name: 'user_id', type: 'uuid', unique: true, nullable: true })
+    userId: string | null;
 
-    @ManyToOne(() => User, { onDelete: 'RESTRICT' })
+    @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
     @JoinColumn({ name: 'user_id' })
-    user: User;
+    user: User | null;
 
     @Column({ name: 'employee_code', type: 'varchar', length: 30, unique: true })
     employeeCode: string;

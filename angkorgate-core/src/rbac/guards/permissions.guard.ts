@@ -23,6 +23,20 @@ export class PermissionsGuard implements CanActivate {
         if (!required || required.length === 0) return true;
 
         const req = context.switchToHttp().getRequest();
+
+        // 1. If request is authenticated via API Key, evaluate API key permissions
+        if (req.apiKey) {
+            const keyPerms = req.apiKey.permissions || [];
+            const missing = required.filter((p) => !keyPerms.includes(p));
+            if (missing.length > 0) {
+                throw new ForbiddenException(
+                    `API Key lacks required permissions: ${missing.join(', ')}`,
+                );
+            }
+            return true;
+        }
+
+        // 2. Otherwise evaluate user DB permissions
         const userId = req.user?.id;
         if (!userId) throw new ForbiddenException('No authenticated user');
 

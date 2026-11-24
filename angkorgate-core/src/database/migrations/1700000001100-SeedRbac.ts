@@ -6,6 +6,7 @@ const ROLES: Array<{ code: string; name: string; description: string }> = [
     { code: 'RECEPTIONIST', name: 'Receptionist', description: 'Front-desk access' },
     { code: 'ACCOUNTANT', name: 'Accountant', description: 'Billing access' },
     { code: 'ASSISTANT', name: 'Assistant', description: 'Assist doctors' },
+    { code: 'DEVELOPER', name: 'Developer', description: 'API Key management, API access and third-party integrations' },
     { code: 'CUSTOMER', name: 'Customer', description: 'Self-service customer/patient/guest' },
 ];
 
@@ -26,6 +27,9 @@ const PERMISSIONS: Array<{ code: string; resource: string; action: string }> = [
     { code: 'app:write', resource: 'app', action: 'write' },
     { code: 'oauth:read', resource: 'oauth', action: 'read' },
     { code: 'oauth:write', resource: 'oauth', action: 'write' },
+    { code: 'apikey:read', resource: 'apikey', action: 'read' },
+    { code: 'apikey:write', resource: 'apikey', action: 'write' },
+    { code: 'apikey:delete', resource: 'apikey', action: 'delete' },
 ];
 
 // Which permissions each role gets by default
@@ -45,6 +49,16 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     ],
     ASSISTANT: [
         'customer:read',
+    ],
+    DEVELOPER: [
+        'apikey:read',
+        'apikey:write',
+        'apikey:delete',
+        'customer:read',
+        'customer:write',
+        'employee:read',
+        'employee:write',
+        'app:read',
     ],
     CUSTOMER: [], // no admin permissions — gets access only to portal endpoints
 };

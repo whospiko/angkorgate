@@ -8,8 +8,8 @@ export class InitUsers1700000000000 implements MigrationInterface {
         await q.query(`
       CREATE TABLE users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        email CITEXT UNIQUE,
-        phone VARCHAR(20) UNIQUE,
+        email CITEXT,
+        phone VARCHAR(20),
         password_hash TEXT NOT NULL,
         is_active BOOLEAN NOT NULL DEFAULT TRUE,
         is_email_verified BOOLEAN NOT NULL DEFAULT FALSE,
@@ -20,8 +20,16 @@ export class InitUsers1700000000000 implements MigrationInterface {
         must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        deleted_at TIMESTAMPTZ,
         CONSTRAINT user_has_login CHECK (email IS NOT NULL OR phone IS NOT NULL)
       );
+    `);
+
+        await q.query(`
+      CREATE UNIQUE INDEX idx_users_email_unique ON users (email) WHERE deleted_at IS NULL;
+    `);
+        await q.query(`
+      CREATE UNIQUE INDEX idx_users_phone_unique ON users (phone) WHERE deleted_at IS NULL;
     `);
     }
 

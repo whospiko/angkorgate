@@ -57,7 +57,32 @@ export class AuditService {
                     }),
                 );
             } catch (err: any) {
-                // If actorId violates foreign key constraint (e.g. user deleted or truncated),
+                // 1. If invalid input syntax for type uuid (e.g. non-UUID entityId like 'default'),
+                // retry with entityId: null and preserve raw identifier in newValue
+                if (err?.code === '22P02' && event.entityId) {
+                    try {
+                        const fallbackNewValue = {
+                            ...(event.newValue || {}),
+                            _entityIdentifier: event.entityId,
+                        };
+                        await this.logRepo.save(
+                            this.logRepo.create({
+                                actorId: event.actorId ?? null,
+                                action: event.action,
+                                entity: event.entity,
+                                entityId: null,
+                                oldValue: event.oldValue ?? null,
+                                newValue: fallbackNewValue,
+                                ipAddress: event.ipAddress ?? null,
+                            }),
+                        );
+                        return;
+                    } catch {
+                        // ignore secondary error
+                    }
+                }
+
+                // 2. If actorId violates foreign key constraint (e.g. user deleted or truncated),
                 // fall back to saving without actorId to preserve audit record.
                 if (err?.code === '23503' && event.actorId) {
                     try {
@@ -86,7 +111,7 @@ export class AuditService {
         })();
 
         AuditService.pendingWrites.add(writePromise);
-        writePromise.finally(() => AuditService.pendingWrites.delete(writePromise));
+        void writePromise.finally(() => AuditService.pendingWrites.delete(writePromise));
 
         if (process.env.NODE_ENV === 'test') {
             await writePromise;

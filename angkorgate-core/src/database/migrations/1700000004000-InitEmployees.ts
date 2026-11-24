@@ -29,7 +29,7 @@ export class InitEmployees1700000004000 implements MigrationInterface {
         await q.query(`
       CREATE TABLE employees (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+        user_id UUID UNIQUE REFERENCES users(id) ON DELETE SET NULL,
         employee_code VARCHAR(30) UNIQUE NOT NULL,
         full_name VARCHAR(150) NOT NULL,
         gender VARCHAR(10) CHECK (gender IN ('MALE','FEMALE','OTHER')),

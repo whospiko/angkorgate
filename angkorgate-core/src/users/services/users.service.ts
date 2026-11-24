@@ -4,7 +4,7 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dto/create-user.dto';
@@ -20,6 +20,7 @@ export class UsersService {
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
         private readonly audit: AuditService,
+        private readonly dataSource: DataSource,
     ) { }
 
     async create(dto: CreateUserDto): Promise<UserResponseDto> {
@@ -178,8 +179,40 @@ export class UsersService {
     }
 
     async remove(id: string): Promise<void> {
-        const result = await this.userRepo.delete(id);
-        if (result.affected === 0) throw new NotFoundException(`User ${id} not found`);
+        const user = await this.userRepo.findOne({ where: { id } });
+        if (!user) throw new NotFoundException(`User ${id} not found`);
+
+        await this.dataSource.transaction(async (manager) => {
+            // Unlink linked employee if present
+            await manager.query(
+                `UPDATE employees SET user_id = NULL WHERE user_id = $1`,
+                [id],
+            );
+
+            // Unlink linked customer if present
+            await manager.query(
+                `UPDATE customers SET user_id = NULL WHERE user_id = $1`,
+                [id],
+            );
+
+            // Invalidate refresh tokens for security
+            await manager.query(
+                `UPDATE refresh_tokens SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`,
+                [id],
+            );
+
+            // Soft-delete user
+            const result = await manager.getRepository(User).softDelete(id);
+            if (result.affected === 0) throw new NotFoundException(`User ${id} not found`);
+        });
+
+        void this.audit.log({
+            action: 'user.delete',
+            entity: 'user',
+            entityId: id,
+            oldValue: { email: user.email, phone: user.phone },
+            newValue: { softDeleted: true },
+        });
     }
 
     async getEmail(id: string): Promise<string | null> {
@@ -216,6 +249,7 @@ export class UsersService {
             .createQueryBuilder('user')
             .addSelect('user.passwordHash')
             .where('user.email = :email', { email })
+            .andWhere('user.deletedAt IS NULL')
             .getOne();
     }
 
@@ -224,6 +258,7 @@ export class UsersService {
             .createQueryBuilder('user')
             .addSelect('user.passwordHash')
             .where('user.phone = :phone', { phone })
+            .andWhere('user.deletedAt IS NULL')
             .getOne();
     }
 
@@ -239,7 +274,8 @@ export class UsersService {
         if (email) {
             const q = this.userRepo
                 .createQueryBuilder('u')
-                .where('u.email = :email', { email });
+                .where('u.email = :email', { email })
+                .andWhere('u.deletedAt IS NULL');
             if (excludeId) q.andWhere('u.id != :id', { id: excludeId });
             if (await q.getExists()) {
                 throw new ConflictException(`Email ${email} is already in use`);
@@ -248,7 +284,8 @@ export class UsersService {
         if (phone) {
             const q = this.userRepo
                 .createQueryBuilder('u')
-                .where('u.phone = :phone', { phone });
+                .where('u.phone = :phone', { phone })
+                .andWhere('u.deletedAt IS NULL');
             if (excludeId) q.andWhere('u.id != :id', { id: excludeId });
             if (await q.getExists()) {
                 throw new ConflictException(`Phone ${phone} is already in use`);

@@ -4,13 +4,13 @@ export class AddAllowedDashboardRolesToSystemConfig1700000014000 implements Migr
     public async up(q: QueryRunner): Promise<void> {
         await q.query(`
             ALTER TABLE system_configs
-            ADD COLUMN IF NOT EXISTS allowed_dashboard_roles TEXT DEFAULT 'ADMIN';
+            ADD COLUMN IF NOT EXISTS allowed_dashboard_roles TEXT DEFAULT 'ADMIN,DEVELOPER';
         `);
 
-        // Ensure any existing rows have 'ADMIN' if NULL
+        // Ensure any existing rows have 'ADMIN,DEVELOPER' if NULL
         await q.query(`
             UPDATE system_configs
-            SET allowed_dashboard_roles = 'ADMIN'
+            SET allowed_dashboard_roles = 'ADMIN,DEVELOPER'
             WHERE allowed_dashboard_roles IS NULL;
         `);
     }

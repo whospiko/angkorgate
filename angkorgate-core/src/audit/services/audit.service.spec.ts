@@ -40,6 +40,33 @@ describe('AuditService', () => {
         );
     });
 
+    it('recovers gracefully from 22P02 invalid UUID syntax by saving with null entityId', async () => {
+        repo.create.mockImplementation((d) => d);
+        const uuidErr: any = new Error('invalid input syntax for type uuid: "default"');
+        uuidErr.code = '22P02';
+
+        repo.save
+            .mockRejectedValueOnce(uuidErr)
+            .mockResolvedValueOnce({ id: '1' } as never);
+
+        await service.log({
+            action: 'system.setup.completed',
+            entity: 'system',
+            entityId: 'default',
+        });
+        await service.flush();
+
+        expect(repo.save).toHaveBeenCalledTimes(2);
+        expect(repo.save).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                action: 'system.setup.completed',
+                entity: 'system',
+                entityId: null,
+                newValue: expect.objectContaining({ _entityIdentifier: 'default' }),
+            }),
+        );
+    });
+
     it('never throws on DB errors (fire-and-forget)', async () => {
         const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => { });
         repo.create.mockImplementation((d) => d);

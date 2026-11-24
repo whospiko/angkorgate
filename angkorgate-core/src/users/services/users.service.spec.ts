@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { createMockRepository } from '../../../test/mocks/repository.mock';
 import { UsersService } from './users.service';
@@ -9,15 +10,32 @@ import { AuditService } from '../../audit/services/audit.service';
 describe('UsersService', () => {
     let service: UsersService;
     let repo: ReturnType<typeof createMockRepository>;
+    let mockDataSource: any;
 
     beforeEach(async () => {
         repo = createMockRepository<User>();
+        mockDataSource = {
+            transaction: jest.fn().mockImplementation(async (cb) => {
+                const manager = {
+                    query: jest.fn().mockResolvedValue([]),
+                    createQueryBuilder: jest.fn().mockReturnValue({
+                        update: jest.fn().mockReturnThis(),
+                        set: jest.fn().mockReturnThis(),
+                        where: jest.fn().mockReturnThis(),
+                        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+                    }),
+                    getRepository: jest.fn().mockReturnValue(repo),
+                };
+                return cb(manager);
+            }),
+        };
 
         const module = await Test.createTestingModule({
             providers: [
                 UsersService,
                 { provide: getRepositoryToken(User), useValue: repo },
                 { provide: AuditService, useValue: { log: jest.fn() } },
+                { provide: DataSource, useValue: mockDataSource },
             ],
         }).compile();
 
@@ -111,6 +129,23 @@ describe('UsersService', () => {
         it('getEmail returns null when no user', async () => {
             repo.findOne.mockResolvedValue(null);
             expect(await service.getEmail('u1')).toBeNull();
+        });
+    });
+
+    describe('remove (soft delete)', () => {
+        it('unlinks employees and soft-deletes the user', async () => {
+            repo.findOne.mockResolvedValue({ id: 'u1', email: 'test@example.com' });
+            repo.softDelete.mockResolvedValue({ affected: 1 });
+
+            await service.remove('u1');
+
+            expect(mockDataSource.transaction).toHaveBeenCalled();
+            expect(repo.softDelete).toHaveBeenCalledWith('u1');
+        });
+
+        it('throws NotFoundException when user does not exist', async () => {
+            repo.findOne.mockResolvedValue(null);
+            await expect(service.remove('missing')).rejects.toThrow(NotFoundException);
         });
     });
 });

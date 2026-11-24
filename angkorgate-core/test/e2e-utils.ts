@@ -66,7 +66,8 @@ export async function truncateAll(ds: DataSource): Promise<void> {
       user_permission_overrides,
       user_roles,
       app_settings,
-      oidc_sessions
+      oidc_sessions,
+      api_keys
     RESTART IDENTITY CASCADE;
   `);
     // Note: roles, permissions, users kept if you re-seed per test class;
@@ -87,7 +88,7 @@ export async function seedAdmin(ds: DataSource): Promise<{
     const userRes = await ds.query(
         `INSERT INTO users (email, password_hash, is_active, is_email_verified)
      VALUES ($1, $2, true, true)
-     ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
+     ON CONFLICT (email) WHERE deleted_at IS NULL DO UPDATE SET password_hash = EXCLUDED.password_hash
      RETURNING id`,
         [email, hash],
     );

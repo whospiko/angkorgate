@@ -9,12 +9,13 @@ import {
 } from 'class-validator';
 
 export class CreateEmployeeDto {
-    @ApiProperty({
+    @ApiPropertyOptional({
         description: 'UUID of associated user account',
         example: '123e4567-e89b-12d3-a456-426614174000',
     })
+    @IsOptional()
     @IsUUID()
-    userId: string;
+    userId?: string;
 
     @ApiProperty({
         description: 'Unique employee ID code',

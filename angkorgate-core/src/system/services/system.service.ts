@@ -182,7 +182,7 @@ export class SystemService {
         void this.auditService.log({
             action: 'system.setup.completed',
             entity: 'system',
-            entityId: 'default',
+            entityId: null,
             actorId: createdUser.id,
             newValue: {
                 adminEmail: createdUser.email,
@@ -241,7 +241,7 @@ export class SystemService {
         void this.auditService.log({
             action: 'system.branding.updated',
             entity: 'system',
-            entityId: 'default',
+            entityId: null,
             actorId: actorId ?? null,
             oldValue: { ...oldValue } as Record<string, unknown>,
             newValue: { ...saved } as Record<string, unknown>,

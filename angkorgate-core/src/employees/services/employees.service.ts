@@ -19,9 +19,15 @@ export class EmployeesService {
     ) { }
 
     async create(dto: CreateEmployeeDto, actorId?: string): Promise<EmployeeResponseDto> {
-        // Validate the linked user exists — the only cross-module call
-        if (!(await this.users.exists(dto.userId))) {
-            throw new NotFoundException(`User ${dto.userId} not found`);
+        // Validate the linked user exists if provided
+        if (dto.userId) {
+            if (!(await this.users.exists(dto.userId))) {
+                throw new NotFoundException(`User ${dto.userId} not found`);
+            }
+            const userLinked = await this.repo.findOne({ where: { userId: dto.userId } });
+            if (userLinked) {
+                throw new ConflictException(`User ${dto.userId} already has an employee record`);
+            }
         }
 
         const codeExists = await this.repo.findOne({
@@ -29,11 +35,6 @@ export class EmployeesService {
         });
         if (codeExists) {
             throw new ConflictException(`Employee code ${dto.employeeCode} exists`);
-        }
-
-        const userLinked = await this.repo.findOne({ where: { userId: dto.userId } });
-        if (userLinked) {
-            throw new ConflictException(`User ${dto.userId} already has an employee record`);
         }
 
         const entity = this.repo.create(dto);

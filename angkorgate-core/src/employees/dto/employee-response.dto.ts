@@ -5,8 +5,8 @@ export class EmployeeResponseDto {
     @ApiProperty({ description: 'Employee UUID', example: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' })
     id: string;
 
-    @ApiProperty({ description: 'Associated user account UUID', example: '123e4567-e89b-12d3-a456-426614174000' })
-    userId: string;
+    @ApiPropertyOptional({ description: 'Associated user account UUID', example: '123e4567-e89b-12d3-a456-426614174000', nullable: true })
+    userId: string | null;
 
     @ApiProperty({ description: 'Unique employee ID code', example: 'EMP-001' })
     employeeCode: string;

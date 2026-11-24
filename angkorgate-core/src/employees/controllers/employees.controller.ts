@@ -11,6 +11,7 @@ import {
     Post,
     Query,
     UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
 import {
     ApiBearerAuth,
@@ -20,10 +21,11 @@ import {
     ApiResponse,
     ApiTags,
 } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { Permissions } from '../../rbac/decorators/permissions.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { UnifiedAuthGuard } from '../../auth/guards/unified-auth.guard';
+import { FieldProjectionInterceptor } from '../../common/interceptors/field-projection.interceptor';
 import { EmployeesService } from '../services/employees.service';
 import { CreateEmployeeDto } from '../dto/create-employee.dto';
 import { UpdateEmployeeDto } from '../dto/update-employee.dto';
@@ -31,7 +33,8 @@ import { EmployeeResponseDto } from '../dto/employee-response.dto';
 
 @ApiTags('Employees')
 @ApiBearerAuth('bearerAuth')
-@UseGuards(AuthGuard('jwt'), PermissionsGuard)
+@UseGuards(UnifiedAuthGuard, PermissionsGuard)
+@UseInterceptors(FieldProjectionInterceptor)
 @Controller('employees')
 export class EmployeesController {
     constructor(private readonly employees: EmployeesService) { }

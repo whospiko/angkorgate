@@ -20,6 +20,7 @@ import { ScopesModule } from './scopes/scopes.module';
 import { OidcModule } from './oidc/oidc.module';
 import { CacheModule } from './cache/cache.module';
 import { SystemModule } from './system/system.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
 import { AppContextMiddleware } from './apps/middleware/app-context.middleware';
 import { OauthConfigService } from './oauth/services/oauth-config.service';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -60,6 +61,7 @@ import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
     OidcModule,
     CacheModule,
     SystemModule,
+    ApiKeysModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

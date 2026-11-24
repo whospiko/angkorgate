@@ -23,6 +23,8 @@ import { MfaPendingGuard } from './guards/mfa-pending.guard';
 import { EmailChangeService } from './services/email-change.service';
 import { EmailChangeToken } from './entities/email-change-token.entity';
 import { EmailChangeController } from './controllers/email-change.controller';
+import { ApiKeysModule } from '../api-keys/api-keys.module';
+import { UnifiedAuthGuard } from './guards/unified-auth.guard';
 
 @Module({
     imports: [
@@ -50,14 +52,25 @@ import { EmailChangeController } from './controllers/email-change.controller';
         ]),
         UsersModule,
         RbacModule,
-        CustomersModule
+        CustomersModule,
+        ApiKeysModule,
     ],
     controllers: [AuthController, MfaController, EmailChangeController],
-    providers: [AuthService, EmailChangeService, JwtStrategy, JwtAuthGuard, EncryptionService, MfaService, MfaPendingGuard, EmailChangeService],
+    providers: [
+        AuthService,
+        EmailChangeService,
+        JwtStrategy,
+        JwtAuthGuard,
+        UnifiedAuthGuard,
+        EncryptionService,
+        MfaService,
+        MfaPendingGuard,
+    ],
     exports: [
         AuthService,
         JwtAuthGuard,
-        MfaService
+        UnifiedAuthGuard,
+        MfaService,
     ],
 })
 export class AuthModule { }

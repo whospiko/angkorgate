@@ -713,4 +713,4 @@ async function runSmokeTest() {
     }
 }
 
-runSmokeTest();
+void runSmokeTest();

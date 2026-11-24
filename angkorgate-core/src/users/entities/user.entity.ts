@@ -1,6 +1,7 @@
 import {
     Column,
     CreateDateColumn,
+    DeleteDateColumn,
     Entity,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
@@ -11,10 +12,10 @@ export class User {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ type: 'citext', unique: true, nullable: true })
+    @Column({ type: 'citext', nullable: true })
     email: string | null;
 
-    @Column({ type: 'varchar', length: 20, unique: true, nullable: true })
+    @Column({ type: 'varchar', length: 20, nullable: true })
     phone: string | null;
 
     @Column({ name: 'password_hash', type: 'text' })
@@ -46,4 +47,7 @@ export class User {
 
     @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
     updatedAt: Date;
+
+    @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz', nullable: true })
+    deletedAt: Date | null;
 }

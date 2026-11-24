@@ -12,6 +12,7 @@ import {
     Put,
     Query,
     UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
 import {
     ApiBearerAuth,
@@ -21,10 +22,11 @@ import {
     ApiResponse,
     ApiTags,
 } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { Permissions } from '../../rbac/decorators/permissions.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { UnifiedAuthGuard } from '../../auth/guards/unified-auth.guard';
+import { FieldProjectionInterceptor } from '../../common/interceptors/field-projection.interceptor';
 import { CustomersService } from '../services/customers.service';
 import { CreateCustomerDto } from '../dto/create-customer.dto';
 import { UpdateCustomerDto } from '../dto/update-customer.dto';
@@ -33,7 +35,8 @@ import { CustomerResponseDto } from '../dto/customer-response.dto';
 
 @ApiTags('Customers')
 @ApiBearerAuth('bearerAuth')
-@UseGuards(AuthGuard('jwt'), PermissionsGuard)
+@UseGuards(UnifiedAuthGuard, PermissionsGuard)
+@UseInterceptors(FieldProjectionInterceptor)
 @Controller('customers')
 export class CustomersController {
     constructor(private readonly customers: CustomersService) { }

@@ -33,6 +33,8 @@ export function createMockRepository<T extends ObjectLiteral = any>(): MockRepos
         create: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
+        softDelete: jest.fn(),
+        restore: jest.fn(),
         count: jest.fn(),
         exists: jest.fn(),
         createQueryBuilder: jest.fn().mockReturnValue(qb),

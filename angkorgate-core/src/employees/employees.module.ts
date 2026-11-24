@@ -9,6 +9,7 @@ import { WorkSchedule } from "./entities/work-schedule.entity";
 import { User } from "../users/entities/user.entity";
 import { UsersModule } from "../users/users.module";
 import { RbacModule } from "../rbac/rbac.module";
+import { ApiKeysModule } from "../api-keys/api-keys.module";
 import { DepartmentsController } from "./controllers/departments.controller";
 import { JobTitlesController } from "./controllers/job-titles.controller";
 import { EmployeesController } from "./controllers/employees.controller";
@@ -33,6 +34,7 @@ import { SchedulesService } from "./services/schedules.service";
         ]),
         UsersModule, // ✅ for UsersService.exists() / getEmail() in employees.service
         RbacModule,  // ✅ for PermissionsGuard in controllers
+        ApiKeysModule, // ✅ for UnifiedAuthGuard in controllers
     ],
     controllers: [
         DepartmentsController,
