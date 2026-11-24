@@ -97,6 +97,10 @@ const defaultNavData = {
       icon: <RiBookOpenLine className="size-4" />,
       items: [
         {
+          title: "API Keys & Integrations",
+          url: "/api-keys",
+        },
+        {
           title: "Documentation",
           url: "/docs",
         },

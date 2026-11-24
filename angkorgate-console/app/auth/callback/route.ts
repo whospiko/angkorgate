@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { apiClient } from "@/lib/api-client"
 import type { UserSummary } from "@/features/auth/types/auth.schemas"
-import type { BrandingConfig } from "@/features/system/types/system.types"
+import type { BrandingConfig } from "@/features/system/types/branding.types"
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
 
     const userRoles = user.roles || []
     const hasAccess = userRoles.some((r) =>
-      allowedRoles.some((allowed) => allowed.toUpperCase() === r.toUpperCase())
+      allowedRoles.some((allowed: string) => allowed.toUpperCase() === r.toUpperCase())
     )
 
     if (!hasAccess) {
