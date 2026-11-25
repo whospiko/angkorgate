@@ -81,17 +81,6 @@ export async function loginAction(
     allowedRoles.some((allowed) => allowed.toUpperCase() === r.toUpperCase())
   )
 
-  if (!hasAccess) {
-    return {
-      success: false,
-      message: `Access denied. Your assigned role (${
-        userRoles.length > 0 ? userRoles.join(", ") : "CUSTOMER"
-      }) is not authorized to access the Admin Console. Configured access roles: ${allowedRoles.join(
-        ", "
-      )}.`,
-    }
-  }
-
   const cookieStore = await cookies()
   const isProd = process.env.NODE_ENV === "production"
 
@@ -124,14 +113,22 @@ export async function loginAction(
     maxAge: authData.refreshTokenExpiresIn || 604800,
   })
 
-  // Safe redirect validation: ensure path starts with '/' and not '//'
-  let targetPath = "/dashboard"
+  // Determine destination path:
+  // Non-dashboard users (e.g. CUSTOMER) route to the self-service /account portal.
+  // Dashboard authorized users default to /dashboard or their specified redirect.
+  let defaultPath = hasAccess ? "/dashboard" : "/account"
+  let targetPath = defaultPath
+
   if (
     typeof rawRedirect === "string" &&
     rawRedirect.startsWith("/") &&
     !rawRedirect.startsWith("//")
   ) {
-    targetPath = rawRedirect
+    if (!hasAccess && !rawRedirect.startsWith("/account")) {
+      targetPath = "/account"
+    } else {
+      targetPath = rawRedirect
+    }
   }
 
   redirect(targetPath)

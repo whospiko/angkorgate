@@ -330,7 +330,7 @@ npm run dev`,
     lastUpdated: "2026-11-23",
     version: "1.0.0",
     prevArticleId: "oidc-engine",
-    nextArticleId: "oidc-debugger",
+    nextArticleId: "account-portal-integration",
     tableOfContents: [
       { id: "confidential-vs-public", titleEn: "Confidential vs. Public Clients", titleKm: "Client សម្ងាត់ (Confidential) vs. Client សាធារណៈ (Public)" },
       { id: "registration-wizard", titleEn: "4-Step Registration Wizard", titleKm: "ជំហានចុះឈ្មោះ ៤ ដំណាក់កាល" },
@@ -746,6 +746,77 @@ echo "JWT: $ADMIN_TOKEN"`,
         content: {
           en: "When testing from browser-based tools like OIDC Debugger, your backend must permit cross-origin OPTIONS preflight requests. AngkorGate Core enables this out of the box via `app.enableCors({ origin: true, credentials: true })` in `src/main.ts` and `clientBasedCORS` in `oidc.service.ts`.",
           km: "នៅពេលតេស្តពី Browser Tool ដូចជា OIDC Debugger ម៉ាស៊ីន Backend ត្រូវតែបើក CORS OPTIONS Preflight។ AngkorGate Core បានរៀបចំរួចជាស្រេចតាមរយៈ `app.enableCors({ origin: true, credentials: true })` ក្នុង `src/main.ts` និង `clientBasedCORS` ក្នុង `oidc.service.ts`។",
+        },
+      },
+    ],
+  },
+
+  // 10. External Frontend Account Linking & Self-Service Portal
+  {
+    id: "account-portal-integration",
+    categoryId: "client-apps",
+    title: {
+      en: "External Frontend Account Linking & Self-Service Portal",
+      km: "ការភ្ជាប់ Frontend ខាងក្រៅ និងទំព័រគ្រប់គ្រងគណនី (Self-Service Portal)",
+    },
+    subtitle: {
+      en: "Learn how client applications link users to AngkorGate's hosted self-service account portal or consume headless profile REST APIs.",
+      km: "ស្វែងយល់ពីរបៀបដែល Client Application ភ្ជាប់អ្នកប្រើប្រាស់មកកាន់ Self-Service Account Portal ឬប្រើប្រាស់ Headless Profile REST APIs។",
+    },
+    badge: "Self-Service & APIs",
+    lastUpdated: "2026-11-25",
+    version: "1.0.0",
+    prevArticleId: "client-management",
+    nextArticleId: "oidc-debugger",
+    tableOfContents: [
+      { id: "two-patterns", titleEn: "Hosted Portal vs Headless APIs", titleKm: "Hosted Portal vs Headless APIs" },
+      { id: "pattern-1-hosted-portal", titleEn: "Pattern 1: Hosted Account Portal URL", titleKm: "ទម្រង់ទី ១៖ Hosted Account Portal URL" },
+      { id: "pattern-2-headless-api", titleEn: "Pattern 2: Headless REST Profile APIs", titleKm: "ទម្រង់ទី ២៖ Headless REST Profile APIs" },
+      { id: "security-and-passkeys", titleEn: "Passkeys, MFA & Session Revocation", titleKm: "Passkeys, MFA និងការលុប Session" },
+    ],
+    sections: [
+      {
+        id: "two-patterns",
+        heading: {
+          en: "Hosted Portal vs Headless REST APIs",
+          km: "Hosted Portal vs Headless REST APIs",
+        },
+        content: {
+          en: "When building external frontend apps (Next.js, React, Vue, mobile apps) authenticated via AngkorGate OIDC, you have two flexible architectural patterns for allowing users to update their profile and security settings:\n\n1. **Hosted Account Portal (`/account`)**: Redirect or link the user to AngkorGate's built-in, responsive self-service portal. Zero frontend code required in your app; supports biometrics/Passkeys, sessions, password change, and a convenient **Return to [App Name]** button.\n2. **Headless Self-Service REST APIs**: Your application builds its own native UI and directly calls AngkorGate's `GET /auth/me` and `PATCH /auth/me` endpoints using the user's OIDC access token.",
+          km: "នៅពេលបង្កើត Frontend ខាងក្រៅ (Next.js, React, Vue, Mobile) ដែល Login តាមរយៈ AngkorGate OIDC អ្នកមានជម្រើស ២ បែបដើម្បីឱ្យអ្នកប្រើប្រាស់កែប្រែ Profile និង Security៖\n\n1. **Hosted Account Portal (`/account`)**៖ បញ្ជូនអ្នកប្រើមកកាន់ទំព័រ Self-Service ស្រាប់របស់ AngkorGate ដោយផ្ទាល់។ មិនបាច់សរសេរ UI ថ្មី គាំទ្រទាំង Passkeys/Biometrics, Sessions, Password Change និងមានប៊ូតុង **Return to [App Name]** ត្រឡប់ទៅវិញ។\n2. **Headless Self-Service REST APIs**៖ Application របស់អ្នកបង្កើត UI ផ្ទាល់ខ្លួន ហើយហៅ API `GET /auth/me` និង `PATCH /auth/me` ដោយប្រើ OIDC Access Token។",
+        },
+      },
+      {
+        id: "pattern-1-hosted-portal",
+        heading: {
+          en: "Pattern 1: Linking to Hosted Account Portal",
+          km: "ទម្រង់ទី ១៖ ការភ្ជាប់ទៅកាន់ Hosted Account Portal",
+        },
+        content: {
+          en: "In your client application's navigation header or user avatar menu, link directly to AngkorGate's account portal passing `return_url` and `app_name` query parameters:\n\n```tsx\n// In your React / Next.js Navbar:\nexport function UserProfileLink() {\n  const portalUrl = new URL('http://localhost:4000/account');\n  portalUrl.searchParams.set('return_url', window.location.href);\n  portalUrl.searchParams.set('app_name', 'Acme Store');\n\n  return (\n    <a\n      href={portalUrl.toString()}\n      className=\"btn btn-outline\"\n    >\n      Manage Account & Security\n    </a>\n  );\n}\n```\n\nIf the user is already authenticated in AngkorGate, the portal displays immediately. If not, they are prompted to sign in and immediately redirected back to `/account`.",
+          km: "នៅក្នុង Navbar ឬ Menu របស់ Client App អ្នកអាចដាក់ Link ទៅកាន់ Account Portal ដោយបញ្ជូន `return_url` និង `app_name`៖\n\n```tsx\n// ឧទាហរណ៍ក្នុង React / Next.js Navbar:\nexport function UserProfileLink() {\n  const portalUrl = new URL('http://localhost:4000/account');\n  portalUrl.searchParams.set('return_url', window.location.href);\n  portalUrl.searchParams.set('app_name', 'Acme Store');\n\n  return (\n    <a\n      href={portalUrl.toString()}\n      className=\"btn btn-outline\"\n    >\n      គ្រប់គ្រងគណនី និងសុវត្ថិភាព\n    </a>\n  );\n}\n```\n\nប្រសិនបើអ្នកប្រើបាន Login រួចហើយ ទំព័រនេះនឹងបង្ហាញភ្លាមៗ។ ប្រសិនបើមិនទាន់ Login ប្រព័ន្ធនឹងនាំទៅ Login រួច redirect មកកាន់ `/account` ដោយស្វ័យប្រវត្តិ។",
+        },
+      },
+      {
+        id: "pattern-2-headless-api",
+        heading: {
+          en: "Pattern 2: Headless Self-Service REST APIs",
+          km: "ទម្រង់ទី ២៖ Headless Self-Service REST APIs",
+        },
+        content: {
+          en: "If you want a 100% custom UI inside your own application, call AngkorGate's REST endpoints using the user's Bearer access token:\n\n### 1. Fetch Rich Profile (`GET /auth/me`)\n```http\nGET http://localhost:8080/auth/me\nAuthorization: Bearer <accessToken>\n```\n**Response:**\n```json\n{\n  \"id\": \"a1b2c3d4-...\",\n  \"email\": \"user@example.com\",\n  \"phone\": \"+85512345678\",\n  \"fullName\": \"Dara Sok\",\n  \"roles\": [\"CUSTOMER\"],\n  \"permissions\": [\"orders:read\"],\n  \"isEmailVerified\": true,\n  \"isPhoneVerified\": true,\n  \"mfaEnabled\": false,\n  \"passkeysCount\": 2,\n  \"createdAt\": \"2026-01-15T08:00:00Z\",\n  \"customer\": { \"id\": \"...\", \"customerCode\": \"CUS-0001\", \"type\": \"CUSTOMER\" }\n}\n```\n\n### 2. Update Profile (`PATCH /auth/me`)\n```http\nPATCH http://localhost:8080/auth/me\nAuthorization: Bearer <accessToken>\nContent-Type: application/json\n\n{\n  \"fullName\": \"Dara Sok\",\n  \"phone\": \"+85598765432\"\n}\n```",
+          km: "ប្រសិនបើអ្នកចង់បង្កើត UI ក្នុង App របស់អ្នក ១០០% សូមហៅ API REST របស់ AngkorGate ដោយភ្ជាប់ Bearer Access Token៖\n\n### 1. ទាញយក Profile (`GET /auth/me`)\n```http\nGET http://localhost:8080/auth/me\nAuthorization: Bearer <accessToken>\n```\n**Response ត្រឡប់មកវិញ៖**\n```json\n{\n  \"id\": \"a1b2c3d4-...\",\n  \"email\": \"user@example.com\",\n  \"phone\": \"+85512345678\",\n  \"fullName\": \"Dara Sok\",\n  \"roles\": [\"CUSTOMER\"],\n  \"permissions\": [\"orders:read\"],\n  \"isEmailVerified\": true,\n  \"isPhoneVerified\": true,\n  \"mfaEnabled\": false,\n  \"passkeysCount\": 2,\n  \"createdAt\": \"2026-01-15T08:00:00Z\",\n  \"customer\": { \"id\": \"...\", \"customerCode\": \"CUS-0001\", \"type\": \"CUSTOMER\" }\n}\n```\n\n### 2. កែប្រែឈ្មោះ និងលេខទូរស័ព្ទ (`PATCH /auth/me`)\n```http\nPATCH http://localhost:8080/auth/me\nAuthorization: Bearer <accessToken>\nContent-Type: application/json\n\n{\n  \"fullName\": \"Dara Sok\",\n  \"phone\": \"+85598765432\"\n}\n```",
+        },
+      },
+      {
+        id: "security-and-passkeys",
+        heading: {
+          en: "Security, Sessions & Passkeys APIs",
+          km: "API សម្រាប់ Passkeys, សុវត្ថិភាព និង Sessions",
+        },
+        content: {
+          en: "External clients can also access dedicated self-service security endpoints:\n- **Change Password**: `POST /auth/change-password` with `{ oldPassword, newPassword }`\n- **Active Sessions**: `GET /auth/sessions` and `DELETE /auth/sessions/:id`\n- **Logout All Devices**: `POST /auth/logout-all`\n- **Biometric Passkeys**: `POST /auth/passkey/register/options`, `POST /auth/passkey/register/verify`, `GET /auth/passkey/list`, and `DELETE /auth/passkey/:id`",
+          km: "Client ខាងក្រៅក៏អាចហៅ Endpoints សម្រាប់គ្រប់គ្រងសុវត្ថិភាពផ្ទាល់ខ្លួនបានផងដែរ៖\n- **ប្តូរពាក្យសម្ងាត់**៖ `POST /auth/change-password` ជាមួយ `{ oldPassword, newPassword }`\n- **បញ្ជី Sessions សកម្ម**៖ `GET /auth/sessions` និង `DELETE /auth/sessions/:id`\n- **ចាកចេញពីគ្រប់ឧបករណ៍**៖ `POST /auth/logout-all`\n- **ចុះឈ្មោះ Passkeys / Biometrics**៖ `POST /auth/passkey/register/options`, `POST /auth/passkey/register/verify`, `GET /auth/passkey/list` និង `DELETE /auth/passkey/:id`",
         },
       },
     ],

@@ -178,7 +178,7 @@ export async function verifyPasskeyAuthAction(
     allowedRoles.some((allowed: string) => allowed.toUpperCase() === r.toUpperCase())
   )
 
-  if (!hasAccess) {
+  if (!hasAccess && !redirectUrl.startsWith("/account")) {
     return {
       success: false,
       message: `Access denied. Your assigned role (${

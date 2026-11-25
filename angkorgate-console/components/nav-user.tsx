@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useTransition } from "react"
+import Link from "next/link"
 import { useTheme } from "next-themes"
 import {
   Avatar,
@@ -33,6 +34,7 @@ import {
   RiLoader4Line,
   RiSunLine,
   RiMoonLine,
+  RiUserLine,
 } from "@remixicon/react"
 import { logoutAction } from "@/features/auth"
 
@@ -134,17 +136,9 @@ export function NavUser({ user }: NavUserProps) {
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <RiCheckboxCircleLine />
-                Account
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <RiBankCardLine />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <RiNotificationLine />
-                Notifications
+              <DropdownMenuItem render={<Link href="/account" />} className="cursor-pointer">
+                <RiUserLine className="size-4 text-primary" />
+                <span>My Account & Security</span>
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
