@@ -541,6 +541,7 @@ npm run dev`,
       { id: "password-and-session", titleEn: "Password Hashing & Secure Cookies", titleKm: "ការ Hash ពាក្យសម្ងាត់ និង Cookie សុវត្ថិភាព" },
       { id: "brute-force-protection", titleEn: "Brute-Force Lockout Protection", titleKm: "ការការពារការទាយពាក្យសម្ងាត់ (Lockout)" },
       { id: "totp-authenticator", titleEn: "TOTP 2FA & Emergency Backup Codes", titleKm: "TOTP 2FA និងកូដបម្រុងសង្គ្រោះបន្ទាន់" },
+      { id: "passkeys-fido2", titleEn: "Passkeys & WebAuthn (FIDO2)", titleKm: "Passkeys និង WebAuthn (FIDO2)" },
     ],
     sections: [
       {
@@ -574,6 +575,17 @@ npm run dev`,
         content: {
           en: "Users can pair any standard authenticator app (Google Authenticator, Microsoft Authenticator, 1Password) via QR code (RFC 6238). Upon activation, 10 single-use cryptographically hashed backup codes are generated for account recovery.",
           km: "អ្នកប្រើប្រាស់អាចភ្ជាប់ Authenticator App (Google Authenticator, 1Password, etc.) តាមរយៈ QR code (RFC 6238)។ នៅពេលបើកប្រើប្រាស់ ប្រព័ន្ធនឹងបង្កើតកូដបម្រុងចំនួន ១០ សន្លឹកសម្រាប់ប្រើពេលសង្គ្រោះបន្ទាន់។",
+        },
+      },
+      {
+        id: "passkeys-fido2",
+        heading: {
+          en: "Passkeys & WebAuthn (FIDO2 / Biometrics)",
+          km: "Passkeys និង WebAuthn (FIDO2 / ស្កេនម្រាមដៃ និងផ្ទៃមុខ)",
+        },
+        content: {
+          en: "AngkorGate natively supports WebAuthn / FIDO2 Passkeys. Users can register Touch ID, Face ID, Windows Hello, or hardware security keys (e.g. YubiKey) for instant zero-phishing passwordless login. Passkey credentials use public-key cryptography (ES256, RS256, EdDSA) where private keys never leave the secure hardware enclave of the user device.",
+          km: "AngkorGate គាំទ្រ WebAuthn / FIDO2 Passkeys ពីកំណើត។ អ្នកប្រើប្រាស់អាចចុះឈ្មោះ Touch ID, Face ID, Windows Hello, ឬ hardware security keys (YubiKey) សម្រាប់ចូលប្រើប្រាស់ដោយគ្មានពាក្យសម្ងាត់ (Passwordless) និងការពារពីការលួច Phishing 100% ដោយប្រើ Public-Key Cryptography។",
         },
       },
     ],

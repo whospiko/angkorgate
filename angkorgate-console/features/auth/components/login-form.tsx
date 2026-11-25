@@ -21,8 +21,14 @@ import {
   RiAlertLine,
   RiShieldKeyholeLine,
   RiTimerLine,
+  RiFingerprintLine,
 } from "@remixicon/react"
+import { startAuthentication, browserSupportsWebAuthn } from "@simplewebauthn/browser"
 import { loginAction } from "../server/auth-actions"
+import {
+  getPasskeyAuthOptionsAction,
+  verifyPasskeyAuthAction,
+} from "../server/passkey-actions"
 import { OAuthProviders } from "./oauth-providers"
 
 export interface LoginFormProps extends React.ComponentProps<"div"> {
@@ -51,6 +57,8 @@ export function LoginForm({
   const [showPassword, setShowPassword] = useState(false)
   const [interactionPending, setInteractionPending] = useState(false)
   const [interactionError, setInteractionError] = useState<string | null>(null)
+  const [passkeyLoading, setPasskeyLoading] = useState(false)
+  const [passkeyError, setPasskeyError] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const redirectParam = searchParams.get("redirect") || "/dashboard"
   const interactionParam = searchParams.get("interaction")
@@ -61,6 +69,61 @@ export function LoginForm({
         searchParams.get("redirect") !== "/" &&
         searchParams.get("redirect") !== "/dashboard"))
   const isExpired = searchParams.get("expired") === "1"
+
+  const handlePasskeySignIn = async () => {
+    setPasskeyLoading(true)
+    setPasskeyError(null)
+
+    try {
+      if (!browserSupportsWebAuthn()) {
+        setPasskeyError("Your browser or device does not support WebAuthn / Passkeys.")
+        setPasskeyLoading(false)
+        return
+      }
+
+      const emailInput = document.getElementById("email") as HTMLInputElement | null
+      const email = emailInput?.value?.trim() || undefined
+
+      // 1. Fetch authentication options
+      const optRes = await getPasskeyAuthOptionsAction(email)
+      if (!optRes.success || !optRes.options) {
+        setPasskeyError(optRes.message || "Failed to generate passkey authentication options.")
+        setPasskeyLoading(false)
+        return
+      }
+
+      // 2. Prompt device authenticator (TouchID / FaceID / Security Key)
+      let assertionResponse: any
+      try {
+        assertionResponse = await startAuthentication({ optionsJSON: optRes.options })
+      } catch (clientErr: any) {
+        if (clientErr.name === "NotAllowedError") {
+          setPasskeyError("Passkey prompt was cancelled or timed out.")
+        } else {
+          setPasskeyError(clientErr.message || "Biometric authentication was not completed.")
+        }
+        setPasskeyLoading(false)
+        return
+      }
+
+      // 3. Verify assertion with server, store cookies, and authorize access
+      const verifyRes = await verifyPasskeyAuthAction(
+        optRes.options.challengeId,
+        assertionResponse,
+        redirectParam
+      )
+
+      if (verifyRes.success) {
+        window.location.href = verifyRes.redirectUrl || redirectParam || "/dashboard"
+      } else {
+        setPasskeyError(verifyRes.message || "Passkey verification failed.")
+        setPasskeyLoading(false)
+      }
+    } catch (err: any) {
+      setPasskeyError(err.message || "An unexpected error occurred during passkey sign in.")
+      setPasskeyLoading(false)
+    }
+  }
 
   const handleInteractionSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     if (!interactionParam) return
@@ -115,8 +178,8 @@ export function LoginForm({
     }
   }
 
-  const activeLoading = interactionParam ? interactionPending : isPending
-  const activeErrorMessage = interactionError || (state?.message && !state?.success ? state.message : null)
+  const activeLoading = (interactionParam ? interactionPending : isPending) || passkeyLoading
+  const activeErrorMessage = passkeyError || interactionError || (state?.message && !state?.success ? state.message : null)
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -305,6 +368,26 @@ export function LoginForm({
           </Field>
 
           <FieldSeparator className="font-mono text-xs">Or continue with</FieldSeparator>
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handlePasskeySignIn}
+            disabled={activeLoading}
+            className="w-full font-mono gap-2 border-primary/30 bg-primary/5 hover:bg-primary/10 text-foreground"
+          >
+            {passkeyLoading ? (
+              <>
+                <RiLoader4Line className="size-4 animate-spin text-primary" />
+                <span>Waiting for Touch ID / Face ID...</span>
+              </>
+            ) : (
+              <>
+                <RiFingerprintLine className="size-4 text-primary" />
+                <span>Sign In with Passkey / Biometrics</span>
+              </>
+            )}
+          </Button>
 
           <OAuthProviders interaction={interactionParam} redirect={redirectParam} />
         </FieldGroup>

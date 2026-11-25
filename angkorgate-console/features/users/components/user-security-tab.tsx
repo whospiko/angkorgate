@@ -28,6 +28,7 @@ import {
   toggleUserStatusAction,
   deleteUserAction,
 } from "../server/users-actions"
+import { PasskeyManager } from "./passkey-manager"
 
 interface UserSecurityTabProps {
   user: User
@@ -344,6 +345,9 @@ export function UserSecurityTab({ user }: UserSecurityTabProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Passkeys & FIDO2 Biometrics Manager */}
+      <PasskeyManager userId={user.id} userEmail={user.email} />
 
       {/* Account Lifecycle & Activation State */}
       <Card className="border-border/60 shadow-xs">
