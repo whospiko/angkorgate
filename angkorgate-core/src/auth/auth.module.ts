@@ -25,6 +25,9 @@ import { EmailChangeToken } from './entities/email-change-token.entity';
 import { EmailChangeController } from './controllers/email-change.controller';
 import { ApiKeysModule } from '../api-keys/api-keys.module';
 import { UnifiedAuthGuard } from './guards/unified-auth.guard';
+import { UserPasskey } from './entities/user-passkey.entity';
+import { PasskeyService } from './services/passkey.service';
+import { PasskeyController } from './controllers/passkey.controller';
 
 @Module({
     imports: [
@@ -49,16 +52,18 @@ import { UnifiedAuthGuard } from './guards/unified-auth.guard';
             UserMfa,
             MfaBackupCode,
             EmailChangeToken,
+            UserPasskey,
         ]),
         UsersModule,
         RbacModule,
         CustomersModule,
         ApiKeysModule,
     ],
-    controllers: [AuthController, MfaController, EmailChangeController],
+    controllers: [AuthController, MfaController, EmailChangeController, PasskeyController],
     providers: [
         AuthService,
         EmailChangeService,
+        PasskeyService,
         JwtStrategy,
         JwtAuthGuard,
         UnifiedAuthGuard,
@@ -68,6 +73,7 @@ import { UnifiedAuthGuard } from './guards/unified-auth.guard';
     ],
     exports: [
         AuthService,
+        PasskeyService,
         JwtAuthGuard,
         UnifiedAuthGuard,
         MfaService,
