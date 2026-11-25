@@ -11,7 +11,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "./node_modules/.bin/cross-env DB_TYPE=sqlite CREATE_DEV_ADMIN=true nest start --watch",
-    "start:dev:memory": "./node_modules/.bin/cross-env DB_TYPE=sqlite DB_SQLITE_DATABASE=:memory: CREATE_DEV_ADMIN=false nest start --watch",
+    "start:dev:memory": "./node_modules/.bin/cross-env DB_TYPE=sqlite DB_SQLITE_DATABASE=:memory: CREATE_DEV_ADMIN=true nest start --watch",
     "start:dev:postgres": "./node_modules/.bin/cross-env DB_TYPE=postgres CREATE_DEV_ADMIN=false nest start --watch",
     "start:dev-postgres": "./node_modules/.bin/cross-env DB_TYPE=postgres CREATE_DEV_ADMIN=false nest start --watch",
     "start:debug": "./node_modules/.bin/cross-env DB_TYPE=sqlite nest start --debug --watch",

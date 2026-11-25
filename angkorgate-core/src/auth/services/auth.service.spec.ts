@@ -14,11 +14,13 @@ import { UsersService } from '../../users/services/users.service';
 import { RbacService } from '../../rbac/services/rbac.service';
 import { MailService } from '../../notifications/services/mail.service';
 import { CustomersService } from '../../customers/services/customers.service';
+import { EmployeesService } from '../../employees/services/employees.service';
 import { AuditService } from '../../audit/services/audit.service';
 import { RefreshToken } from '../entities/refresh-token.entity';
 import { LoginAttempt } from '../entities/login-attempt.entity';
 import { EmailVerificationToken } from '../entities/email-verification-token.entity';
 import { PasswordResetToken } from '../entities/password-reset-token.entity';
+import { UserPasskey } from '../entities/user-passkey.entity';
 import { AuthResponseDto, MfaChallengeDto } from '../dto/auth-response.dto';
 import { createMockRepository } from '../../../test/mocks/repository.mock';
 
@@ -32,12 +34,15 @@ describe('AuthService', () => {
     let config: Record<string, jest.Mock>;
     let audit: { log: jest.Mock };
     let mfa: Record<string, jest.Mock>;
+    let customers: Record<string, jest.Mock>;
+    let employees: Record<string, jest.Mock>;
 
     // Repositories
     let refreshRepo: ReturnType<typeof createMockRepository>;
     let attemptRepo: ReturnType<typeof createMockRepository>;
     let evtRepo: ReturnType<typeof createMockRepository>;
     let prtRepo: ReturnType<typeof createMockRepository>;
+    let passkeyRepo: ReturnType<typeof createMockRepository>;
 
     // Shared fixtures
     const goodPassword = 'GoodPass123!';
@@ -64,10 +69,12 @@ describe('AuthService', () => {
             findByPhone: jest.fn(),
             setEmailVerified: jest.fn(),
             setPhoneVerified: jest.fn(),
+            update: jest.fn(),
         };
 
         rbac = {
             getUserRoleCodes: jest.fn().mockResolvedValue(['CUSTOMER']),
+            getUserPermissions: jest.fn().mockResolvedValue([]),
             assignRoleToUser: jest.fn(),
         };
 
@@ -94,10 +101,24 @@ describe('AuthService', () => {
             verifyCodeOrBackup: jest.fn(),
         };
 
+        customers = {
+            create: jest.fn(),
+            findByUserId: jest.fn().mockResolvedValue(null),
+            update: jest.fn(),
+        };
+
+        employees = {
+            create: jest.fn(),
+            findByUserId: jest.fn().mockResolvedValue(null),
+            update: jest.fn(),
+        };
+
         refreshRepo = createMockRepository<RefreshToken>();
         attemptRepo = createMockRepository<LoginAttempt>();
         evtRepo = createMockRepository<EmailVerificationToken>();
         prtRepo = createMockRepository<PasswordResetToken>();
+        passkeyRepo = createMockRepository<UserPasskey>();
+        passkeyRepo.count = jest.fn().mockResolvedValue(0);
 
         const module = await Test.createTestingModule({
             providers: [
@@ -107,13 +128,15 @@ describe('AuthService', () => {
                 { provide: JwtService, useValue: jwt },
                 { provide: ConfigService, useValue: config },
                 { provide: MailService, useValue: { send: jest.fn() } },
-                { provide: CustomersService, useValue: { create: jest.fn() } },
+                { provide: CustomersService, useValue: customers },
+                { provide: EmployeesService, useValue: employees },
                 { provide: AuditService, useValue: audit },
                 { provide: MfaService, useValue: mfa },
                 { provide: getRepositoryToken(RefreshToken), useValue: refreshRepo },
                 { provide: getRepositoryToken(LoginAttempt), useValue: attemptRepo },
                 { provide: getRepositoryToken(EmailVerificationToken), useValue: evtRepo },
                 { provide: getRepositoryToken(PasswordResetToken), useValue: prtRepo },
+                { provide: getRepositoryToken(UserPasskey), useValue: passkeyRepo },
             ],
         }).compile();
 
@@ -467,6 +490,79 @@ describe('AuthService', () => {
             await expect(
                 service.changePassword('u1', 'wrong', 'NewPass1!'),
             ).rejects.toThrow('Old password is incorrect');
+        });
+    });
+
+    // ─────────────────────────────────────────────────────────────
+    //  PROFILE & SELF-SERVICE (GET/PATCH /auth/me)
+    // ─────────────────────────────────────────────────────────────
+
+    describe('getMeProfile & updateMeProfile', () => {
+        it('returns rich profile with linked customer data and passkeys count', async () => {
+            users.findByIdOrFail.mockResolvedValue({
+                id: 'u1',
+                email: 'dara@example.com',
+                phone: '+85512345678',
+                isEmailVerified: true,
+                isPhoneVerified: true,
+                createdAt: new Date('2026-01-01'),
+            });
+            rbac.getUserRoleCodes.mockResolvedValue(['CUSTOMER']);
+            rbac.getUserPermissions.mockResolvedValue(['orders:read']);
+            mfa.isEnabled.mockResolvedValue(false);
+            passkeyRepo.count.mockResolvedValue(2);
+            customers.findByUserId.mockResolvedValue({
+                id: 'c1',
+                customerCode: 'CUS-0001',
+                fullName: 'Dara Sok',
+                type: 'INDIVIDUAL',
+                status: 'ACTIVE',
+            });
+
+            const profile = await service.getMeProfile('u1');
+
+            expect(profile.id).toBe('u1');
+            expect(profile.email).toBe('dara@example.com');
+            expect(profile.fullName).toBe('Dara Sok');
+            expect(profile.passkeysCount).toBe(2);
+            expect(profile.customer?.customerCode).toBe('CUS-0001');
+            expect(profile.employee).toBeNull();
+        });
+
+        it('updates profile full name and phone number on customer', async () => {
+            users.findByIdOrFail.mockResolvedValue({
+                id: 'u1',
+                email: 'dara@example.com',
+                phone: '+85512345678',
+                isEmailVerified: true,
+                isPhoneVerified: true,
+                createdAt: new Date('2026-01-01'),
+            });
+            users.update.mockResolvedValue({});
+            customers.findByUserId.mockResolvedValue({
+                id: 'c1',
+                customerCode: 'CUS-0001',
+                fullName: 'Old Name',
+                phone: '+85512345678',
+            });
+            customers.update.mockResolvedValue({});
+
+            await service.updateMeProfile('u1', {
+                fullName: 'New Name',
+                phone: '+85598765432',
+            });
+
+            expect(users.update).toHaveBeenCalledWith('u1', { phone: '+85598765432' });
+            expect(customers.update).toHaveBeenCalledWith('c1', {
+                fullName: 'New Name',
+                phone: '+85598765432',
+            }, 'u1');
+            expect(audit.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    action: 'auth.profile.updated',
+                    entityId: 'u1',
+                }),
+            );
         });
     });
 });

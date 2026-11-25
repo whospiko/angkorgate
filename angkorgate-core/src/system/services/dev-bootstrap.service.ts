@@ -90,14 +90,11 @@ export class DevBootstrapService {
             return;
         }
 
-        // Determine whether dev admin should be auto-created
-        const createAdminEnv = process.env.CREATE_DEV_ADMIN;
-        let shouldCreateAdmin = false;
-        if (createAdminEnv !== undefined) {
+        // In dev mode, always ensure dev admin exists for smooth local testing
+        let shouldCreateAdmin = true;
+        if (process.env.NODE_ENV === 'production') {
+            const createAdminEnv = process.env.CREATE_DEV_ADMIN;
             shouldCreateAdmin = createAdminEnv === 'true' || createAdminEnv === '1';
-        } else {
-            // Default: only true for file-backed dev.sqlite (never for :memory:)
-            shouldCreateAdmin = storage !== ':memory:';
         }
 
         // Check if RBAC roles exist
@@ -227,12 +224,47 @@ export class DevBootstrapService {
                 directAccessGrantsEnabled: false,
                 serviceAccountsEnabled: false,
                 requirePkce: true,
-                validRedirectUris: ['http://localhost:4000/callback', 'http://localhost:3000/callback', 'http://localhost:5173/callback'],
+                validRedirectUris: [
+                    'http://localhost:4000/callback',
+                    'http://localhost:4000/auth/callback',
+                    'http://localhost:3000/callback',
+                    'http://localhost:5173/callback',
+                    'https://oidcdebugger.com/debug',
+                ],
                 validPostLogoutRedirectUris: ['http://localhost:4000', 'http://localhost:3000', 'http://localhost:5173'],
-                webOrigins: ['http://localhost:4000', 'http://localhost:3000', 'http://localhost:5173'],
+                webOrigins: ['http://localhost:4000', 'http://localhost:3000', 'http://localhost:5173', 'https://oidcdebugger.com'],
                 allowedScopes: defaultScopes,
             });
             await appRepo.save(consoleApp);
+        } else if (!consoleApp.validRedirectUris?.includes('https://oidcdebugger.com/debug')) {
+            consoleApp.validRedirectUris = [...(consoleApp.validRedirectUris || []), 'https://oidcdebugger.com/debug'];
+            await appRepo.save(consoleApp);
+        }
+
+        // 3. Demo App for OIDC Debugger & Testing
+        let demoApp = await appRepo.findOne({ where: { appCode: 'demo-app' } });
+        if (!demoApp) {
+            demoApp = appRepo.create({
+                appCode: 'demo-app',
+                name: 'OIDC Debugger Demo App',
+                description: 'Public OIDC client for OIDC Debugger verification and development',
+                clientSecret: null,
+                isPublicClient: true,
+                standardFlowEnabled: true,
+                directAccessGrantsEnabled: false,
+                serviceAccountsEnabled: false,
+                requirePkce: false,
+                validRedirectUris: [
+                    'https://oidcdebugger.com/debug',
+                    'http://localhost:3000/callback',
+                    'http://localhost:4000/callback',
+                    'http://localhost:5173/callback',
+                ],
+                validPostLogoutRedirectUris: ['https://oidcdebugger.com', 'http://localhost:3000', 'http://localhost:4000'],
+                webOrigins: ['https://oidcdebugger.com', 'http://localhost:3000', 'http://localhost:4000'],
+                allowedScopes: defaultScopes,
+            });
+            await appRepo.save(demoApp);
         }
     }
 

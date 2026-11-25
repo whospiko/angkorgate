@@ -7,6 +7,7 @@ import {
     HttpStatus,
     Param,
     ParseUUIDPipe,
+    Patch,
     Post,
     Query,
     Req,
@@ -39,6 +40,8 @@ import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { MfaPendingGuard } from '../guards/mfa-pending.guard';
 import { LoginMfaDto } from '../dto/login-mfa.dto';
 import { SessionResponseDto } from '../dto/session-response.dto';
+import { UserProfileDto } from '../dto/user-profile.dto';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { extractClientContext } from '../utils/client-context.util';
 
 interface MfaRequest extends Request {
@@ -134,11 +137,26 @@ export class AuthController {
     @ApiBearerAuth('bearerAuth')
     @UseGuards(JwtAuthGuard)
     @Get('me')
-    @ApiOperation({ summary: 'Get the profile of the currently authenticated user' })
-    @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
+    @ApiOperation({ summary: 'Get the full profile of the currently authenticated user' })
+    @ApiResponse({ status: 200, description: 'User profile retrieved successfully', type: UserProfileDto })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
-    me(@CurrentUser() user: AuthenticatedUser): AuthenticatedUser {
-        return user;
+    me(@CurrentUser('id') userId: string): Promise<UserProfileDto> {
+        return this.auth.getMeProfile(userId);
+    }
+
+    @ApiBearerAuth('bearerAuth')
+    @UseGuards(JwtAuthGuard)
+    @Patch('me')
+    @ApiOperation({ summary: 'Update self profile (full name, phone)' })
+    @ApiResponse({ status: 200, description: 'Profile updated successfully', type: UserProfileDto })
+    @ApiResponse({ status: 400, description: 'Validation error' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    updateMe(
+        @CurrentUser('id') userId: string,
+        @Body() dto: UpdateProfileDto,
+        @Req() req: Request,
+    ): Promise<UserProfileDto> {
+        return this.auth.updateMeProfile(userId, dto, this.ctxFrom(req));
     }
 
     @ApiBearerAuth('bearerAuth')

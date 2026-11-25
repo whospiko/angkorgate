@@ -24,10 +24,14 @@ import { EmailVerificationToken } from '../entities/email-verification-token.ent
 import { PasswordResetToken } from '../entities/password-reset-token.entity';
 import { MailService } from '../../notifications/services/mail.service';
 import { CustomersService } from '../../customers/services/customers.service';
+import { EmployeesService } from '../../employees/services/employees.service';
 import { resetPasswordTemplate } from '../templates/reset-password.template';
 import { verifyEmailTemplate } from '../templates/verify-email.template';
 import { RegisterCustomerDto } from '../dto/register-customer.dto';
 import { AuditService } from '../../audit/services/audit.service';
+import { UserPasskey } from '../entities/user-passkey.entity';
+import { UserProfileDto } from '../dto/user-profile.dto';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
 
 import { MfaService } from './mfa.service';
 
@@ -63,7 +67,10 @@ export class AuthService {
         private readonly prtRepo: Repository<PasswordResetToken>,
         private readonly mail: MailService,
         private readonly customers: CustomersService,
+        private readonly employees: EmployeesService,
         private readonly mfa: MfaService,
+        @InjectRepository(UserPasskey)
+        private readonly passkeyRepo: Repository<UserPasskey>,
     ) { }
 
     async hashPassword(plain: string): Promise<string> {
@@ -677,6 +684,126 @@ export class AuthService {
     ): Promise<AuthResponseDto> {
         const roles = await this.rbac.getUserRoleCodes(userId);
         return this.issueTokens(userId, email, phone, roles, ctx);
+    }
+
+    /**
+     * Get rich self profile including linked customer/employee details,
+     * permissions, MFA status, and registered passkeys count.
+     */
+    async getMeProfile(userId: string): Promise<UserProfileDto> {
+        const user = await this.users.findByIdOrFail(userId);
+
+        const [roles, permissions, mfaEnabled, passkeysCount, customer, employee] =
+            await Promise.all([
+                this.rbac.getUserRoleCodes(userId),
+                this.rbac.getUserPermissions(userId),
+                this.mfa.isEnabled(userId),
+                this.passkeyRepo.count({ where: { userId } }),
+                this.customers.findByUserId(userId),
+                this.employees.findByUserId(userId),
+            ]);
+
+        const fullName = employee?.fullName ?? customer?.fullName ?? null;
+
+        return {
+            id: user.id,
+            email: user.email,
+            phone: user.phone,
+            fullName,
+            roles,
+            permissions,
+            isEmailVerified: user.isEmailVerified,
+            isPhoneVerified: user.isPhoneVerified,
+            mfaEnabled,
+            passkeysCount,
+            createdAt: user.createdAt,
+            customer: customer
+                ? {
+                      id: customer.id,
+                      customerCode: customer.customerCode,
+                      type: customer.type,
+                      status: customer.status,
+                  }
+                : null,
+            employee: employee
+                ? {
+                      id: employee.id,
+                      employeeCode: employee.employeeCode,
+                      employmentStatus: employee.employmentStatus,
+                  }
+                : null,
+        };
+    }
+
+    /**
+     * Update current authenticated user's profile (name, phone).
+     */
+    async updateMeProfile(
+        userId: string,
+        dto: UpdateProfileDto,
+        ctx?: LoginContext,
+    ): Promise<UserProfileDto> {
+        const user = await this.users.findByIdOrFail(userId);
+        const oldPhone = user.phone;
+
+        // 1. Update phone on User entity if changed
+        if (dto.phone !== undefined && dto.phone !== user.phone) {
+            await this.users.update(userId, { phone: dto.phone });
+        }
+
+        // 2. Update fullName on linked employee or customer
+        if (dto.fullName !== undefined) {
+            const [customer, employee] = await Promise.all([
+                this.customers.findByUserId(userId),
+                this.employees.findByUserId(userId),
+            ]);
+
+            if (employee) {
+                await this.employees.update(
+                    employee.id,
+                    {
+                        fullName: dto.fullName,
+                        phone: dto.phone !== undefined ? dto.phone : (employee.phone ?? undefined),
+                    },
+                    userId,
+                );
+            } else if (customer) {
+                await this.customers.update(
+                    customer.id,
+                    {
+                        fullName: dto.fullName,
+                        phone: dto.phone !== undefined ? dto.phone : (customer.phone ?? undefined),
+                    },
+                    userId,
+                );
+            } else {
+                // If neither exists, provision an employee record for user
+                const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
+                const employeeCode = `EMP-${randomHex}`;
+                await this.employees.create(
+                    {
+                        employeeCode,
+                        fullName: dto.fullName,
+                        userId,
+                        phone: dto.phone ?? user.phone ?? undefined,
+                    },
+                    userId,
+                );
+            }
+        }
+
+        // 3. Audit log
+        void this.audit.log({
+            actorId: userId,
+            action: 'auth.profile.updated',
+            entity: 'user',
+            entityId: userId,
+            oldValue: { phone: oldPhone },
+            newValue: { phone: dto.phone, fullName: dto.fullName },
+            ipAddress: ctx?.ip ?? null,
+        });
+
+        return this.getMeProfile(userId);
     }
 }
 

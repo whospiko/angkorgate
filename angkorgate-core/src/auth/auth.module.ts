@@ -13,6 +13,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { EmailVerificationToken } from './entities/email-verification-token.entity';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { CustomersModule } from '../customers/customers.module';
+import { EmployeesModule } from '../employees/employees.module';
 import { AuthController } from './controllers/auth.controller';
 import { MfaController } from './controllers/mfa.controller';
 import { MfaBackupCode } from './entities/mfa-backup-code.entity';
@@ -57,6 +58,7 @@ import { PasskeyController } from './controllers/passkey.controller';
         UsersModule,
         RbacModule,
         CustomersModule,
+        EmployeesModule,
         ApiKeysModule,
     ],
     controllers: [AuthController, MfaController, EmailChangeController, PasskeyController],
