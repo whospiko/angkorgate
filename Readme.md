@@ -7,12 +7,15 @@ AngkorGate is an open-source Identity and Access Management (IAM) platform inspi
 ## ✨ Features
 
 - Authentication & Authorization
+- Passkeys & WebAuthn (FIDO2 / Biometrics)
+- Multi-Factor Authentication (MFA / TOTP)
 - User and Organization Management
 - Employee and Customer Management
 - Role-Based Access Control (RBAC)
 - OAuth 2.0 & OpenID Connect (OIDC)
-- Single Sign-On (SSO)
-- Developer-Friendly APIs
+- Single Sign-On (SSO) & Social Login (Google)
+- Developer API Keys Gateway & Friendly APIs
+- Tamper-Evident Audit Logging
 
 ## Non Features
 - Multi-Tenant
