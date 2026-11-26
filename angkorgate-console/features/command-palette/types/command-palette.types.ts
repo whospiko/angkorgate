@@ -30,7 +30,7 @@ export interface StaticCommandEntry {
   subtitle: string
   keywords: string[]
   href?: string
-  actionId?: "create-api-key" | "toggle-maintenance" | "purge-cache"
+  actionId?: "create-api-key" | "toggle-maintenance" | "purge-cache" | "open-help"
 }
 
 export const STATIC_COMMAND_ENTRIES: StaticCommandEntry[] = [
@@ -58,6 +58,14 @@ export const STATIC_COMMAND_ENTRIES: StaticCommandEntry[] = [
     subtitle: "Flush all cached keys in Redis and in-memory store",
     keywords: ["purge", "redis", "cache", "flush", "clear", "reset"],
     actionId: "purge-cache",
+  },
+  {
+    id: "action:open-help",
+    group: "action",
+    title: "Command Palette Guide",
+    subtitle: "View keyboard shortcuts, search tips, and quick actions",
+    keywords: ["help", "guide", "shortcuts", "cheat", "docs", "?"],
+    actionId: "open-help",
   },
   // Direct Navigation
   {

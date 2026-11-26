@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { SearchForm } from "@/components/search-form"
+import { CommandPaletteHelpButton } from "@/features/command-palette"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -60,7 +61,10 @@ export function SiteHeader() {
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
-        <SearchForm className="w-full sm:ml-auto sm:w-auto" />
+        <div className="flex w-full items-center gap-1.5 sm:ml-auto sm:w-auto">
+          <SearchForm className="flex-1 sm:flex-initial" />
+          <CommandPaletteHelpButton />
+        </div>
       </div>
     </header>
   )

@@ -22,6 +22,7 @@ import {
   RiLockLine,
   RiMailSendLine,
   RiPaletteLine,
+  RiQuestionLine,
   RiSearchLine,
   RiServerLine,
   RiSettings3Line,
@@ -62,6 +63,8 @@ function getStaticIcon(entry: StaticCommandEntry): React.ReactNode {
       return <RiServerLine className="size-4 text-amber-500" />
     case "action:purge-cache":
       return <RiDeleteBinLine className="size-4 text-rose-500" />
+    case "action:open-help":
+      return <RiQuestionLine className="size-4 text-primary" />
     case "nav:apps":
       return <RiApps2Line className="size-4 text-muted-foreground" />
     case "nav:audit":
@@ -237,6 +240,13 @@ export function CommandPalette({
           type: res.success ? "success" : "error",
           message: res.message,
         })
+        return
+      }
+
+      if (entry.actionId === "open-help") {
+        setOpen(false)
+        setQuery("")
+        window.dispatchEvent(new CustomEvent("angkorgate:open-command-help"))
       }
     },
     [maintenanceMode, pathname, router]
@@ -498,6 +508,19 @@ export function CommandPalette({
             <span>↑↓ Navigate</span>
             <span>↵ Select</span>
             <span>ESC Close</span>
+            <button
+              type="button"
+              onClick={() => {
+                handleOpenChange(false)
+                window.dispatchEvent(
+                  new CustomEvent("angkorgate:open-command-help")
+                )
+              }}
+              className="inline-flex items-center gap-1 text-primary hover:underline"
+            >
+              <RiQuestionLine className="size-3.5" />
+              Guide
+            </button>
           </div>
           <div className="flex items-center gap-1.5">
             <span>Maintenance:</span>
