@@ -25,6 +25,7 @@ import { UsersService } from '../../users/services/users.service';
 import { MfaService } from '../../auth/services/mfa.service';
 import { SkipTransform } from '../../common/decorators/skip-transform.decorator';
 import { OidcLoginDto } from '../dto/oidc-login.dto';
+import { extractClientContext } from '../../auth/utils/client-context.util';
 
 @ApiTags('OIDC')
 @SkipTransform()
@@ -116,6 +117,40 @@ export class OidcController {
     @ApiResponse({ status: 200, description: 'Token revoked' })
     async revoke(@Req() req: Request, @Res() res: Response) {
         return this.oidcService.callback()(req, res);
+    }
+
+    @Post('sso-session')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Exchange a valid OIDC access token for Core session tokens' })
+    @ApiResponse({ status: 200, description: 'Core session tokens issued' })
+    @ApiResponse({ status: 401, description: 'Invalid or expired OIDC access token' })
+    async ssoSession(
+        @Body() body: { accessToken?: string },
+        @Req() req: Request,
+        @Res() res: Response,
+    ) {
+        const rawToken = body?.accessToken?.trim();
+        if (!rawToken) {
+            return res.status(HttpStatus.BAD_REQUEST).json({ message: 'accessToken is required' });
+        }
+
+        const oidcToken = await this.oidcService.oidc.AccessToken.find(rawToken);
+        if (!oidcToken || oidcToken.isExpired || !oidcToken.accountId) {
+            return res.status(HttpStatus.UNAUTHORIZED).json({ message: 'Invalid or expired OIDC access token' });
+        }
+
+        const user = await this.usersService.findById(oidcToken.accountId);
+        if (!user || !user.isActive) {
+            return res.status(HttpStatus.UNAUTHORIZED).json({ message: 'User account not found or inactive' });
+        }
+
+        const tokens = await this.authService.issueTokensForUser(
+            user.id,
+            user.email ?? null,
+            user.phone ?? null,
+            extractClientContext(req),
+        );
+        return res.status(HttpStatus.OK).json(tokens);
     }
 
     /** Interaction Endpoints */

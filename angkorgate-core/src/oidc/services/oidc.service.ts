@@ -153,6 +153,33 @@ export class OidcService implements OnModuleInit {
 
             conformIdTokenClaims: false,
 
+            loadExistingGrant: async (ctx: KoaContextWithOIDC) => {
+                const grantId =
+                    (ctx.oidc.result && ctx.oidc.result.consent && ctx.oidc.result.consent.grantId) ||
+                    ctx.oidc.session?.grantIdFor(ctx.oidc.client!.clientId);
+
+                if (grantId) {
+                    return ctx.oidc.provider.Grant.find(grantId);
+                }
+
+                // Auto-grant requested scopes for the first-party AngkorGate Console client
+                // so silent SSO (prompt=none) succeeds without a consent prompt.
+                if (ctx.oidc.client?.clientId === 'angkorgate-console' && ctx.oidc.session?.accountId) {
+                    const grant = new ctx.oidc.provider.Grant({
+                        clientId: ctx.oidc.client.clientId,
+                        accountId: ctx.oidc.session.accountId,
+                    });
+                    const requestedScope = ctx.oidc.params?.scope
+                        ? String(ctx.oidc.params.scope)
+                        : 'openid profile email roles';
+                    grant.addOIDCScope(requestedScope);
+                    await grant.save();
+                    return grant;
+                }
+
+                return undefined;
+            },
+
             features: {
                 devInteractions: { enabled: false },
                 clientCredentials: { enabled: true },
