@@ -10,6 +10,8 @@ A minimal Express + TypeScript backend API backed by **TypeORM** and **`better-s
 - **TypeORM + `better-sqlite3` ([src/data-source.ts](src/data-source.ts), [src/entities/todo.entity.ts](src/entities/todo.entity.ts))**
   - Zero-config local SQLite persistence (`todo.sqlite`).
 - **Endpoints**
+  - `GET /docs` — Interactive Swagger UI (click **Authorize** and paste your Bearer token)
+  - `GET /openapi.json` — OpenAPI 3.0 JSON specification
   - `GET /health` — Public health check
   - `GET /me` — Returns authenticated SSO user info, roles, and permissions
   - `GET /todos` — List todos belonging to the current SSO user
