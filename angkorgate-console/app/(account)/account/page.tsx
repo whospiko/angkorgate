@@ -9,7 +9,7 @@ export default async function AccountPage() {
   const profile = await getMyProfile()
 
   if (!profile) {
-    redirect("/login?unauthorized=1&redirect=/account")
+    redirect("/auth/sso?redirect=/account")
   }
 
   const branding = await getBranding()

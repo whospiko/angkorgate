@@ -18,7 +18,7 @@ export default async function AccountLayout({
   const token = cookieStore.get("angkorgate_token")?.value
 
   if (!token) {
-    redirect("/login?unauthorized=1&redirect=/account")
+    redirect("/auth/sso?redirect=/account")
   }
 
   const branding = await getBranding()

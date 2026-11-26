@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { apiClient } from "@/lib/api-client"
-import { getConsoleUrl } from "@/lib/env"
+import { getConsoleUrl, getCoreApiUrl } from "@/lib/env"
 import type { UserSummary } from "@/features/auth/types/auth.schemas"
 import type { BrandingConfig } from "@/features/system/types/branding.types"
 
@@ -35,8 +35,134 @@ function getPublicOrigin(request: NextRequest, fallbackWebUrl?: string): string 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
   const ticket = searchParams.get("ticket")
-  const targetRedirect = searchParams.get("redirect") || "/dashboard"
+  const code = searchParams.get("code")
+  const state = searchParams.get("state")
+  const oidcError = searchParams.get("error")
+  const ssoCookie = request.cookies.get("angkorgate_sso_tx")?.value
+  let targetRedirect = searchParams.get("redirect") || "/dashboard"
   const originBase = getPublicOrigin(request)
+
+  // Handle OIDC silent SSO callback when angkorgate_sso_tx cookie is present
+  if (!ticket && (code || oidcError) && ssoCookie) {
+    let tx: {
+      codeVerifier: string
+      state: string
+      redirectTo: string
+      callbackUri: string
+    } | null = null
+    try {
+      tx = JSON.parse(ssoCookie)
+    } catch {
+      tx = null
+    }
+
+    if (oidcError || !code || !tx || !state || state !== tx.state) {
+      const loginUrl = new URL("/login", originBase)
+      loginUrl.searchParams.set("unauthorized", "1")
+      if (tx?.redirectTo) {
+        loginUrl.searchParams.set("redirect", tx.redirectTo)
+      }
+      const res = NextResponse.redirect(loginUrl)
+      res.cookies.delete("angkorgate_sso_tx")
+      return res
+    }
+
+    targetRedirect = tx.redirectTo || "/account"
+
+    try {
+      const coreUrl = getCoreApiUrl()
+      const tokenRes = await fetch(`${coreUrl}/oidc/token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+        },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          client_id: "angkorgate-console",
+          code,
+          redirect_uri: tx.callbackUri,
+          code_verifier: tx.codeVerifier,
+        }).toString(),
+        cache: "no-store",
+      })
+
+      if (!tokenRes.ok) {
+        throw new Error(`OIDC token exchange failed (${tokenRes.status})`)
+      }
+
+      const tokenData = (await tokenRes.json()) as { access_token?: string }
+      if (!tokenData.access_token) {
+        throw new Error("Missing access_token from OIDC token endpoint")
+      }
+
+      const sessionRes = await fetch(`${coreUrl}/oidc/sso-session`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ accessToken: tokenData.access_token }),
+        cache: "no-store",
+      })
+
+      if (!sessionRes.ok) {
+        throw new Error(`SSO session exchange failed (${sessionRes.status})`)
+      }
+
+      const sessionData = (await sessionRes.json()) as {
+        accessToken: string
+        refreshToken?: string
+        user?: UserSummary
+      }
+
+      const user: UserSummary =
+        sessionData.user ||
+        (await apiClient.get<UserSummary>("/auth/me", {
+          token: sessionData.accessToken,
+        }))
+
+      const response = NextResponse.redirect(new URL(targetRedirect, originBase))
+      const isProd = process.env.NODE_ENV === "production"
+
+      response.cookies.delete("angkorgate_sso_tx")
+      response.cookies.set("angkorgate_token", sessionData.accessToken, {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 900,
+      })
+
+      if (sessionData.refreshToken) {
+        response.cookies.set("angkorgate_refresh_token", sessionData.refreshToken, {
+          httpOnly: true,
+          secure: isProd,
+          sameSite: "lax",
+          path: "/",
+          maxAge: 604800,
+        })
+      }
+
+      response.cookies.set("angkorgate_user", JSON.stringify(user), {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 604800,
+      })
+
+      return response
+    } catch (err) {
+      console.error("OIDC SSO callback failed:", err)
+      const loginUrl = new URL("/login", originBase)
+      loginUrl.searchParams.set("unauthorized", "1")
+      loginUrl.searchParams.set("redirect", targetRedirect)
+      const res = NextResponse.redirect(loginUrl)
+      res.cookies.delete("angkorgate_sso_tx")
+      return res
+    }
+  }
 
   if (!ticket) {
     return NextResponse.redirect(new URL("/login?error=missing_ticket", originBase))
