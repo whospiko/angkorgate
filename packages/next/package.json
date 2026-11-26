@@ -1,0 +1,48 @@
+{
+  "name": "@angkorgate/nextjs",
+  "version": "0.1.0",
+  "description": "Drop-in Next.js App Router SDK for AngkorGate OIDC/SSO, middleware route protection, and RBAC components.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js",
+      "require": "./dist/server.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "./node_modules/.bin/tsup",
+    "typecheck": "./node_modules/.bin/tsc --noEmit",
+    "test": "./node_modules/.bin/tsx --test \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@angkorgate/react": "file:../react"
+  },
+  "peerDependencies": {
+    "next": ">=14.0.0",
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^19.0.0",
+    "next": "^16.1.6",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}
