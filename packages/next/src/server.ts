@@ -105,6 +105,43 @@ export interface AngkorGateMiddlewareOptions {
   protectedRoutes?: Array<string | RegExp>;
   loginPath?: string;
   afterSignInPath?: string;
+  baseUrl?: string;
+  clientId?: string;
+}
+
+interface RefreshedOidcTokens {
+  access_token: string;
+  refresh_token?: string;
+  id_token?: string;
+  expires_in?: number;
+}
+
+async function tryRefreshOidcCookieSession(
+  baseUrl: string,
+  clientId: string,
+  refreshToken: string
+): Promise<RefreshedOidcTokens | null> {
+  try {
+    const cleanBase = baseUrl.replace(/\/+$/, "");
+    const res = await fetch(`${cleanBase}/oidc/token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: clientId,
+        refresh_token: refreshToken,
+      }).toString(),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const tokens = (await res.json()) as RefreshedOidcTokens;
+    return tokens?.access_token ? tokens : null;
+  } catch {
+    return null;
+  }
 }
 
 export function angkorgateMiddleware(
@@ -118,9 +155,33 @@ export function angkorgateMiddleware(
 
   const isProtected = createRouteMatcher(protectedRoutes);
 
-  return function middleware(request: NextRequest) {
+  return async function middleware(request: NextRequest) {
     const { pathname, search } = request.nextUrl;
-    const isAuthenticated = hasValidSessionCookie(request);
+    let isAuthenticated = hasValidSessionCookie(request);
+    let refreshed: RefreshedOidcTokens | null = null;
+
+    if (!isAuthenticated) {
+      const refreshToken = request.cookies.get(DEFAULT_REFRESH_COOKIE)?.value;
+      const baseUrl =
+        options.baseUrl ||
+        process.env.NEXT_PUBLIC_ANGKORGATE_URL ||
+        process.env.ANGKORGATE_URL;
+      const clientId =
+        options.clientId ||
+        process.env.NEXT_PUBLIC_ANGKORGATE_CLIENT_ID ||
+        process.env.ANGKORGATE_CLIENT_ID;
+
+      if (refreshToken && baseUrl && clientId) {
+        refreshed = await tryRefreshOidcCookieSession(
+          baseUrl,
+          clientId,
+          refreshToken
+        );
+        if (refreshed) {
+          isAuthenticated = true;
+        }
+      }
+    }
 
     if (isProtected(request) && !isAuthenticated) {
       const loginUrl = new URL(loginPath, request.url);
@@ -134,6 +195,56 @@ export function angkorgateMiddleware(
 
     if (pathname === loginPath && isAuthenticated) {
       return NextResponse.redirect(new URL(afterSignInPath, request.url));
+    }
+
+    if (refreshed) {
+      const isProd = process.env.NODE_ENV === "production";
+      const cookieMap = new Map<string, string>();
+      for (const c of request.cookies.getAll()) {
+        cookieMap.set(c.name, c.value);
+      }
+      cookieMap.set(DEFAULT_ACCESS_COOKIE, refreshed.access_token);
+      if (refreshed.refresh_token) {
+        cookieMap.set(DEFAULT_REFRESH_COOKIE, refreshed.refresh_token);
+      }
+      if (refreshed.id_token) {
+        cookieMap.set(DEFAULT_ID_COOKIE, refreshed.id_token);
+      }
+      const reqHeaders = new Headers(request.headers);
+      reqHeaders.set(
+        "cookie",
+        Array.from(cookieMap.entries())
+          .map(([k, v]) => `${k}=${v}`)
+          .join("; ")
+      );
+
+      const res = NextResponse.next({ request: { headers: reqHeaders } });
+      res.cookies.set(DEFAULT_ACCESS_COOKIE, refreshed.access_token, {
+        httpOnly: false,
+        secure: isProd,
+        sameSite: "lax",
+        path: "/",
+        maxAge: refreshed.expires_in || 3600,
+      });
+      if (refreshed.refresh_token) {
+        res.cookies.set(DEFAULT_REFRESH_COOKIE, refreshed.refresh_token, {
+          httpOnly: false,
+          secure: isProd,
+          sameSite: "lax",
+          path: "/",
+          maxAge: 604800,
+        });
+      }
+      if (refreshed.id_token) {
+        res.cookies.set(DEFAULT_ID_COOKIE, refreshed.id_token, {
+          httpOnly: false,
+          secure: isProd,
+          sameSite: "lax",
+          path: "/",
+          maxAge: 604800,
+        });
+      }
+      return res;
     }
 
     return NextResponse.next();
