@@ -21,8 +21,9 @@ import {
   RiShieldKeyholeLine,
   RiTimerLine,
   RiFingerprintLine,
+  RiMagicLine,
 } from "@remixicon/react"
-import { BrandLogo } from "@/features/system"
+import { BrandLogo, type PublicAuthMethods } from "@/features/system"
 import { startAuthentication, browserSupportsWebAuthn } from "@simplewebauthn/browser"
 import { loginAction } from "../server/auth-actions"
 import {
@@ -30,12 +31,14 @@ import {
   verifyPasskeyAuthAction,
 } from "../server/passkey-actions"
 import { OAuthProviders } from "./oauth-providers"
+import { PasswordlessLogin } from "./passwordless-login"
 import type { PublicOAuthProvider } from "@/features/oauth-providers"
 
 export interface LoginFormProps extends React.ComponentProps<"div"> {
   oauthProviders?: PublicOAuthProvider[]
   oauthBaseUrl?: string | null
   oauthWebUrl?: string | null
+  authMethods?: PublicAuthMethods
   branding?: {
     appName: string
     appDescription?: string | null
@@ -53,6 +56,12 @@ export function LoginForm({
   oauthProviders = [],
   oauthBaseUrl,
   oauthWebUrl,
+  authMethods = {
+    passkeyEnabled: true,
+    magicLinkEnabled: true,
+    emailOtpEnabled: true,
+    smsOtpEnabled: true,
+  },
   ...props
 }: LoginFormProps) {
   const appName = branding?.appName || "AngkorGate"
@@ -66,6 +75,7 @@ export function LoginForm({
   const [interactionError, setInteractionError] = useState<string | null>(null)
   const [passkeyLoading, setPasskeyLoading] = useState(false)
   const [passkeyError, setPasskeyError] = useState<string | null>(null)
+  const [passwordlessMode, setPasswordlessMode] = useState(false)
   const searchParams = useSearchParams()
   const redirectParam = searchParams.get("redirect") || "/dashboard"
   const interactionParam = searchParams.get("interaction")
@@ -187,6 +197,49 @@ export function LoginForm({
 
   const activeLoading = (interactionParam ? interactionPending : isPending) || passkeyLoading
   const activeErrorMessage = passkeyError || interactionError || (state?.message && !state?.success ? state.message : null)
+
+  const anyPasswordlessEnabled =
+    authMethods.magicLinkEnabled ||
+    authMethods.emailOtpEnabled ||
+    authMethods.smsOtpEnabled
+  const anyAltAuthEnabled =
+    authMethods.passkeyEnabled ||
+    anyPasswordlessEnabled ||
+    oauthProviders.length > 0
+
+  if (passwordlessMode && anyPasswordlessEnabled) {
+    return (
+      <div className={cn("flex flex-col gap-6", className)} {...props}>
+        <div className="flex flex-col items-center gap-2 text-center">
+          <Link
+            href="/"
+            className="flex flex-col items-center gap-2 font-medium"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm overflow-hidden">
+              <BrandLogo
+                logoUrl={logoUrl}
+                alt={appName}
+                customClassName="size-6 object-contain"
+              />
+            </div>
+            <span className="sr-only">{appName}</span>
+          </Link>
+          <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
+            Passwordless Sign In
+          </h1>
+          <FieldDescription className="font-mono text-xs">
+            Sign in with a one-click magic link or 6-digit OTP.
+          </FieldDescription>
+        </div>
+
+        <PasswordlessLogin
+          redirectUrl={redirectParam}
+          enabledMethods={authMethods}
+          onBackToPassword={() => setPasswordlessMode(false)}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -373,27 +426,44 @@ export function LoginForm({
             </Button>
           </Field>
 
-          <FieldSeparator className="font-mono text-xs">Or continue with</FieldSeparator>
+          {anyAltAuthEnabled && (
+            <FieldSeparator className="font-mono text-xs">Or continue with</FieldSeparator>
+          )}
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handlePasskeySignIn}
-            disabled={activeLoading}
-            className="w-full font-mono gap-2 border-primary/30 bg-primary/5 hover:bg-primary/10 text-foreground"
-          >
-            {passkeyLoading ? (
-              <>
-                <RiLoader4Line className="size-4 animate-spin text-primary" />
-                <span>Waiting for Touch ID / Face ID...</span>
-              </>
-            ) : (
-              <>
-                <RiFingerprintLine className="size-4 text-primary" />
-                <span>Sign In with Passkey / Biometrics</span>
-              </>
-            )}
-          </Button>
+          {authMethods.passkeyEnabled && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handlePasskeySignIn}
+              disabled={activeLoading}
+              className="w-full font-mono gap-2 border-primary/30 bg-primary/5 hover:bg-primary/10 text-foreground"
+            >
+              {passkeyLoading ? (
+                <>
+                  <RiLoader4Line className="size-4 animate-spin text-primary" />
+                  <span>Waiting for Touch ID / Face ID...</span>
+                </>
+              ) : (
+                <>
+                  <RiFingerprintLine className="size-4 text-primary" />
+                  <span>Sign In with Passkey / Biometrics</span>
+                </>
+              )}
+            </Button>
+          )}
+
+          {anyPasswordlessEnabled && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPasswordlessMode(true)}
+              disabled={activeLoading}
+              className="w-full font-mono gap-2 border-border/70 hover:bg-muted/60 text-foreground"
+            >
+              <RiMagicLine className="size-4 text-primary" />
+              <span>Sign In with Magic Link / OTP</span>
+            </Button>
+          )}
 
           <OAuthProviders
             providers={oauthProviders}

@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, randomInt } from 'crypto';
 
 /**
  * Computes SHA-256 hex digest for a string or buffer.
@@ -26,6 +26,6 @@ export function generateHexSecret(bytes = 32): string {
  */
 export function generateNumericOtp(length = 6): string {
     const min = Math.pow(10, length - 1);
-    const max = Math.pow(10, length) - 1;
-    return String(Math.floor(min + Math.random() * (max - min + 1)));
+    const max = Math.pow(10, length);
+    return String(randomInt(min, max));
 }

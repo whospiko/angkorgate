@@ -85,6 +85,14 @@ const defaultNavData = {
           url: "/settings/content",
         },
         {
+          title: "Environment & Providers",
+          url: "/settings/environment",
+        },
+        {
+          title: "Dev Outbox (Links & OTP)",
+          url: "/settings/dev-inbox",
+        },
+        {
           title: "Customers CRM",
           url: "/customers",
         },

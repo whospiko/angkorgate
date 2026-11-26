@@ -29,6 +29,9 @@ import { UnifiedAuthGuard } from './guards/unified-auth.guard';
 import { UserPasskey } from './entities/user-passkey.entity';
 import { PasskeyService } from './services/passkey.service';
 import { PasskeyController } from './controllers/passkey.controller';
+import { PasswordlessToken } from './entities/passwordless-token.entity';
+import { PasswordlessService } from './services/passwordless.service';
+import { PasswordlessController } from './controllers/passwordless.controller';
 
 @Module({
     imports: [
@@ -54,6 +57,7 @@ import { PasskeyController } from './controllers/passkey.controller';
             MfaBackupCode,
             EmailChangeToken,
             UserPasskey,
+            PasswordlessToken,
         ]),
         UsersModule,
         RbacModule,
@@ -61,11 +65,12 @@ import { PasskeyController } from './controllers/passkey.controller';
         EmployeesModule,
         ApiKeysModule,
     ],
-    controllers: [AuthController, MfaController, EmailChangeController, PasskeyController],
+    controllers: [AuthController, MfaController, EmailChangeController, PasskeyController, PasswordlessController],
     providers: [
         AuthService,
         EmailChangeService,
         PasskeyService,
+        PasswordlessService,
         JwtStrategy,
         JwtAuthGuard,
         UnifiedAuthGuard,
@@ -76,6 +81,7 @@ import { PasskeyController } from './controllers/passkey.controller';
     exports: [
         AuthService,
         PasskeyService,
+        PasswordlessService,
         JwtAuthGuard,
         UnifiedAuthGuard,
         MfaService,

@@ -57,4 +57,11 @@ export default () => ({
         rpId: process.env.WEBAUTHN_RP_ID ?? 'localhost',
         origins: (process.env.WEBAUTHN_ORIGINS ?? 'http://localhost:4000,http://localhost:3000,http://localhost:8080,http://127.0.0.1:4000,http://127.0.0.1:3000').split(','),
     },
+    passwordless: {
+        magicLinkTtlMinutes: parseInt(process.env.PASSWORDLESS_MAGIC_LINK_TTL_MINUTES ?? '15', 10),
+        otpTtlMinutes: parseInt(process.env.PASSWORDLESS_OTP_TTL_MINUTES ?? '10', 10),
+        resendCooldownSeconds: parseInt(process.env.PASSWORDLESS_COOLDOWN_SECONDS ?? '60', 10),
+        maxOtpAttempts: parseInt(process.env.PASSWORDLESS_MAX_OTP_ATTEMPTS ?? '5', 10),
+        autoRegister: process.env.PASSWORDLESS_AUTO_REGISTER === 'true',
+    },
 });

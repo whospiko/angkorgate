@@ -4,6 +4,7 @@ import {
     Injectable,
     Logger,
     NotFoundException,
+    Optional,
     UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -21,6 +22,7 @@ import { UsersService } from '../../users/services/users.service';
 import { AuthService, LoginContext } from './auth.service';
 import { CacheService } from '../../cache/cache.service';
 import { AuditService } from '../../audit/services/audit.service';
+import { RuntimeConfigService } from '../../system/services/runtime-config.service';
 
 @Injectable()
 export class PasskeyService {
@@ -34,10 +36,20 @@ export class PasskeyService {
         private readonly cacheService: CacheService,
         private readonly configService: ConfigService,
         private readonly auditService: AuditService,
+        @Optional() private readonly runtimeConfig?: RuntimeConfigService,
     ) { }
 
+    private assertPasskeyEnabled(): void {
+        const enabled = this.runtimeConfig?.getBoolean('WEBAUTHN_ENABLED', true) ?? true;
+        if (!enabled) {
+            throw new ForbiddenException('Passkey authentication is currently disabled by administrator.');
+        }
+    }
+
     private getRpID(reqHost?: string): string {
-        const configuredRpId = this.configService.get<string>('webauthn.rpId', 'localhost');
+        const configuredRpId =
+            this.runtimeConfig?.get('WEBAUTHN_RP_ID') ??
+            this.configService.get<string>('webauthn.rpId', 'localhost');
         if (reqHost) {
             const hostWithoutPort = reqHost.split(':')[0];
             if (hostWithoutPort === 'localhost' || hostWithoutPort === '127.0.0.1') {
@@ -48,13 +60,16 @@ export class PasskeyService {
     }
 
     private getAllowedOrigins(reqOrigin?: string): string[] {
-        const configured = this.configService.get<string[]>('webauthn.origins') || [
-            'http://localhost:4000',
-            'http://localhost:3000',
-            'http://localhost:8080',
-            'http://127.0.0.1:4000',
-            'http://127.0.0.1:3000',
-        ];
+        const runtimeOrigins = this.runtimeConfig?.get('WEBAUTHN_ORIGINS');
+        const configured = runtimeOrigins
+            ? runtimeOrigins.split(',').map((o) => o.trim()).filter(Boolean)
+            : this.configService.get<string[]>('webauthn.origins') || [
+                  'http://localhost:4000',
+                  'http://localhost:3000',
+                  'http://localhost:8080',
+                  'http://127.0.0.1:4000',
+                  'http://127.0.0.1:3000',
+              ];
 
         const origins = new Set<string>(configured.map((o) => o.trim()));
         if (reqOrigin) {
@@ -83,11 +98,14 @@ export class PasskeyService {
         reqHost?: string,
         userDisplayName?: string,
     ) {
+        this.assertPasskeyEnabled();
         const user = await this.usersService.findByIdOrFail(userId);
         const existingPasskeys = await this.passkeyRepo.find({ where: { userId } });
 
         const rpID = this.getRpID(reqHost);
-        const rpName = this.configService.get<string>('webauthn.rpName', 'AngkorGate');
+        const rpName =
+            this.runtimeConfig?.get('WEBAUTHN_RP_NAME') ??
+            this.configService.get<string>('webauthn.rpName', 'AngkorGate');
 
         const options = await generateRegistrationOptions({
             rpName,
@@ -123,6 +141,7 @@ export class PasskeyService {
         reqHost?: string,
         ctx?: LoginContext,
     ) {
+        this.assertPasskeyEnabled();
         const expectedChallenge = await this.cacheService.get<string>(`passkey:reg-challenge:${userId}`);
         if (!expectedChallenge) {
             throw new BadRequestException('Passkey registration challenge expired or not found. Please try again.');
@@ -193,6 +212,7 @@ export class PasskeyService {
      * Generate authentication options for passkey sign-in (supports discoverable credentials / resident keys).
      */
     async generateAuthenticationOptions(email?: string, reqHost?: string) {
+        this.assertPasskeyEnabled();
         const challengeId = randomUUID();
         const rpID = this.getRpID(reqHost);
 
@@ -241,6 +261,7 @@ export class PasskeyService {
         reqHost?: string,
         ctx?: LoginContext,
     ) {
+        this.assertPasskeyEnabled();
         const cachedRaw = await this.cacheService.get<string>(`passkey:auth-challenge:${challengeId}`);
         if (!cachedRaw) {
             throw new BadRequestException('Passkey authentication challenge expired or invalid. Please try again.');

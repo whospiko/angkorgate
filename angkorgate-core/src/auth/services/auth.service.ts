@@ -4,6 +4,7 @@ import {
     Injectable,
     Logger,
     NotFoundException,
+    Optional,
     UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -34,6 +35,7 @@ import { UserProfileDto } from '../dto/user-profile.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 
 import { MfaService } from './mfa.service';
+import { RuntimeConfigService } from '../../system/services/runtime-config.service';
 
 
 const MAX_FAILED_ATTEMPTS = 5;
@@ -71,6 +73,7 @@ export class AuthService {
         private readonly mfa: MfaService,
         @InjectRepository(UserPasskey)
         private readonly passkeyRepo: Repository<UserPasskey>,
+        @Optional() private readonly runtimeConfig?: RuntimeConfigService,
     ) { }
 
     async hashPassword(plain: string): Promise<string> {
@@ -379,8 +382,12 @@ export class AuthService {
         ctx: LoginContext,
     ): Promise<AuthResponseDto> {
         // Parse TTLs as integers so jsonwebtoken treats them as seconds, not milliseconds
-        const accessTtl = parseInt(this.config.get<string>('JWT_ACCESS_TTL') ?? '900', 10);
-        const refreshTtl = parseInt(this.config.get<string>('JWT_REFRESH_TTL') ?? '604800', 10);
+        const accessTtl =
+            this.runtimeConfig?.getNumber('JWT_ACCESS_TTL', 900) ??
+            parseInt(this.config.get<string>('JWT_ACCESS_TTL') ?? '900', 10);
+        const refreshTtl =
+            this.runtimeConfig?.getNumber('JWT_REFRESH_TTL', 604800) ??
+            parseInt(this.config.get<string>('JWT_REFRESH_TTL') ?? '604800', 10);
         const refreshSecret = this.config.get<string>('JWT_REFRESH_SECRET')!;
 
         const payload: JwtPayload = { sub: userId, email, phone, roles };

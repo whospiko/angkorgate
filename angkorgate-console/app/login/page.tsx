@@ -2,7 +2,11 @@ import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import { LoginForm } from "@/features/auth"
 import { getPublicOAuthConfig } from "@/features/oauth-providers"
-import { getSetupStatus, getBranding } from "@/features/system"
+import {
+  getSetupStatus,
+  getBranding,
+  getPublicAuthMethods,
+} from "@/features/system"
 
 export const dynamic = "force-dynamic"
 
@@ -13,9 +17,10 @@ export default async function LoginPage() {
     redirect("/setup")
   }
 
-  const [branding, oauthConfig] = await Promise.all([
+  const [branding, oauthConfig, authMethods] = await Promise.all([
     getBranding(),
     getPublicOAuthConfig(),
+    getPublicAuthMethods(),
   ])
 
   return (
@@ -33,6 +38,7 @@ export default async function LoginPage() {
             oauthProviders={oauthConfig.providers}
             oauthBaseUrl={oauthConfig.callbackBaseUrl}
             oauthWebUrl={oauthConfig.webUrl}
+            authMethods={authMethods}
           />
         </Suspense>
       </div>

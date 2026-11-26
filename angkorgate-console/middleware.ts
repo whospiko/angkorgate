@@ -10,6 +10,7 @@ const PROTECTED_PREFIXES = [
   "/customers",
   "/employees",
   "/oidc",
+  "/settings",
 ]
 
 export function middleware(request: NextRequest) {

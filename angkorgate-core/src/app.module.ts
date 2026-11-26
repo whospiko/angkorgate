@@ -20,6 +20,7 @@ import { ScopesModule } from './scopes/scopes.module';
 import { OidcModule } from './oidc/oidc.module';
 import { CacheModule } from './cache/cache.module';
 import { SystemModule } from './system/system.module';
+import { RuntimeConfigModule } from './system/runtime-config.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { AppContextMiddleware } from './apps/middleware/app-context.middleware';
 import { OauthConfigService } from './oauth/services/oauth-config.service';
@@ -75,6 +76,7 @@ import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
     ScopesModule,
     OidcModule,
     CacheModule,
+    RuntimeConfigModule,
     SystemModule,
     ApiKeysModule,
   ],
