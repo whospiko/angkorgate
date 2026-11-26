@@ -15,8 +15,13 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic"
 
-export default async function ApiKeysPage() {
-  const [apiKeys, schemaResources] = await Promise.all([
+export default async function ApiKeysPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ create?: string }>
+}) {
+  const [{ create }, apiKeys, schemaResources] = await Promise.all([
+    searchParams,
     getApiKeys(),
     getSchemaResources(),
   ])
@@ -36,7 +41,10 @@ export default async function ApiKeysPage() {
           </p>
         </div>
 
-        <CreateApiKeyDialog schemaResources={schemaResources} />
+        <CreateApiKeyDialog
+          schemaResources={schemaResources}
+          defaultOpen={create === "1"}
+        />
       </div>
 
       {/* Stats Cards */}

@@ -125,3 +125,70 @@ export async function testSmsConfigAction(to: string): Promise<{
     return { success: false, message }
   }
 }
+
+export async function getMaintenanceModeAction(): Promise<{
+  maintenanceMode: boolean
+}> {
+  try {
+    return await apiClient.get<{ maintenanceMode: boolean }>(
+      "/system/maintenance"
+    )
+  } catch {
+    return { maintenanceMode: false }
+  }
+}
+
+export async function toggleMaintenanceModeAction(
+  enabled: boolean
+): Promise<{
+  success: boolean
+  maintenanceMode: boolean
+  message: string
+}> {
+  try {
+    await apiClient.patch<RuntimeSettingView[]>("/system/runtime-config", {
+      settings: { MAINTENANCE_MODE: enabled },
+    })
+    return {
+      success: true,
+      maintenanceMode: enabled,
+      message: enabled
+        ? "Maintenance mode enabled. Public registration and OAuth/OIDC flows are paused."
+        : "Maintenance mode disabled. All public authentication flows are active.",
+    }
+  } catch (error) {
+    const message =
+      error instanceof ApiError
+        ? error.message
+        : "Failed to toggle maintenance mode."
+    return {
+      success: false,
+      maintenanceMode: !enabled,
+      message,
+    }
+  }
+}
+
+export async function purgeCacheAction(): Promise<{
+  success: boolean
+  provider?: string
+  message: string
+}> {
+  try {
+    const res = await apiClient.post<{ purged: boolean; provider: string }>(
+      "/system/cache/purge"
+    )
+    return {
+      success: true,
+      provider: res.provider,
+      message: `Purged ${res.provider} cache successfully.`,
+    }
+  } catch (error) {
+    const message =
+      error instanceof ApiError ? error.message : "Failed to purge cache."
+    return {
+      success: false,
+      message,
+    }
+  }
+}

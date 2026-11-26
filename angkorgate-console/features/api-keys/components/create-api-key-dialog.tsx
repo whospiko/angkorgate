@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -39,6 +39,7 @@ import type {
 interface CreateApiKeyDialogProps {
   schemaResources?: ResourceSchemaMeta[]
   onSuccess?: () => void
+  defaultOpen?: boolean
 }
 
 const DEFAULT_SAMPLE_CUSTOMER = {
@@ -73,8 +74,17 @@ const DEFAULT_SAMPLE_EMPLOYEE = {
 export function CreateApiKeyDialog({
   schemaResources = [],
   onSuccess,
+  defaultOpen = false,
 }: CreateApiKeyDialogProps) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
+
+  useEffect(() => {
+    const handleOpen = () => setOpen(true)
+    window.addEventListener("angkorgate:open-create-api-key", handleOpen)
+    return () => {
+      window.removeEventListener("angkorgate:open-create-api-key", handleOpen)
+    }
+  }, [])
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)

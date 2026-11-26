@@ -1,23 +1,31 @@
 "use client"
 
-import { Label } from "@/components/ui/label"
-import { SidebarInput } from "@/components/ui/sidebar"
 import { RiSearchLine } from "@remixicon/react"
+import { cn } from "cn"
 
-export function SearchForm({ ...props }: React.ComponentProps<"form">) {
+export function SearchForm({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  const openPalette = () => {
+    window.dispatchEvent(new CustomEvent("angkorgate:open-command-palette"))
+  }
+
   return (
-    <form {...props}>
-      <div className="relative">
-        <Label htmlFor="search" className="sr-only">
-          Search
-        </Label>
-        <SidebarInput
-          id="search"
-          placeholder="Type to search..."
-          className="h-8 pl-7"
-        />
-        <RiSearchLine className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 opacity-50 select-none" />
-      </div>
-    </form>
+    <div className={cn(className)} {...props}>
+      <button
+        type="button"
+        onClick={openPalette}
+        className="flex h-8 w-full sm:w-64 items-center justify-between gap-2 rounded-md border border-input bg-background px-2.5 text-xs font-mono text-muted-foreground shadow-xs transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <span className="flex items-center gap-2 truncate">
+          <RiSearchLine className="size-3.5 shrink-0 opacity-60" />
+          <span className="truncate">Search or jump to...</span>
+        </span>
+        <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+          ⌘K
+        </kbd>
+      </button>
+    </div>
   )
 }

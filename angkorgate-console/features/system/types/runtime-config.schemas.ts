@@ -6,6 +6,7 @@ export const RuntimeSettingCategorySchema = z.enum([
   "passwordless",
   "webauthn",
   "auth",
+  "system",
 ])
 
 export type RuntimeSettingCategory = z.infer<

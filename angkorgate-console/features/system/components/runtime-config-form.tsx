@@ -25,6 +25,7 @@ import {
   RiRestartLine,
   RiSaveLine,
   RiSendPlaneLine,
+  RiServerLine,
   RiSmartphoneLine,
 } from "@remixicon/react"
 import type {
@@ -71,6 +72,11 @@ const CATEGORIES: {
     label: "Session & JWT",
     description: "Adjust access and refresh token lifetimes.",
   },
+  {
+    id: "system",
+    label: "System",
+    description: "Control global maintenance mode and operational safeguards.",
+  },
 ]
 
 function CategoryIcon({ category }: { category: RuntimeSettingCategory }) {
@@ -85,6 +91,8 @@ function CategoryIcon({ category }: { category: RuntimeSettingCategory }) {
       return <RiFingerprintLine className="size-4 text-primary" />
     case "auth":
       return <RiKey2Line className="size-4 text-primary" />
+    case "system":
+      return <RiServerLine className="size-4 text-primary" />
   }
 }
 
