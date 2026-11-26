@@ -10,9 +10,10 @@ A minimal Next.js (App Router + TypeScript) example that integrates with **Angko
 2. **Authorization Code Exchange (`/callback` -> `POST /oidc/token`)**
    - AngkorGate redirects back to `http://localhost:3001/callback?code=...&state=...`.
    - [src/app/callback/page.tsx](src/app/callback/page.tsx) verifies `state` and exchanges `code` + `code_verifier` via native `fetch` against `POST /oidc/token`.
-3. **Protected Route (`/dashboard`)**
+3. **Protected Route & Fullstack Todo API (`/dashboard` + `/api/todos`)**
    - [src/middleware.ts](src/middleware.ts) checks the `angkorgate_token` cookie on `/dashboard` (and `/dashboard/*`) and redirects unauthenticated requests to `/login?redirect=/dashboard`.
-   - [src/app/dashboard/page.tsx](src/app/dashboard/page.tsx) fetches live claims from `GET /oidc/me`, displays decoded ID Token claims, supports token refresh (`grant_type=refresh_token`), and signs out via RP-Initiated Logout (`GET /oidc/session/end`).
+   - [src/app/dashboard/page.tsx](src/app/dashboard/page.tsx) fetches live claims from `GET /oidc/me`, displays decoded ID Token claims, supports token refresh (`grant_type=refresh_token`), signs out via RP-Initiated Logout (`GET /oidc/session/end`), and manages todos via `/api/todos`.
+   - [src/app/api/todos/route.ts](src/app/api/todos/route.ts) & [src/app/api/todos/[id]/route.ts](src/app/api/todos/[id]/route.ts) persist todos in `better-sqlite3` (`todo.sqlite`) and verify AngkorGate Bearer tokens via `/oidc/me`.
 
 ## Quick Start
 

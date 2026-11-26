@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -15,22 +15,37 @@ import {
   decodeJwtPayload,
   getIdToken,
 } from "@/lib/auth-storage";
+import {
+  createTodoItem,
+  deleteTodoItem,
+  fetchTodos,
+  toggleTodoItem,
+  type TodoItem,
+} from "@/lib/todo-client";
 import type { OidcUserInfo } from "@/types/auth";
 
 export default function DashboardPage() {
   const router = useRouter();
   const [userInfo, setUserInfo] = useState<OidcUserInfo | null>(null);
   const [idClaims, setIdClaims] = useState<Record<string, unknown> | null>(null);
+  const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [todoScope, setTodoScope] = useState<"mine" | "all">("mine");
+  const [newTitle, setNewTitle] = useState("");
+  const [addingTodo, setAddingTodo] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<"refresh" | "logout" | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const loadUserInfo = useCallback(async () => {
-    const info = await fetchUserInfo();
+  const loadDashboard = useCallback(async (scope: "mine" | "all" = "mine") => {
+    const [info, todoList] = await Promise.all([
+      fetchUserInfo(),
+      fetchTodos(scope),
+    ]);
     const idToken = getIdToken();
     return {
       info,
+      todoList,
       claims: idToken ? decodeJwtPayload(idToken) : null,
     };
   }, []);
@@ -38,10 +53,11 @@ export default function DashboardPage() {
   useEffect(() => {
     let active = true;
 
-    loadUserInfo()
-      .then(({ info, claims }) => {
+    loadDashboard("mine")
+      .then(({ info, todoList, claims }) => {
         if (!active) return;
         setUserInfo(info);
+        setTodos(todoList);
         setIdClaims(claims);
       })
       .catch((err) => {
@@ -64,7 +80,7 @@ export default function DashboardPage() {
     return () => {
       active = false;
     };
-  }, [loadUserInfo, router]);
+  }, [loadDashboard, router]);
 
   async function handleRefreshToken() {
     setBusyAction("refresh");
@@ -75,8 +91,9 @@ export default function DashboardPage() {
       setStatusMessage(
         `OIDC tokens refreshed (expires in ${refreshed.expires_in}s).`
       );
-      const { info, claims } = await loadUserInfo();
+      const { info, todoList, claims } = await loadDashboard(todoScope);
       setUserInfo(info);
+      setTodos(todoList);
       setIdClaims(claims);
     } catch (err) {
       if (err instanceof AngkorGateError && err.status === 401) {
@@ -96,6 +113,54 @@ export default function DashboardPage() {
     window.location.replace(endSessionUrl);
   }
 
+  async function handleAddTodo(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const trimmed = newTitle.trim();
+    if (!trimmed) return;
+    setAddingTodo(true);
+    setError(null);
+    try {
+      const created = await createTodoItem(trimmed);
+      setTodos((prev) => [created, ...prev]);
+      setNewTitle("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create todo.");
+    } finally {
+      setAddingTodo(false);
+    }
+  }
+
+  async function handleToggleTodo(todo: TodoItem) {
+    setError(null);
+    try {
+      const updated = await toggleTodoItem(todo.id, !todo.completed);
+      setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update todo.");
+    }
+  }
+
+  async function handleDeleteTodo(id: string) {
+    setError(null);
+    try {
+      await deleteTodoItem(id);
+      setTodos((prev) => prev.filter((t) => t.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete todo.");
+    }
+  }
+
+  async function handleScopeChange(nextScope: "mine" | "all") {
+    setTodoScope(nextScope);
+    setError(null);
+    try {
+      const list = await fetchTodos(nextScope);
+      setTodos(list);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch todos.");
+    }
+  }
+
   if (loading && !userInfo) {
     return (
       <main className="mx-auto flex min-h-screen max-w-4xl items-center justify-center px-6">
@@ -110,6 +175,9 @@ export default function DashboardPage() {
   const permissions = Array.isArray(userInfo?.permissions)
     ? userInfo.permissions
     : [];
+  const canViewAll =
+    roles.some((r) => r.toUpperCase() === "ADMIN") ||
+    permissions.includes("todos:read:all");
 
   return (
     <main className="mx-auto min-h-screen max-w-4xl px-6 py-10">
@@ -237,6 +305,112 @@ export default function DashboardPage() {
                   ))}
                 </div>
               </div>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 md:col-span-2">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
+                  Todo List (better-sqlite3 • /api/todos)
+                </h2>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Fullstack Next.js API routes verified against AngkorGate SSO.
+                </p>
+              </div>
+
+              {canViewAll && (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleScopeChange("mine")}
+                    className={`rounded-lg border px-3 py-1 text-xs font-medium transition ${
+                      todoScope === "mine"
+                        ? "border-zinc-600 bg-zinc-800 text-white"
+                        : "border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    My Todos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleScopeChange("all")}
+                    className={`rounded-lg border px-3 py-1 text-xs font-medium transition ${
+                      todoScope === "all"
+                        ? "border-zinc-600 bg-zinc-800 text-white"
+                        : "border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    All Users&apos; Todos (Admin)
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleAddTodo} className="mt-4 flex gap-2.5">
+              <input
+                type="text"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder="Add a todo stored in SQLite..."
+                disabled={addingTodo}
+                className="flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-3.5 py-2 text-sm text-white placeholder-zinc-500 outline-none focus:border-indigo-500"
+              />
+              <button
+                type="submit"
+                disabled={addingTodo}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:opacity-50"
+              >
+                {addingTodo ? "Adding..." : "Add Todo"}
+              </button>
+            </form>
+
+            {todos.length === 0 ? (
+              <p className="mt-5 text-center text-xs text-zinc-500">
+                No todos yet. Add one above to test SQLite persistence.
+              </p>
+            ) : (
+              <ul className="mt-4 divide-y divide-zinc-800">
+                {todos.map((todo) => (
+                  <li
+                    key={todo.id}
+                    className="flex items-center justify-between gap-3 py-2.5"
+                  >
+                    <label className="flex cursor-pointer items-center gap-3 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={todo.completed}
+                        onChange={() => void handleToggleTodo(todo)}
+                        className="h-4 w-4 rounded border-zinc-600 bg-zinc-950 accent-indigo-500"
+                      />
+                      <span
+                        className={
+                          todo.completed
+                            ? "text-zinc-500 line-through"
+                            : "text-zinc-100"
+                        }
+                      >
+                        {todo.title}
+                      </span>
+                    </label>
+                    <div className="flex items-center gap-3">
+                      {todoScope === "all" && todo.userEmail && (
+                        <span className="text-xs text-zinc-500">
+                          {todo.userEmail}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteTodo(todo.id)}
+                        className="rounded px-2 py-1 text-xs text-zinc-500 transition hover:bg-zinc-800 hover:text-red-400"
+                        aria-label="Delete todo"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </section>
 
