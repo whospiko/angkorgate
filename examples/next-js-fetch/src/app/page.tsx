@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ANGKORGATE_URL, OIDC_CLIENT_ID } from "@/lib/angkorgate";
+import { SignInButton } from "@/components/sign-in-button";
 
 export default function HomePage() {
   return (
@@ -43,12 +44,10 @@ export default function HomePage() {
           >
             Open Protected /dashboard
           </Link>
-          <Link
-            href="/login"
-            className="rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm font-medium text-zinc-200 transition hover:bg-zinc-700"
-          >
-            Sign In with AngkorGate
-          </Link>
+          <SignInButton
+            redirectTo="/dashboard"
+            className="rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm font-medium text-zinc-200 transition hover:bg-zinc-700 disabled:opacity-60"
+          />
         </div>
 
         <div className="mt-8 grid gap-3 border-t border-zinc-800 pt-6 text-xs text-zinc-400 sm:grid-cols-3">
