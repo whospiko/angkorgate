@@ -5,11 +5,13 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Optional,
     Param,
     Patch,
     Post,
     Put,
     Query,
+    Req,
     UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -21,37 +23,90 @@ import {
     ApiResponse,
     ApiTags,
 } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { Permissions } from '../rbac/decorators/permissions.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { StepUpService } from '../auth/services/step-up.service';
+import { AuditService } from '../audit/services/audit.service';
+import { extractClientContext } from '../auth/utils/client-context.util';
 import { AppsService } from './apps.service';
+import { AppSetting } from './entities/app-setting.entity';
 import { CreateAppDto } from './dto/create-app.dto';
 import { UpdateAppSettingsDto } from './dto/update-app-settings.dto';
+
+const SECRET_MASK = '••••••••';
 
 @ApiTags('Apps')
 @ApiBearerAuth('bearerAuth')
 @UseGuards(AuthGuard('jwt'), PermissionsGuard)
 @Controller('admin/apps')
 export class AppsController {
-    constructor(private readonly apps: AppsService) { }
+    constructor(
+        private readonly apps: AppsService,
+        @Optional() private readonly stepUp?: StepUpService,
+        @Optional() private readonly audit?: AuditService,
+    ) { }
+
+    private maskApp(app: AppSetting) {
+        return {
+            ...app,
+            clientSecret: app.clientSecret ? SECRET_MASK : null,
+            secondaryClientSecret: app.secondaryClientSecret ? SECRET_MASK : null,
+            hasClientSecret: Boolean(app.clientSecret),
+            hasSecondaryClientSecret: Boolean(app.secondaryClientSecret),
+        };
+    }
 
     @Get()
     @Permissions('app:read')
-    @ApiOperation({ summary: 'List all registered client applications' })
+    @ApiOperation({ summary: 'List all registered client applications (secrets masked)' })
     @ApiResponse({ status: 200, description: 'List of registered applications' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden - requires app:read permission' })
-    list() {
-        return this.apps.findAll();
+    async list() {
+        const list = await this.apps.findAll();
+        return list.map((app) => this.maskApp(app));
     }
 
     @Get(':code')
     @Permissions('app:read')
-    @ApiOperation({ summary: 'Get application details by app code' })
+    @ApiOperation({ summary: 'Get application details by app code (secrets masked)' })
     @ApiParam({ name: 'code', description: 'Application code', example: 'clinic-prod' })
     @ApiResponse({ status: 200, description: 'Application settings retrieved successfully' })
     @ApiResponse({ status: 404, description: 'Application not found' })
-    findOne(@Param('code') code: string) {
-        return this.apps.findByCodeOrFail(code);
+    async findOne(@Param('code') code: string) {
+        const app = await this.apps.findByCodeOrFail(code);
+        return this.maskApp(app);
+    }
+
+    @Get(':code/reveal-secret')
+    @Permissions('app:read')
+    @ApiOperation({ summary: 'Reveal client secret and secondary secret for an application (requires step-up verification)' })
+    @ApiParam({ name: 'code', description: 'Application code', example: 'clinic-prod' })
+    @ApiResponse({ status: 200, description: 'Client secrets returned' })
+    @ApiResponse({ status: 403, description: 'Step-up verification required' })
+    @ApiResponse({ status: 404, description: 'Application not found' })
+    async revealSecret(
+        @Param('code') code: string,
+        @CurrentUser('id') userId: string,
+        @Req() req: Request,
+    ) {
+        await this.stepUp?.assertVerified(userId);
+        const app = await this.apps.findByCodeOrFail(code);
+        const ctx = extractClientContext(req);
+        void this.audit?.log({
+            actorId: userId,
+            action: 'app.secret.revealed',
+            entity: 'app_setting',
+            entityId: app.appCode,
+            ipAddress: ctx.ip ?? null,
+        });
+        return {
+            clientSecret: app.clientSecret ?? null,
+            secondaryClientSecret: app.secondaryClientSecret ?? null,
+            secondarySecretExpiresAt: app.secondarySecretExpiresAt ?? null,
+        };
     }
 
     @Post()

@@ -252,6 +252,110 @@ export class PasskeyService {
     }
 
     /**
+     * Generate WebAuthn authentication options scoped strictly to a specific authenticated user (Step-Up / Sudo mode).
+     */
+    async generateAuthenticationOptionsForUser(userId: string, reqHost?: string) {
+        this.assertPasskeyEnabled();
+        const userPasskeys = await this.passkeyRepo.find({ where: { userId } });
+        if (userPasskeys.length === 0) {
+            throw new BadRequestException('No passkeys registered for this account.');
+        }
+
+        const challengeId = randomUUID();
+        const rpID = this.getRpID(reqHost);
+        const allowCredentials = userPasskeys.map((p) => ({
+            id: p.credentialId,
+            transports: p.transports ? (p.transports.split(',') as any) : undefined,
+        }));
+
+        const options = await generateAuthenticationOptions({
+            rpID,
+            userVerification: 'preferred',
+            allowCredentials,
+        });
+
+        await this.cacheService.set(
+            `passkey:stepup-challenge:${challengeId}`,
+            JSON.stringify({ challenge: options.challenge, userId }),
+            300,
+        );
+
+        return {
+            ...options,
+            challengeId,
+        };
+    }
+
+    /**
+     * Verify a WebAuthn assertion for an already-authenticated user without issuing new login tokens.
+     */
+    async verifyAuthenticationForUser(
+        userId: string,
+        challengeId: string,
+        response: any,
+        reqOrigin?: string,
+        reqHost?: string,
+    ): Promise<{ verified: boolean; passkeyId: string }> {
+        this.assertPasskeyEnabled();
+        const cachedRaw = await this.cacheService.get<string>(`passkey:stepup-challenge:${challengeId}`);
+        if (!cachedRaw) {
+            throw new BadRequestException('Step-up passkey challenge expired or invalid.');
+        }
+
+        let parsed: { challenge: string; userId: string };
+        try {
+            parsed = typeof cachedRaw === 'string' ? JSON.parse(cachedRaw) : cachedRaw;
+        } catch {
+            throw new BadRequestException('Invalid step-up passkey challenge.');
+        }
+
+        if (parsed.userId !== userId) {
+            throw new ForbiddenException('Step-up challenge does not belong to current user.');
+        }
+
+        const credentialId = response?.id;
+        const passkey = await this.passkeyRepo.findOne({
+            where: { credentialId, userId },
+        });
+        if (!passkey) {
+            throw new UnauthorizedException('Passkey credential not recognized for this account.');
+        }
+
+        const rpID = this.getRpID(reqHost);
+        const expectedOrigins = this.getAllowedOrigins(reqOrigin);
+
+        let verification;
+        try {
+            verification = await verifyAuthenticationResponse({
+                response,
+                expectedChallenge: parsed.challenge,
+                expectedOrigin: expectedOrigins,
+                expectedRPID: rpID,
+                credential: {
+                    id: passkey.credentialId,
+                    publicKey: new Uint8Array(Buffer.from(passkey.publicKey, 'base64url')),
+                    counter: Number(passkey.counter),
+                    transports: passkey.transports ? (passkey.transports.split(',') as any) : undefined,
+                },
+                requireUserVerification: false,
+            });
+        } catch (err: any) {
+            throw new UnauthorizedException(`Passkey verification failed: ${err.message}`);
+        }
+
+        if (!verification.verified) {
+            throw new UnauthorizedException('Passkey verification failed.');
+        }
+
+        await this.cacheService.del(`passkey:stepup-challenge:${challengeId}`);
+        passkey.counter = Number(verification.authenticationInfo.newCounter);
+        passkey.lastUsedAt = new Date();
+        await this.passkeyRepo.save(passkey);
+
+        return { verified: true, passkeyId: passkey.id };
+    }
+
+    /**
      * Verify passkey authentication assertion and issue authentication tokens.
      */
     async verifyAuthentication(

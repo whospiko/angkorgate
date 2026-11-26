@@ -206,6 +206,19 @@ export class RuntimeConfigService implements OnModuleInit {
         return this.getAllMasked();
     }
 
+    async revealSecret(key: string): Promise<{ key: string; value: string }> {
+        const def = RUNTIME_SETTING_MAP.get(key);
+        if (!def) {
+            throw new BadRequestException(`Unknown runtime setting key: "${key}"`);
+        }
+        if (!def.isSecret) {
+            throw new BadRequestException(`Setting "${key}" is not a secret.`);
+        }
+        await this.reload();
+        const value = this.get(key, '') ?? '';
+        return { key, value };
+    }
+
     private encrypt(plaintext: string): string {
         const iv = randomBytes(IV_LENGTH);
         const cipher = createCipheriv(ALGORITHM, this.encryptionKey, iv);

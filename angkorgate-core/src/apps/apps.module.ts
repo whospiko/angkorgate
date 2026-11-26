@@ -6,12 +6,14 @@ import { AppsService } from './apps.service';
 import { AppsController } from './apps.controller';
 import { RbacModule } from '../rbac/rbac.module';
 import { ScopesModule } from '../scopes/scopes.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([AppSetting, Scope]),
         RbacModule, // for PermissionsGuard
         ScopesModule,
+        AuthModule,
     ],
     controllers: [AppsController],
     providers: [AppsService],

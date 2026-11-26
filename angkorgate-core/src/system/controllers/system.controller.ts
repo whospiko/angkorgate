@@ -6,6 +6,7 @@ import {
     HttpCode,
     HttpStatus,
     Optional,
+    Param,
     Patch,
     Post,
     Query,
@@ -43,7 +44,8 @@ import { BrandingResponseDto } from '../dto/branding-response.dto';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { Permissions } from '../../rbac/decorators/permissions.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
-import { type JwtPayload } from '../../auth/interfaces/jwt-payload.interface';
+import { type AuthenticatedUser, type JwtPayload } from '../../auth/interfaces/jwt-payload.interface';
+import { StepUpService } from '../../auth/services/step-up.service';
 
 @ApiTags('System Setup & Content Management')
 @Controller('system')
@@ -57,6 +59,8 @@ export class SystemController {
         private readonly auditService: AuditService,
         @Optional()
         private readonly cacheService?: CacheService,
+        @Optional()
+        private readonly stepUp?: StepUpService,
     ) { }
 
     @Get('setup-status')
@@ -125,6 +129,32 @@ export class SystemController {
     @ApiResponse({ status: 200, description: 'Runtime settings returned' })
     async getRuntimeConfig(): Promise<RuntimeSettingView[]> {
         return this.runtimeConfig.getAllMasked();
+    }
+
+    @Get('runtime-config/:key/reveal')
+    @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+    @Permissions('app:read')
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Reveal a single runtime secret value (requires recent step-up verification)' })
+    @ApiResponse({ status: 200, description: 'Decrypted runtime secret returned' })
+    @ApiResponse({ status: 403, description: 'Forbidden - step-up verification required or insufficient permissions' })
+    async revealRuntimeSecret(
+        @Param('key') key: string,
+        @CurrentUser() user: AuthenticatedUser | JwtPayload,
+        @Req() req: Request,
+    ): Promise<{ key: string; value: string }> {
+        const actorId = (user as AuthenticatedUser).id ?? (user as JwtPayload).sub;
+        await this.stepUp?.assertVerified(actorId);
+        const result = await this.runtimeConfig.revealSecret(key);
+        const ip = (req.headers['x-forwarded-for'] as string) || req.socket?.remoteAddress;
+        void this.auditService.log({
+            actorId,
+            action: 'system.runtime_config.secret_revealed',
+            entity: 'runtime_settings',
+            entityId: key,
+            ipAddress: ip ?? null,
+        });
+        return result;
     }
 
     @Patch('runtime-config')

@@ -16,6 +16,8 @@ import { CustomersModule } from '../customers/customers.module';
 import { EmployeesModule } from '../employees/employees.module';
 import { AuthController } from './controllers/auth.controller';
 import { UserSessionsController } from './controllers/user-sessions.controller';
+import { StepUpController } from './controllers/step-up.controller';
+import { StepUpService } from './services/step-up.service';
 import { MfaController } from './controllers/mfa.controller';
 import { MfaBackupCode } from './entities/mfa-backup-code.entity';
 import { UserMfa } from './entities/user-mfa.entity';
@@ -66,9 +68,10 @@ import { PasswordlessController } from './controllers/passwordless.controller';
         EmployeesModule,
         ApiKeysModule,
     ],
-    controllers: [AuthController, UserSessionsController, MfaController, EmailChangeController, PasskeyController, PasswordlessController],
+    controllers: [AuthController, UserSessionsController, StepUpController, MfaController, EmailChangeController, PasskeyController, PasswordlessController],
     providers: [
         AuthService,
+        StepUpService,
         EmailChangeService,
         PasskeyService,
         PasswordlessService,
@@ -81,6 +84,7 @@ import { PasswordlessController } from './controllers/passwordless.controller';
     ],
     exports: [
         AuthService,
+        StepUpService,
         PasskeyService,
         PasswordlessService,
         JwtAuthGuard,

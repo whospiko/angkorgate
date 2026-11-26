@@ -839,6 +839,121 @@ async function runSmokeTest() {
             .send({ refreshToken: devBBody.refreshToken });
         assert('Device B refresh still succeeds after revoke-others', devBRefreshAfter.status === 200);
 
+        // ══════════════════════════════════════════════════════════════════
+        logSection('13. Step-Up Verification & Masked Secret Reveal');
+        // ══════════════════════════════════════════════════════════════════
+        const maskedAppRes = await request(http)
+            .get('/admin/apps/smoke-app')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const maskedAppData = dataOf(maskedAppRes);
+        assert(
+            'GET /admin/apps/:code masks clientSecret by default',
+            maskedAppRes.status === 200 && maskedAppData?.clientSecret === '••••••••',
+        );
+
+        const maskedAppsListRes = await request(http)
+            .get('/admin/apps')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const maskedAppsList = dataOf(maskedAppsListRes);
+        const smokeAppRow = Array.isArray(maskedAppsList)
+            ? maskedAppsList.find((a: any) => a.appCode === 'smoke-app')
+            : null;
+        assert(
+            'GET /admin/apps masks confidential app secrets',
+            maskedAppsListRes.status === 200 && smokeAppRow?.clientSecret === '••••••••',
+        );
+
+        // Store a runtime secret via PATCH /system/runtime-config
+        const patchRuntimeRes = await request(http)
+            .patch('/system/runtime-config')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ settings: { MAIL_PASS: 'smoke-secret-smtp-pass' } });
+        assert('PATCH /system/runtime-config saves secret', patchRuntimeRes.status === 200);
+
+        // Reveal attempts before step-up must fail with 403
+        const unverifiedAppReveal = await request(http)
+            .get('/admin/apps/smoke-app/reveal-secret')
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert(
+            'GET /admin/apps/:code/reveal-secret rejects before step-up (403)',
+            unverifiedAppReveal.status === 403,
+        );
+
+        const unverifiedRuntimeReveal = await request(http)
+            .get('/system/runtime-config/MAIL_PASS/reveal')
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert(
+            'GET /system/runtime-config/:key/reveal rejects before step-up (403)',
+            unverifiedRuntimeReveal.status === 403,
+        );
+
+        // Status before verification
+        const stepUpBeforeRes = await request(http)
+            .get('/auth/step-up/status')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const stepUpBefore = dataOf(stepUpBeforeRes);
+        assert(
+            'GET /auth/step-up/status reports unverified with password enabled',
+            stepUpBeforeRes.status === 200 &&
+                stepUpBefore?.verified === false &&
+                stepUpBefore?.availableMethods?.password === true,
+        );
+
+        // Wrong password fails 401
+        const badStepUp = await request(http)
+            .post('/auth/step-up/verify')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ method: 'password', password: 'WrongPassword!' });
+        assert('POST /auth/step-up/verify rejects wrong password (401)', badStepUp.status === 401);
+
+        // Correct password unlocks 5-minute sudo window (Section 11 reset admin password to NewAdminPass123!)
+        const goodStepUp = await request(http)
+            .post('/auth/step-up/verify')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ method: 'password', password: 'NewAdminPass123!' });
+        const goodStepUpData = dataOf(goodStepUp);
+        assert(
+            'POST /auth/step-up/verify unlocks sudo window for password',
+            (goodStepUp.status === 200 || goodStepUp.status === 201) &&
+                goodStepUpData?.verified === true &&
+                goodStepUpData?.method === 'password',
+        );
+
+        // Reveal endpoints succeed after step-up
+        const verifiedAppReveal = await request(http)
+            .get('/admin/apps/smoke-app/reveal-secret')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const verifiedAppData = dataOf(verifiedAppReveal);
+        assert(
+            'GET /admin/apps/:code/reveal-secret returns plaintext secret after step-up',
+            verifiedAppReveal.status === 200 &&
+                typeof verifiedAppData?.clientSecret === 'string' &&
+                verifiedAppData.clientSecret.length > 0 &&
+                verifiedAppData.clientSecret !== '••••••••',
+        );
+
+        const verifiedRuntimeReveal = await request(http)
+            .get('/system/runtime-config/MAIL_PASS/reveal')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const verifiedRuntimeData = dataOf(verifiedRuntimeReveal);
+        assert(
+            'GET /system/runtime-config/:key/reveal decrypts and returns secret after step-up',
+            verifiedRuntimeReveal.status === 200 &&
+                verifiedRuntimeData?.key === 'MAIL_PASS' &&
+                verifiedRuntimeData?.value === 'smoke-secret-smtp-pass',
+        );
+
+        // Clear sudo lock -> reveal is blocked again
+        const lockStepUp = await request(http)
+            .delete('/auth/step-up')
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert('DELETE /auth/step-up clears sudo window', lockStepUp.status === 200 || lockStepUp.status === 204);
+
+        const postLockReveal = await request(http)
+            .get('/admin/apps/smoke-app/reveal-secret')
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert('Reveal endpoint rejects again (403) after sudo lock is cleared', postLockReveal.status === 403);
+
     } catch (err) {
         console.error(`\n${c.red}💥 Smoke test crashed unexpectedly:${c.reset}`, err);
         hasErrors = true;

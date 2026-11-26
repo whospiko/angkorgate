@@ -45,7 +45,18 @@ export class OauthProvidersService {
 
     async update(code: string, dto: UpdateProviderDto): Promise<OauthProvider> {
         const p = await this.findByCodeOrFail(code);
-        Object.assign(p, dto);
+        const { clientSecret, extraConfig, ...rest } = dto;
+        Object.assign(p, rest);
+        if (clientSecret !== undefined && clientSecret !== '••••••••') {
+            p.clientSecret = clientSecret;
+        }
+        if (extraConfig !== undefined) {
+            const nextExtra = { ...(p.extraConfig ?? {}), ...extraConfig };
+            if (extraConfig.privateKey === '••••••••' && p.extraConfig?.privateKey) {
+                nextExtra.privateKey = p.extraConfig.privateKey;
+            }
+            p.extraConfig = nextExtra;
+        }
         const saved = await this.repo.save(p);
         this.registry?.invalidate(code);
         return saved;

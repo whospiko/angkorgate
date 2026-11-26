@@ -161,8 +161,9 @@ export class OauthLoginService {
         }
 
         // Create user (no password — they'll use OAuth)
-        // For password_hash NOT NULL constraint: generate a random one they'll never know
-        const randomPasswordHash = '$2b$12$' + generateSecureToken(40).slice(0, 53);
+        // Store a non-bcrypt marker containing "hash" so UsersService passes it through without hashing
+        // and StepUpService knows this account has no local password.
+        const randomPasswordHash = `oauth_no_password_hash_${generateSecureToken(24)}`;
 
         const user = await this.users.create({
             email: profile.email ?? undefined,

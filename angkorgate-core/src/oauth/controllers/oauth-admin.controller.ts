@@ -9,6 +9,7 @@ import {
     Param,
     Patch,
     Post,
+    Req,
     UseGuards,
 } from '@nestjs/common';
 import {
@@ -19,15 +20,23 @@ import {
     ApiTags,
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
+import type { Request } from 'express';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { Permissions } from '../../rbac/decorators/permissions.decorator';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { StepUpService } from '../../auth/services/step-up.service';
+import { AuditService } from '../../audit/services/audit.service';
+import { extractClientContext } from '../../auth/utils/client-context.util';
 import { OauthConfigService } from '../services/oauth-config.service';
 import { OauthProvidersService } from '../services/oauth-providers.service';
 import { OauthAccountsService } from '../services/oauth-accounts.service';
 import { OauthStrategyRegistry } from '../services/oauth-strategy.registry';
+import { OauthProvider } from '../entities/oauth-provider.entity';
 import { CreateProviderDto } from '../dto/create-provider.dto';
 import { UpdateProviderDto } from '../dto/update-provider.dto';
 import { UpdateOauthSettingsDto } from '../dto/update-oauth-settings.dto';
+
+const SECRET_MASK = '••••••••';
 
 @ApiTags('OAuth Providers - Admin')
 @ApiBearerAuth('bearerAuth')
@@ -39,7 +48,24 @@ export class OauthAdminController {
         @Optional() private readonly config?: OauthConfigService,
         @Optional() private readonly registry?: OauthStrategyRegistry,
         @Optional() private readonly accounts?: OauthAccountsService,
+        @Optional() private readonly stepUp?: StepUpService,
+        @Optional() private readonly audit?: AuditService,
     ) { }
+
+    private maskProvider(p: OauthProvider) {
+        const extraConfig = p.extraConfig ? { ...p.extraConfig } : null;
+        const hasPrivateKey = Boolean(extraConfig && typeof extraConfig.privateKey === 'string' && extraConfig.privateKey);
+        if (extraConfig && hasPrivateKey) {
+            extraConfig.privateKey = SECRET_MASK;
+        }
+        return {
+            ...p,
+            clientSecret: p.clientSecret ? SECRET_MASK : null,
+            hasClientSecret: Boolean(p.clientSecret),
+            hasPrivateKey,
+            extraConfig,
+        };
+    }
 
     @Get('users/:userId/accounts')
     @Permissions('oauth:read')
@@ -85,24 +111,57 @@ export class OauthAdminController {
 
     @Get()
     @Permissions('oauth:read')
-    @ApiOperation({ summary: 'List all configured OAuth providers' })
+    @ApiOperation({ summary: 'List all configured OAuth providers (secrets masked)' })
     @ApiResponse({ status: 200, description: 'List of all OAuth providers' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden' })
-    list() {
-        return this.providers.list();
+    async list() {
+        const rows = await this.providers.list();
+        return rows.map((p) => this.maskProvider(p));
     }
 
     @Get(':code')
     @Permissions('oauth:read')
-    @ApiOperation({ summary: 'Get details of a single OAuth identity provider' })
+    @ApiOperation({ summary: 'Get details of a single OAuth identity provider (secrets masked)' })
     @ApiParam({ name: 'code', description: 'Provider code (e.g. google, github, discord, microsoft, telegram)' })
     @ApiResponse({ status: 200, description: 'OAuth provider details' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden' })
     @ApiResponse({ status: 404, description: 'Provider not found' })
-    findOne(@Param('code') code: string) {
-        return this.providers.findByCodeOrFail(code);
+    async findOne(@Param('code') code: string) {
+        const provider = await this.providers.findByCodeOrFail(code);
+        return this.maskProvider(provider);
+    }
+
+    @Get(':code/reveal-secret')
+    @Permissions('oauth:read')
+    @ApiOperation({ summary: 'Reveal client secret or bot token for an OAuth provider (requires step-up verification)' })
+    @ApiParam({ name: 'code', description: 'Provider code (e.g. google, github, discord, microsoft, telegram)' })
+    @ApiResponse({ status: 200, description: 'OAuth provider secrets returned' })
+    @ApiResponse({ status: 403, description: 'Step-up verification required' })
+    @ApiResponse({ status: 404, description: 'Provider not found' })
+    async revealSecret(
+        @Param('code') code: string,
+        @CurrentUser('id') userId: string,
+        @Req() req: Request,
+    ) {
+        await this.stepUp?.assertVerified(userId);
+        const provider = await this.providers.findByCodeOrFail(code);
+        const ctx = extractClientContext(req);
+        void this.audit?.log({
+            actorId: userId,
+            action: 'oauth.provider.secret_revealed',
+            entity: 'oauth_provider',
+            entityId: provider.code,
+            ipAddress: ctx.ip ?? null,
+        });
+        return {
+            clientSecret: provider.clientSecret ?? null,
+            privateKey:
+                typeof provider.extraConfig?.privateKey === 'string'
+                    ? provider.extraConfig.privateKey
+                    : null,
+        };
     }
 
     @Post()
