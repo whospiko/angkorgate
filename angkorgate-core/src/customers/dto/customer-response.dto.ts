@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Customer } from '../entities/customer.entity';
+import { CustomerContact } from '../entities/customer-contact.entity';
 
 export class CustomerResponseDto {
     @ApiProperty({ description: 'Customer UUID', example: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' })
@@ -50,6 +51,12 @@ export class CustomerResponseDto {
     @ApiProperty({ description: 'Last update timestamp', example: '2026-11-21T11:00:00.000Z' })
     updatedAt: Date;
 
+    @ApiPropertyOptional({ description: 'Linked contacts when loaded' })
+    contacts?: CustomerContact[];
+
+    @ApiPropertyOptional({ description: 'Dynamic attributes map when loaded' })
+    attributes?: Record<string, unknown>;
+
     static fromEntity(c: Customer): CustomerResponseDto {
         const dto = new CustomerResponseDto();
         dto.id = c.id;
@@ -68,6 +75,16 @@ export class CustomerResponseDto {
         dto.isMinor = c.isMinor;
         dto.createdAt = c.createdAt;
         dto.updatedAt = c.updatedAt;
+        if (Array.isArray(c.contacts)) {
+            dto.contacts = c.contacts;
+        }
+        if (Array.isArray(c.attributes)) {
+            const attrs: Record<string, unknown> = {};
+            for (const a of c.attributes) {
+                attrs[a.key] = a.value;
+            }
+            dto.attributes = attrs;
+        }
         return dto;
     }
 }

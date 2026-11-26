@@ -2,6 +2,7 @@ import { colTimestamptz, colCitext } from '../../common/utils/db-types.util';
 import {
     Column,
     CreateDateColumn,
+    DeleteDateColumn,
     Entity,
     Index,
     JoinColumn,
@@ -74,6 +75,9 @@ export class Customer {
 
     @UpdateDateColumn({ name: 'updated_at', type: colTimestamptz() })
     updatedAt: Date;
+
+    @DeleteDateColumn({ name: 'deleted_at', type: colTimestamptz(), nullable: true })
+    deletedAt: Date | null;
 
     @OneToMany(() => CustomerContact, (c) => c.customer)
     contacts: CustomerContact[];

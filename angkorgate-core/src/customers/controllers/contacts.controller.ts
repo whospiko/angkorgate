@@ -19,9 +19,10 @@ import {
     ApiResponse,
     ApiTags,
 } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { Permissions } from '../../rbac/decorators/permissions.decorator';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { UnifiedAuthGuard } from '../../auth/guards/unified-auth.guard';
 import { ContactsService } from '../services/contacts.service';
 import { CreateContactDto } from '../dto/create-contact.dto';
 import { UpdateContactDto } from '../dto/update-contact.dto';
@@ -29,7 +30,7 @@ import { SetAttributeDto } from '../dto/set-attribute.dto';
 
 @ApiTags('Customer Contacts')
 @ApiBearerAuth('bearerAuth')
-@UseGuards(AuthGuard('jwt'), PermissionsGuard)
+@UseGuards(UnifiedAuthGuard, PermissionsGuard)
 @Controller('customers/:customerId/contacts')
 export class ContactsController {
     constructor(private readonly contacts: ContactsService) { }
@@ -46,8 +47,9 @@ export class ContactsController {
     add(
         @Param('customerId', ParseUUIDPipe) customerId: string,
         @Body() dto: CreateContactDto,
+        @CurrentUser('id') actorId: string,
     ) {
-        return this.contacts.add(customerId, dto);
+        return this.contacts.add(customerId, dto, actorId);
     }
 
     @Get()
@@ -89,10 +91,12 @@ export class ContactsController {
     @ApiResponse({ status: 403, description: 'Forbidden' })
     @ApiResponse({ status: 404, description: 'Contact not found' })
     update(
+        @Param('customerId', ParseUUIDPipe) customerId: string,
         @Param('contactId', ParseUUIDPipe) contactId: string,
         @Body() dto: UpdateContactDto,
+        @CurrentUser('id') actorId: string,
     ) {
-        return this.contacts.update(contactId, dto);
+        return this.contacts.update(customerId, contactId, dto, actorId);
     }
 
     @Delete(':contactId')
@@ -105,8 +109,12 @@ export class ContactsController {
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden' })
     @ApiResponse({ status: 404, description: 'Contact not found' })
-    remove(@Param('contactId', ParseUUIDPipe) contactId: string) {
-        return this.contacts.remove(contactId);
+    remove(
+        @Param('customerId', ParseUUIDPipe) customerId: string,
+        @Param('contactId', ParseUUIDPipe) contactId: string,
+        @CurrentUser('id') actorId: string,
+    ) {
+        return this.contacts.remove(customerId, contactId, actorId);
     }
 
     @Get(':contactId/attributes')
@@ -117,8 +125,11 @@ export class ContactsController {
     @ApiResponse({ status: 200, description: 'Contact attributes map' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden' })
-    getAttrs(@Param('contactId', ParseUUIDPipe) contactId: string) {
-        return this.contacts.getAttributes(contactId);
+    getAttrs(
+        @Param('customerId', ParseUUIDPipe) customerId: string,
+        @Param('contactId', ParseUUIDPipe) contactId: string,
+    ) {
+        return this.contacts.getAttributes(customerId, contactId);
     }
 
     @Put(':contactId/attributes/:key')
@@ -131,10 +142,31 @@ export class ContactsController {
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden' })
     setAttr(
+        @Param('customerId', ParseUUIDPipe) customerId: string,
         @Param('contactId', ParseUUIDPipe) contactId: string,
         @Param('key') key: string,
         @Body() dto: SetAttributeDto,
+        @CurrentUser('id') actorId: string,
     ) {
-        return this.contacts.setAttribute(contactId, key, dto.value);
+        return this.contacts.setAttribute(customerId, contactId, key, dto.value, actorId);
+    }
+
+    @Delete(':contactId/attributes/:key')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    @Permissions('customer:write')
+    @ApiOperation({ summary: 'Delete dynamic attribute from contact person' })
+    @ApiParam({ name: 'customerId', description: 'Customer UUID' })
+    @ApiParam({ name: 'contactId', description: 'Contact UUID' })
+    @ApiParam({ name: 'key', description: 'Attribute key' })
+    @ApiResponse({ status: 204, description: 'Attribute deleted successfully' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    @ApiResponse({ status: 403, description: 'Forbidden' })
+    deleteAttr(
+        @Param('customerId', ParseUUIDPipe) customerId: string,
+        @Param('contactId', ParseUUIDPipe) contactId: string,
+        @Param('key') key: string,
+        @CurrentUser('id') actorId: string,
+    ) {
+        return this.contacts.deleteAttribute(customerId, contactId, key, actorId);
     }
 }

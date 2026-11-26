@@ -1,11 +1,12 @@
 import {
+    BadRequestException,
     ConflictException,
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
-import { Customer, CustomerType } from '../entities/customer.entity';
+import { Customer, CustomerStatus, CustomerType } from '../entities/customer.entity';
 import { CustomerAttribute } from '../entities/customer-attribute.entity';
 import { CreateCustomerDto } from '../dto/create-customer.dto';
 import { UpdateCustomerDto } from '../dto/update-customer.dto';
@@ -19,6 +20,12 @@ import {
 } from '../utils/customer-code.util';
 import { normalizePagination } from '../../common/utils/pagination.util';
 import { isSqlite } from '../../common/utils/db-types.util';
+
+const ALLOWED_CUSTOMER_STATUSES: ReadonlyArray<CustomerStatus> = [
+    'ACTIVE',
+    'INACTIVE',
+    'ARCHIVED',
+];
 
 @Injectable()
 export class CustomersService {
@@ -36,13 +43,7 @@ export class CustomersService {
         actorId?: string,
     ): Promise<CustomerResponseDto> {
         if (dto.userId) {
-            if (!(await this.users.exists(dto.userId))) {
-                throw new NotFoundException(`User ${dto.userId} not found`);
-            }
-            const linked = await this.repo.findOne({ where: { userId: dto.userId } });
-            if (linked) {
-                throw new ConflictException(`User ${dto.userId} already has a customer record`);
-            }
+            await this.assertUserLinkAvailable(dto.userId);
         }
 
         const type: CustomerType = dto.type ?? 'CUSTOMER';
@@ -95,24 +96,72 @@ export class CustomersService {
         return CustomerResponseDto.fromEntity(saved);
     }
 
-    async setStatus(
+    async linkUser(
         id: string,
-        status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED',
+        userId: string | null,
         actorId?: string,
-    ): Promise<void> {
-        const r = await this.repo.update(id, { status });
-        if (r.affected === 0) throw new NotFoundException(`Customer ${id} not found`);
+    ): Promise<CustomerResponseDto> {
+        const c = await this.repo.findOne({ where: { id } });
+        if (!c) throw new NotFoundException(`Customer ${id} not found`);
+
+        const previousUserId = c.userId;
+        if (userId && userId !== c.userId) {
+            await this.assertUserLinkAvailable(userId, id);
+        }
+
+        c.userId = userId;
+        const saved = await this.repo.save(c);
 
         void this.audit.log({
             actorId: actorId ?? null,
-            action: `customer.status.${status.toLowerCase()}`,
+            action: userId ? 'customer.user.link' : 'customer.user.unlink',
             entity: 'customer',
             entityId: id,
+            oldValue: { userId: previousUserId },
+            newValue: { userId },
+        });
+
+        return CustomerResponseDto.fromEntity(saved);
+    }
+
+    async setStatus(
+        id: string,
+        status: string,
+        actorId?: string,
+    ): Promise<void> {
+        const normalized = status.toUpperCase() as CustomerStatus;
+        if (!ALLOWED_CUSTOMER_STATUSES.includes(normalized)) {
+            throw new BadRequestException(
+                `Invalid customer status '${status}'. Allowed: ${ALLOWED_CUSTOMER_STATUSES.join(', ')}`,
+            );
+        }
+
+        const existing = await this.repo.findOne({ where: { id } });
+        if (!existing) throw new NotFoundException(`Customer ${id} not found`);
+
+        const prevStatus = existing.status;
+        await this.repo.update(id, { status: normalized });
+
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: `customer.status.${normalized.toLowerCase()}`,
+            entity: 'customer',
+            entityId: id,
+            oldValue: { status: prevStatus },
+            newValue: { status: normalized },
         });
     }
 
     async remove(id: string, actorId?: string): Promise<void> {
-        const r = await this.repo.delete(id);
+        const existing = await this.repo.findOne({ where: { id } });
+        if (!existing) throw new NotFoundException(`Customer ${id} not found`);
+
+        // Clear user link before soft-deleting so the user account can be re-linked cleanly
+        if (existing.userId) {
+            await this.repo.update(id, { userId: null });
+        }
+
+        const r = await this.repo.softDelete(id);
         if (r.affected === 0) throw new NotFoundException(`Customer ${id} not found`);
 
         void this.audit.log({
@@ -120,11 +169,16 @@ export class CustomersService {
             action: 'customer.delete',
             entity: 'customer',
             entityId: id,
+            oldValue: { customerCode: existing.customerCode, fullName: existing.fullName },
+            newValue: { softDeleted: true },
         });
     }
 
     async findByIdOrFail(id: string): Promise<CustomerResponseDto> {
-        const c = await this.repo.findOne({ where: { id } });
+        const c = await this.repo.findOne({
+            where: { id },
+            relations: { contacts: true, attributes: true },
+        });
         if (!c) throw new NotFoundException(`Customer ${id} not found`);
         return CustomerResponseDto.fromEntity(c);
     }
@@ -157,11 +211,12 @@ export class CustomersService {
         const qb = this.repo.createQueryBuilder('c');
 
         if (params.type) qb.andWhere('c.type = :type', { type: params.type });
-        if (params.status) qb.andWhere('c.status = :status', { status: params.status });
-        if (params.search) {
+        if (params.status) qb.andWhere('c.status = :status', { status: params.status.toUpperCase() });
+        if (params.search && params.search.trim().length > 0) {
+            const term = `%${params.search.trim().toLowerCase()}%`;
             qb.andWhere(
-                '(c.fullName ILIKE :q OR c.phone ILIKE :q OR c.email ILIKE :q OR c.customerCode ILIKE :q)',
-                { q: `%${params.search}%` },
+                '(LOWER(c.fullName) LIKE :q OR LOWER(COALESCE(c.phone, \'\')) LIKE :q OR LOWER(COALESCE(c.email, \'\')) LIKE :q OR LOWER(c.customerCode) LIKE :q)',
+                { q: term },
             );
         }
 
@@ -182,16 +237,29 @@ export class CustomersService {
         customerId: string,
         key: string,
         value: unknown,
+        actorId?: string,
     ): Promise<CustomerAttribute> {
         await this.findByIdOrFail(customerId);
 
         let attr = await this.attrRepo.findOne({ where: { customerId, key } });
+        const oldValue = attr ? attr.value : undefined;
         if (attr) {
             attr.value = value;
         } else {
             attr = this.attrRepo.create({ customerId, key, value });
         }
-        return this.attrRepo.save(attr);
+        const saved = await this.attrRepo.save(attr);
+
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'customer.attribute.set',
+            entity: 'customer',
+            entityId: customerId,
+            oldValue: oldValue !== undefined ? { [key]: oldValue } : undefined,
+            newValue: { [key]: value },
+        });
+
+        return saved;
     }
 
     async getAttributes(customerId: string): Promise<Record<string, unknown>> {
@@ -202,8 +270,22 @@ export class CustomersService {
         return out;
     }
 
-    async deleteAttribute(customerId: string, key: string): Promise<void> {
-        await this.attrRepo.delete({ customerId, key });
+    async deleteAttribute(
+        customerId: string,
+        key: string,
+        actorId?: string,
+    ): Promise<void> {
+        await this.findByIdOrFail(customerId);
+        const result = await this.attrRepo.delete({ customerId, key });
+        if (result.affected && result.affected > 0) {
+            void this.audit.log({
+                actorId: actorId ?? null,
+                action: 'customer.attribute.delete',
+                entity: 'customer',
+                entityId: customerId,
+                oldValue: { key },
+            });
+        }
     }
 
     async exists(id: string): Promise<boolean> {
@@ -211,13 +293,23 @@ export class CustomersService {
     }
 
     async getFullName(id: string): Promise<string | null> {
-        const c = await this.repo.findOne({ where: { id }, select: { 'id': true, 'fullName': true } });
+        const c = await this.repo.findOne({ where: { id }, select: { id: true, fullName: true } });
         return c?.fullName ?? null;
     }
 
     async getPhone(id: string): Promise<string | null> {
-        const c = await this.repo.findOne({ where: { id }, select: { 'id': true, 'phone': true } });
+        const c = await this.repo.findOne({ where: { id }, select: { id: true, phone: true } });
         return c?.phone ?? null;
+    }
+
+    private async assertUserLinkAvailable(userId: string, excludeCustomerId?: string): Promise<void> {
+        if (!(await this.users.exists(userId))) {
+            throw new NotFoundException(`User ${userId} not found`);
+        }
+        const linked = await this.repo.findOne({ where: { userId } });
+        if (linked && linked.id !== excludeCustomerId) {
+            throw new ConflictException(`User ${userId} already has a customer record`);
+        }
     }
 
     /** Generates PAT-0001 / GST-0001 / CUS-0001 atomically using a transaction. */
@@ -229,19 +321,25 @@ export class CustomersService {
                 .createQueryBuilder(Customer, 'c')
                 .where('c.customerCode LIKE :p', { p: `${prefix}-%` });
 
+            // Include soft-deleted rows so customer codes are never reused
+            if (typeof qb.withDeleted === 'function') {
+                qb.withDeleted();
+            }
+
             if (!isSqlite()) {
                 qb.orderBy('CAST(SUBSTRING(c.customerCode FROM 5) AS INT)', 'DESC')
                     .setLock('pessimistic_write');
-            } else {
-                qb.orderBy('c.customerCode', 'DESC');
+                const lastCustomer = await qb.getOne();
+                const currentMax = lastCustomer ? parseCustomerSequence(lastCustomer.customerCode) : 0;
+                return formatCustomerCode(prefix, currentMax + 1);
             }
 
-            const lastCustomer = await qb.getOne();
-
-            const currentMax = lastCustomer ? parseCustomerSequence(lastCustomer.customerCode) : 0;
-            const next = currentMax + 1;
-
-            return formatCustomerCode(prefix, next);
+            const existing = await qb.select(['c.customerCode']).getMany();
+            const currentMax = existing.reduce(
+                (max, row) => Math.max(max, parseCustomerSequence(row.customerCode)),
+                0,
+            );
+            return formatCustomerCode(prefix, currentMax + 1);
         });
     }
 }

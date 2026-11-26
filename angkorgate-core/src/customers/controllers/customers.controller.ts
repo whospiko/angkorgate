@@ -32,6 +32,8 @@ import { CreateCustomerDto } from '../dto/create-customer.dto';
 import { UpdateCustomerDto } from '../dto/update-customer.dto';
 import { SetAttributeDto } from '../dto/set-attribute.dto';
 import { CustomerResponseDto } from '../dto/customer-response.dto';
+import { LinkCustomerUserDto } from '../dto/link-customer-user.dto';
+import { ATTRIBUTE_SCHEMAS } from '../seed/attribute-schemas';
 
 @ApiTags('Customers')
 @ApiBearerAuth('bearerAuth')
@@ -59,8 +61,8 @@ export class CustomersController {
     @Permissions('customer:read')
     @ApiOperation({ summary: 'List customer profiles with filtering and pagination' })
     @ApiQuery({ name: 'type', required: false, enum: ['PATIENT', 'GUEST', 'CUSTOMER'], description: 'Filter by customer type' })
-    @ApiQuery({ name: 'status', required: false, description: 'Filter by customer status' })
-    @ApiQuery({ name: 'search', required: false, description: 'Search name, phone, or email' })
+    @ApiQuery({ name: 'status', required: false, enum: ['ACTIVE', 'INACTIVE', 'ARCHIVED'], description: 'Filter by customer status' })
+    @ApiQuery({ name: 'search', required: false, description: 'Search name, phone, email, or customerCode' })
     @ApiQuery({ name: 'page', required: false, example: '1', description: 'Page number' })
     @ApiQuery({ name: 'limit', required: false, example: '20', description: 'Items per page' })
     @ApiResponse({ status: 200, description: 'Paginated customer list' })
@@ -80,6 +82,14 @@ export class CustomersController {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
         });
+    }
+
+    @Get('attribute-schemas')
+    @Permissions('customer:read')
+    @ApiOperation({ summary: 'Get suggested attribute schemas per customer type' })
+    @ApiResponse({ status: 200, description: 'Suggested attribute schemas map' })
+    getAttributeSchemas() {
+        return ATTRIBUTE_SCHEMAS;
     }
 
     @Get('by-user/:userId')
@@ -120,6 +130,19 @@ export class CustomersController {
         return this.customers.update(id, dto, actorId);
     }
 
+    @Patch(':id/user')
+    @Permissions('customer:write')
+    @ApiOperation({ summary: 'Link or unlink a user account to a customer profile' })
+    @ApiParam({ name: 'id', description: 'Customer UUID' })
+    @ApiResponse({ status: 200, description: 'Customer user link updated', type: CustomerResponseDto })
+    linkUser(
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() dto: LinkCustomerUserDto,
+        @CurrentUser('id') actorId: string,
+    ) {
+        return this.customers.linkUser(id, dto.userId ?? null, actorId);
+    }
+
     @Patch(':id/status/:status')
     @HttpCode(HttpStatus.NO_CONTENT)
     @Permissions('customer:write')
@@ -127,6 +150,7 @@ export class CustomersController {
     @ApiParam({ name: 'id', description: 'Customer UUID' })
     @ApiParam({ name: 'status', enum: ['ACTIVE', 'INACTIVE', 'ARCHIVED'], description: 'New status' })
     @ApiResponse({ status: 204, description: 'Customer status updated' })
+    @ApiResponse({ status: 400, description: 'Invalid status' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden (lacks customer:write permission)' })
     @ApiResponse({ status: 404, description: 'Customer not found' })
@@ -135,11 +159,7 @@ export class CustomersController {
         @Param('status') status: string,
         @CurrentUser('id') actorId: string,
     ) {
-        return this.customers.setStatus(
-            id,
-            status.toUpperCase() as 'ACTIVE' | 'INACTIVE' | 'ARCHIVED',
-            actorId,
-        );
+        return this.customers.setStatus(id, status, actorId);
     }
 
     @Delete(':id')
@@ -184,8 +204,9 @@ export class CustomersController {
         @Param('id', ParseUUIDPipe) id: string,
         @Param('key') key: string,
         @Body() dto: SetAttributeDto,
+        @CurrentUser('id') actorId: string,
     ) {
-        return this.customers.setAttribute(id, key, dto.value);
+        return this.customers.setAttribute(id, key, dto.value, actorId);
     }
 
     @Delete(':id/attributes/:key')
@@ -201,7 +222,8 @@ export class CustomersController {
     deleteAttribute(
         @Param('id', ParseUUIDPipe) id: string,
         @Param('key') key: string,
+        @CurrentUser('id') actorId: string,
     ) {
-        return this.customers.deleteAttribute(id, key);
+        return this.customers.deleteAttribute(id, key, actorId);
     }
 }
