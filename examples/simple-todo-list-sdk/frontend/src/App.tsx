@@ -22,11 +22,19 @@ interface TodoItem {
 }
 
 export function App() {
-  const { isLoaded, isSignedIn, getToken } = useAngkorGate();
+  const {
+    isLoaded,
+    isSignedIn,
+    error: authError,
+    getToken,
+    refreshSession,
+  } = useAngkorGate();
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [viewMode, setViewMode] = useState<"mine" | "all">("mine");
   const [title, setTitle] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const apiCall = useCallback(
@@ -123,6 +131,19 @@ export function App() {
     }
   }
 
+  async function handleRefreshSession() {
+    setRefreshing(true);
+    setStatusMessage(null);
+    setError(null);
+    const tokens = await refreshSession();
+    setRefreshing(false);
+    if (tokens) {
+      setStatusMessage(
+        `Session refreshed (expires in ${tokens.expires_in ?? 3600}s).`
+      );
+    }
+  }
+
   if (!isLoaded) {
     return (
       <main className="page center">
@@ -151,7 +172,39 @@ export function App() {
         <main className="page">
           <UserProfile showRoles showPermissions />
 
-          {error && <div className="alert">{error}</div>}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              marginTop: 12,
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={refreshing}
+              onClick={() => void handleRefreshSession()}
+            >
+              {refreshing ? "Refreshing..." : "Refresh Session"}
+            </button>
+          </div>
+
+          {statusMessage && (
+            <div
+              className="card"
+              style={{
+                marginTop: 12,
+                padding: "10px 14px",
+                borderColor: "#10b981",
+                color: "#34d399",
+              }}
+            >
+              {statusMessage}
+            </div>
+          )}
+          {(error || authError) && (
+            <div className="alert">{error || authError}</div>
+          )}
 
           <section className="card" style={{ marginTop: 20 }}>
             <form onSubmit={handleAddTodo} className="todo-form">
