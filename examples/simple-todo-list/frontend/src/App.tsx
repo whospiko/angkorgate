@@ -5,6 +5,7 @@ import {
   exchangeCodeForTokens,
   getAccessToken,
   logoutSso,
+  refreshOidcTokens,
   startSsoLogin,
 } from "./lib/angkorgate";
 import {
@@ -26,6 +27,8 @@ export function App() {
   const [title, setTitle] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const callbackHandled = useRef(false);
 
@@ -125,6 +128,24 @@ export function App() {
     }
   }
 
+  async function handleRefreshSession() {
+    setRefreshing(true);
+    setStatusMessage(null);
+    setError(null);
+    try {
+      const tokens = await refreshOidcTokens();
+      setStatusMessage(
+        `Session refreshed (expires in ${tokens.expires_in ?? 3600}s).`
+      );
+      await loadWorkspace(viewMode);
+    } catch (err) {
+      setUser(null);
+      setError(err instanceof Error ? err.message : "Session refresh failed.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   async function handleSwitchView(mode: "mine" | "all") {
     setViewMode(mode);
     setError(null);
@@ -183,13 +204,21 @@ export function App() {
         </div>
 
         <div className="actions">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={refreshing}
+            onClick={() => void handleRefreshSession()}
+          >
+            {refreshing ? "Refreshing..." : "Refresh Token"}
+          </button>
           <a
             href={`${ANGKORGATE_CONSOLE_URL}/account`}
             target="_blank"
             rel="noopener noreferrer"
             className="btn btn-secondary"
           >
-            Manage Account ↗
+            Manage Sessions ↗
           </a>
           <button type="button" className="btn btn-danger" onClick={logoutSso}>
             Sign Out
@@ -197,6 +226,19 @@ export function App() {
         </div>
       </header>
 
+      {statusMessage && (
+        <div
+          className="card"
+          style={{
+            marginBottom: 16,
+            padding: "10px 14px",
+            borderColor: "#10b981",
+            color: "#34d399",
+          }}
+        >
+          {statusMessage}
+        </div>
+      )}
       {error && <div className="alert">{error}</div>}
 
       <section className="card">
