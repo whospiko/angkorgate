@@ -30,6 +30,7 @@ import {
   getPasskeyAuthOptionsAction,
   verifyPasskeyAuthAction,
 } from "../server/passkey-actions"
+import { completeOidcInteractionWithToken } from "../lib/oidc-interaction"
 import { OAuthProviders } from "./oauth-providers"
 import { PasswordlessLogin } from "./passwordless-login"
 import type { PublicOAuthProvider } from "@/features/oauth-providers"
@@ -127,10 +128,19 @@ export function LoginForm({
       const verifyRes = await verifyPasskeyAuthAction(
         optRes.options.challengeId,
         assertionResponse,
-        redirectParam
+        redirectParam,
+        Boolean(interactionParam)
       )
 
       if (verifyRes.success) {
+        if (interactionParam && verifyRes.oidcAccessToken) {
+          const nextUrl = await completeOidcInteractionWithToken(
+            interactionParam,
+            verifyRes.oidcAccessToken
+          )
+          window.location.href = nextUrl
+          return
+        }
         window.location.href = verifyRes.redirectUrl || redirectParam || "/dashboard"
       } else {
         setPasskeyError(verifyRes.message || "Passkey verification failed.")
@@ -234,6 +244,7 @@ export function LoginForm({
 
         <PasswordlessLogin
           redirectUrl={redirectParam}
+          interaction={interactionParam}
           enabledMethods={authMethods}
           onBackToPassword={() => setPasswordlessMode(false)}
         />

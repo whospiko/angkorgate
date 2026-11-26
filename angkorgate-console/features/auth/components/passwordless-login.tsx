@@ -25,11 +25,13 @@ import {
   requestOtpAction,
   verifyOtpAction,
 } from "../server/passwordless-actions"
+import { completeOidcInteractionWithToken } from "../lib/oidc-interaction"
 
 export type PasswordlessMethod = "magic_link" | "email_otp" | "sms_otp"
 
 interface PasswordlessLoginProps {
   redirectUrl?: string
+  interaction?: string | null
   enabledMethods?: {
     magicLinkEnabled: boolean
     emailOtpEnabled: boolean
@@ -40,6 +42,7 @@ interface PasswordlessLoginProps {
 
 export function PasswordlessLogin({
   redirectUrl = "/dashboard",
+  interaction = null,
   enabledMethods = {
     magicLinkEnabled: true,
     emailOtpEnabled: true,
@@ -76,7 +79,10 @@ export function PasswordlessLogin({
     setStatusMessage(null)
 
     if (method === "magic_link") {
-      const res = await requestMagicLinkAction(email, redirectUrl)
+      const magicRedirect = interaction
+        ? `/oidc-interaction/${encodeURIComponent(interaction)}`
+        : redirectUrl
+      const res = await requestMagicLinkAction(email, magicRedirect)
       setLoading(false)
       if (!res.success) {
         setError(res.message)
@@ -115,10 +121,27 @@ export function PasswordlessLogin({
         phone: channel === "sms" ? phone : undefined,
         code,
       },
-      redirectUrl
+      redirectUrl,
+      Boolean(interaction)
     )
 
     if (res.success) {
+      if (interaction && res.oidcAccessToken) {
+        try {
+          const nextUrl = await completeOidcInteractionWithToken(
+            interaction,
+            res.oidcAccessToken
+          )
+          window.location.href = nextUrl
+          return
+        } catch (err) {
+          setError(
+            err instanceof Error ? err.message : "Failed to complete OIDC sign in."
+          )
+          setLoading(false)
+          return
+        }
+      }
       window.location.href = res.redirectUrl || redirectUrl || "/dashboard"
       return
     }

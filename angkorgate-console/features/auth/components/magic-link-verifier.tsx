@@ -11,11 +11,17 @@ import {
   RiMagicLine,
 } from "@remixicon/react"
 import { verifyMagicLinkAction } from "../server/passwordless-actions"
+import { completeOidcInteractionWithToken } from "../lib/oidc-interaction"
 
 export function MagicLinkVerifier() {
   const searchParams = useSearchParams()
   const token = searchParams.get("token")
   const redirectParam = searchParams.get("redirect") || "/dashboard"
+  const interactionParam =
+    searchParams.get("interaction") ||
+    (redirectParam.startsWith("/oidc-interaction/")
+      ? decodeURIComponent(redirectParam.slice("/oidc-interaction/".length))
+      : null)
 
   const [status, setStatus] = useState<"verifying" | "success" | "error">(
     token ? "verifying" : "error"
@@ -31,20 +37,40 @@ export function MagicLinkVerifier() {
     if (!token || startedRef.current) return
     startedRef.current = true
 
-    verifyMagicLinkAction(token, redirectParam).then((res) => {
-      if (res.success) {
-        setStatus("success")
-        setMessage("Signed in! Redirecting you now...")
-        window.location.href = res.redirectUrl || redirectParam || "/dashboard"
-      } else {
-        setStatus("error")
-        setMessage(
-          res.message ||
-            "This magic link is invalid, expired, or has already been used."
-        )
+    verifyMagicLinkAction(token, redirectParam, Boolean(interactionParam)).then(
+      async (res) => {
+        if (res.success) {
+          setStatus("success")
+          setMessage("Signed in! Redirecting you now...")
+          if (interactionParam && res.oidcAccessToken) {
+            try {
+              const nextUrl = await completeOidcInteractionWithToken(
+                interactionParam,
+                res.oidcAccessToken
+              )
+              window.location.href = nextUrl
+              return
+            } catch (err) {
+              setStatus("error")
+              setMessage(
+                err instanceof Error
+                  ? err.message
+                  : "Failed to complete OIDC sign in."
+              )
+              return
+            }
+          }
+          window.location.href = res.redirectUrl || redirectParam || "/dashboard"
+        } else {
+          setStatus("error")
+          setMessage(
+            res.message ||
+              "This magic link is invalid, expired, or has already been used."
+          )
+        }
       }
-    })
-  }, [token, redirectParam])
+    )
+  }, [token, redirectParam, interactionParam])
 
   return (
     <div className="w-full max-w-sm rounded-lg border border-border/60 bg-card p-6 text-center shadow-sm">

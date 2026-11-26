@@ -50,11 +50,13 @@ export async function requestMagicLinkAction(
 
 export async function verifyMagicLinkAction(
   token: string,
-  redirectUrl = "/dashboard"
+  redirectUrl = "/dashboard",
+  includeOidcToken = false
 ): Promise<{
   success: boolean
   message?: string
   redirectUrl?: string
+  oidcAccessToken?: string
 }> {
   const parsed = MagicLinkVerifySchema.safeParse({ token })
   if (!parsed.success) {
@@ -89,7 +91,11 @@ export async function verifyMagicLinkAction(
     authData.redirectUrl || redirectUrl
   )
 
-  return { success: true, redirectUrl: targetPath }
+  return {
+    success: true,
+    redirectUrl: targetPath,
+    ...(includeOidcToken ? { oidcAccessToken: authData.accessToken } : {}),
+  }
 }
 
 export async function requestOtpAction(
@@ -128,11 +134,13 @@ export async function requestOtpAction(
 
 export async function verifyOtpAction(
   input: OtpVerifyInput,
-  redirectUrl = "/dashboard"
+  redirectUrl = "/dashboard",
+  includeOidcToken = false
 ): Promise<{
   success: boolean
   message?: string
   redirectUrl?: string
+  oidcAccessToken?: string
 }> {
   const parsed = OtpVerifySchema.safeParse(input)
   if (!parsed.success) {
@@ -164,5 +172,9 @@ export async function verifyOtpAction(
   }
 
   const targetPath = await establishAuthSession(authData, redirectUrl)
-  return { success: true, redirectUrl: targetPath }
+  return {
+    success: true,
+    redirectUrl: targetPath,
+    ...(includeOidcToken ? { oidcAccessToken: authData.accessToken } : {}),
+  }
 }

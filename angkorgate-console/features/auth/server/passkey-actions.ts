@@ -131,11 +131,13 @@ export async function getPasskeyAuthOptionsAction(email?: string) {
 export async function verifyPasskeyAuthAction(
   challengeId: string,
   response: any,
-  redirectUrl = "/dashboard"
+  redirectUrl = "/dashboard",
+  includeOidcToken = false
 ): Promise<{
   success: boolean
   message?: string
   redirectUrl?: string
+  oidcAccessToken?: string
 }> {
   let authData: AuthSuccessData
   try {
@@ -230,7 +232,11 @@ export async function verifyPasskeyAuthAction(
     // Non-request context (e.g. unit testing)
   }
 
-  return { success: true, redirectUrl: targetPath }
+  return {
+    success: true,
+    redirectUrl: targetPath,
+    ...(includeOidcToken ? { oidcAccessToken: authData.accessToken } : {}),
+  }
 }
 
 /**
