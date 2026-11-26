@@ -6,7 +6,13 @@ import { Protect, useAngkorGate, UserProfile } from "@angkorgate/nextjs";
 import type { TodoRow } from "@/lib/todo-db";
 
 export default function DashboardPage() {
-  const { isLoaded, isSignedIn, getToken, refreshSession } = useAngkorGate();
+  const {
+    isLoaded,
+    isSignedIn,
+    error: authError,
+    getToken,
+    refreshSession,
+  } = useAngkorGate();
   const [todos, setTodos] = useState<TodoRow[]>([]);
   const [todoScope, setTodoScope] = useState<"mine" | "all">("mine");
   const [newTitle, setNewTitle] = useState("");
@@ -157,9 +163,9 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {error && (
+      {(error || authError) && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-          {error}
+          {error || authError}
         </div>
       )}
 
