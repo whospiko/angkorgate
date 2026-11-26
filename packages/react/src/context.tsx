@@ -51,7 +51,9 @@ export function AngkorGateProvider({
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [idToken, setIdToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const callbackHandled = useRef(false);
+  const callbackPromiseRef = useRef<Promise<void> | null>(null);
+  const onNavigateRef = useRef(onNavigate);
+  onNavigateRef.current = onNavigate;
 
   const cleanBaseUrl = baseUrl.replace(/\/+$/, "");
   const cleanConsoleUrl = consoleUrl.replace(/\/+$/, "");
@@ -110,33 +112,37 @@ export function AngkorGateProvider({
         return;
       }
 
-      if (code && !callbackHandled.current) {
-        callbackHandled.current = true;
-        const tx = store.consumeTransaction();
-        if (!tx || !state || state !== tx.state) {
-          if (active) {
-            setError("Invalid or expired OIDC login state.");
-            setIsLoaded(true);
+      if (code) {
+        if (!callbackPromiseRef.current) {
+          const tx = store.consumeTransaction();
+          if (!tx || !state || state !== tx.state) {
+            if (active) {
+              setError("Invalid or expired OIDC login state.");
+              setIsLoaded(true);
+            }
+            return;
           }
-          return;
+
+          callbackPromiseRef.current = (async () => {
+            const tokens = await exchangeAuthorizationCode({
+              baseUrl: cleanBaseUrl,
+              clientId,
+              code,
+              redirectUri: tx.redirectUri,
+              codeVerifier: tx.codeVerifier,
+            });
+            await applyTokensAndUser(tokens);
+            const target = tx.redirectTo || "/";
+            if (onNavigateRef.current) {
+              onNavigateRef.current(target);
+            } else {
+              window.history.replaceState({}, "", target);
+            }
+          })();
         }
 
         try {
-          const tokens = await exchangeAuthorizationCode({
-            baseUrl: cleanBaseUrl,
-            clientId,
-            code,
-            redirectUri: tx.redirectUri,
-            codeVerifier: tx.codeVerifier,
-          });
-          if (!active) return;
-          await applyTokensAndUser(tokens);
-          const target = tx.redirectTo || "/";
-          if (onNavigate) {
-            onNavigate(target);
-          } else {
-            window.history.replaceState({}, "", target);
-          }
+          await callbackPromiseRef.current;
         } catch (err) {
           if (active) {
             setError(
@@ -178,7 +184,7 @@ export function AngkorGateProvider({
     return () => {
       active = false;
     };
-  }, [applyTokensAndUser, cleanBaseUrl, clientId, onNavigate, refreshSession, store]);
+  }, [applyTokensAndUser, cleanBaseUrl, clientId, refreshSession, store]);
 
   const signIn = useCallback(
     async (redirectTo?: string) => {

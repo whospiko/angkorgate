@@ -86,15 +86,13 @@ export function Protect({
     return <>{fallback}</>;
   }
 
-  if (anyRole && anyRole.length > 0 && !anyRole.some((r) => hasRole(r))) {
-    return <>{fallback}</>;
-  }
+  const hasAnyRoleMatch =
+    Boolean(anyRole?.length) && anyRole!.some((r) => hasRole(r));
+  const hasAnyPermMatch =
+    Boolean(anyPermission?.length) &&
+    anyPermission!.some((p) => hasPermission(p));
 
-  if (
-    anyPermission &&
-    anyPermission.length > 0 &&
-    !anyPermission.some((p) => hasPermission(p))
-  ) {
+  if ((anyRole?.length || anyPermission?.length) && !hasAnyRoleMatch && !hasAnyPermMatch) {
     return <>{fallback}</>;
   }
 
