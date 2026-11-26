@@ -60,4 +60,20 @@ describe('OidcService', () => {
         const callback = service.callback();
         expect(typeof callback).toBe('function');
     });
+
+    it('resolves and clamps OIDC token TTLs safely', () => {
+        expect(service.getOidcTtl('OIDC_ACCESS_TOKEN_TTL', 3600, 60, 86400)).toBe(3600);
+        expect(service.getOidcTtl('OIDC_REFRESH_TOKEN_TTL', 15552000, 300, 31536000)).toBe(15552000);
+
+        config.get.mockImplementation((key: string) => {
+            if (key === 'OIDC_ACCESS_TOKEN_TTL') return '10'; // below min 60
+            if (key === 'OIDC_REFRESH_TOKEN_TTL') return '99999999'; // above max 31536000
+            if (key === 'OIDC_ID_TOKEN_TTL') return '1800';
+            return null;
+        });
+
+        expect(service.getOidcTtl('OIDC_ACCESS_TOKEN_TTL', 3600, 60, 86400)).toBe(60);
+        expect(service.getOidcTtl('OIDC_REFRESH_TOKEN_TTL', 1209600, 300, 31536000)).toBe(31536000);
+        expect(service.getOidcTtl('OIDC_ID_TOKEN_TTL', 3600, 60, 86400)).toBe(1800);
+    });
 });

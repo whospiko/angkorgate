@@ -569,15 +569,15 @@ export class AuthService {
 
     private getAccessTtlSeconds(): number {
         return (
-            this.runtimeConfig?.getNumber('JWT_ACCESS_TTL', 900) ??
-            parseInt(this.config.get<string>('JWT_ACCESS_TTL') ?? '900', 10)
+            this.runtimeConfig?.getNumber('JWT_ACCESS_TTL', 3600) ??
+            parseInt(this.config.get<string>('JWT_ACCESS_TTL') ?? '3600', 10)
         );
     }
 
     private getRefreshTtlSeconds(): number {
         return (
-            this.runtimeConfig?.getNumber('JWT_REFRESH_TTL', 604800) ??
-            parseInt(this.config.get<string>('JWT_REFRESH_TTL') ?? '604800', 10)
+            this.runtimeConfig?.getNumber('JWT_REFRESH_TTL', 15552000) ??
+            parseInt(this.config.get<string>('JWT_REFRESH_TTL') ?? '15552000', 10)
         );
     }
 

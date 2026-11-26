@@ -45,7 +45,7 @@ import { PasswordlessController } from './controllers/passwordless.controller';
                     algorithm: 'HS256',
                     issuer: 'angkorgate-core',
                     audience: 'angkorgate-api',
-                    expiresIn: parseInt(config.get<string>('JWT_ACCESS_TTL') ?? '900', 10),
+                    expiresIn: parseInt(config.get<string>('JWT_ACCESS_TTL') ?? '3600', 10),
                 }
             }),
         }),

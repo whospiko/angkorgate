@@ -11,6 +11,7 @@ import { OidcAdapterService } from '../adapters/oidc.adapter';
 import { UsersService } from '../../users/services/users.service';
 import { RbacService } from '../../rbac/services/rbac.service';
 import { OauthProvider } from '../../oauth/entities/oauth-provider.entity';
+import { RuntimeConfigService } from '../../system/services/runtime-config.service';
 
 const OIDC_SETTINGS_CODE = '_oidc_settings';
 
@@ -27,6 +28,7 @@ export class OidcService implements OnModuleInit {
         private readonly usersService: UsersService,
         private readonly rbacService: RbacService,
         @Optional() @InjectDataSource() private readonly dataSource?: DataSource,
+        @Optional() private readonly runtimeConfig?: RuntimeConfigService,
     ) { }
 
     async onModuleInit() {
@@ -245,6 +247,17 @@ export class OidcService implements OnModuleInit {
                 return client.grantTypes.includes('refresh_token');
             },
 
+            ttl: {
+                AccessToken: () =>
+                    this.getOidcTtl('OIDC_ACCESS_TOKEN_TTL', 3600, 60, 86400),
+                RefreshToken: () =>
+                    this.getOidcTtl('OIDC_REFRESH_TOKEN_TTL', 15552000, 300, 31536000),
+                IdToken: () =>
+                    this.getOidcTtl('OIDC_ID_TOKEN_TTL', 3600, 60, 86400),
+                ClientCredentials: () =>
+                    this.getOidcTtl('OIDC_ACCESS_TOKEN_TTL', 3600, 60, 86400),
+            },
+
             interactions: {
                 url(ctx: KoaContextWithOIDC, interaction: any) {
                     return `/oidc/interaction/${interaction.uid}`;
@@ -282,6 +295,23 @@ export class OidcService implements OnModuleInit {
             this.config.get<string>('APP_WEB_URL') ||
             'http://localhost:4000'
         ).replace(/\/+$/, '');
+    }
+
+    getOidcTtl(
+        key: 'OIDC_ACCESS_TOKEN_TTL' | 'OIDC_REFRESH_TOKEN_TTL' | 'OIDC_ID_TOKEN_TTL',
+        fallback: number,
+        min: number,
+        max: number,
+    ): number {
+        const fromRuntime = this.runtimeConfig?.getNumber(key, fallback);
+        const fromEnv = parseInt(this.config.get<string>(key) ?? '', 10);
+        const raw =
+            fromRuntime !== undefined && Number.isFinite(fromRuntime)
+                ? fromRuntime
+                : Number.isFinite(fromEnv)
+                  ? fromEnv
+                  : fallback;
+        return Math.min(max, Math.max(min, Math.floor(raw)));
     }
 
     getSettings(): { issuer: string; consoleUrl: string } {
