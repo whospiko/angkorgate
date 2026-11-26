@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -42,17 +42,6 @@ export function EditEmployeeDialog({
   const [hireDate, setHireDate] = useState(
     employee.hireDate ? employee.hireDate.split("T")[0] : ""
   )
-
-  useEffect(() => {
-    setFullName(employee.fullName || "")
-    setGender(employee.gender || "FEMALE")
-    setDateOfBirth(employee.dateOfBirth ? employee.dateOfBirth.split("T")[0] : "")
-    setPhone(employee.phone || "")
-    setNationalId(employee.nationalId || "")
-    setAddress(employee.address || "")
-    setHireDate(employee.hireDate ? employee.hireDate.split("T")[0] : "")
-    setError(null)
-  }, [employee])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -40,17 +40,6 @@ export function EditCustomerDialog({
   const [email, setEmail] = useState(customer.email || "")
   const [address, setAddress] = useState(customer.address || "")
   const [nationalId, setNationalId] = useState(customer.nationalId || "")
-
-  useEffect(() => {
-    setFullName(customer.fullName || "")
-    setGender(customer.gender || "MALE")
-    setDateOfBirth(customer.dateOfBirth ? customer.dateOfBirth.split("T")[0] : "")
-    setPhone(customer.phone || "")
-    setEmail(customer.email || "")
-    setAddress(customer.address || "")
-    setNationalId(customer.nationalId || "")
-    setError(null)
-  }, [customer])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

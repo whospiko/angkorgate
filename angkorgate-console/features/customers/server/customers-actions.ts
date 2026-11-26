@@ -30,6 +30,10 @@ function cleanOptionalStrings<T extends Record<string, unknown>>(obj: T): T {
   return out as T
 }
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback
+}
+
 export async function getCustomers(query?: {
   search?: string
   status?: string
@@ -46,12 +50,16 @@ export async function getCustomers(query?: {
     if (query?.limit) params.set("limit", query.limit.toString())
 
     const queryStr = params.toString() ? `?${params.toString()}` : ""
-    const res = await apiClient.get<any>(`/customers${queryStr}`)
+    const res = await apiClient.get<
+      | Customer[]
+      | { data: Customer[]; total?: number; page?: number; limit?: number }
+      | PaginatedCustomers
+    >(`/customers${queryStr}`)
 
     if (Array.isArray(res)) {
       return { items: res, total: res.length, page: 1, limit: res.length }
     }
-    if (res && Array.isArray(res.data)) {
+    if (res && "data" in res && Array.isArray(res.data)) {
       return {
         items: res.data,
         total: res.total ?? res.data.length,
@@ -59,8 +67,8 @@ export async function getCustomers(query?: {
         limit: res.limit ?? 20,
       }
     }
-    if (res && Array.isArray(res.items)) {
-      return res as PaginatedCustomers
+    if (res && "items" in res && Array.isArray(res.items)) {
+      return res
     }
     return { items: [], total: 0, page: 1, limit: 20 }
   } catch (error) {
@@ -103,8 +111,8 @@ export async function createCustomerAction(
     revalidatePath("/customers")
     revalidatePath("/dashboard")
     return { success: true, data: created }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to create customer profile" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to create customer profile") }
   }
 }
 
@@ -122,8 +130,8 @@ export async function updateCustomerAction(
     )
     revalidatePath("/customers")
     return { success: true, data: updated }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to update customer" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to update customer") }
   }
 }
 
@@ -139,8 +147,8 @@ export async function linkCustomerUserAction(
     revalidatePath("/customers")
     revalidatePath("/users")
     return { success: true, data: updated }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to update linked user" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to update linked user") }
   }
 }
 
@@ -152,8 +160,8 @@ export async function deleteCustomerAction(
     revalidatePath("/customers")
     revalidatePath("/dashboard")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to delete customer" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to delete customer") }
   }
 }
 
@@ -168,8 +176,8 @@ export async function updateCustomerStatusAction(
     )
     revalidatePath("/customers")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to update status" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to update status") }
   }
 }
 
@@ -198,8 +206,8 @@ export async function setCustomerAttributeAction(
     )
     revalidatePath("/customers")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to set attribute" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to set attribute") }
   }
 }
 
@@ -213,8 +221,8 @@ export async function deleteCustomerAttributeAction(
     )
     revalidatePath("/customers")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to delete attribute" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to delete attribute") }
   }
 }
 
@@ -244,8 +252,8 @@ export async function createCustomerContactAction(
     )
     revalidatePath("/customers")
     return { success: true, data: created }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to add contact" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to add contact") }
   }
 }
 
@@ -263,8 +271,8 @@ export async function updateCustomerContactAction(
     )
     revalidatePath("/customers")
     return { success: true, data: updated }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to update contact" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to update contact") }
   }
 }
 
@@ -278,7 +286,7 @@ export async function deleteCustomerContactAction(
     )
     revalidatePath("/customers")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to delete contact" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to delete contact") }
   }
 }

@@ -101,8 +101,8 @@ export function EmployeeDetailsDialog({
 
   // Positions
   const [positions, setPositions] = useState<EmployeePosition[]>([])
-  const [selectedJobTitle, setSelectedJobTitle] = useState("")
-  const [selectedDept, setSelectedDept] = useState("")
+  const [selectedJobTitle, setSelectedJobTitle] = useState(() => jobTitles[0]?.code || "")
+  const [selectedDept, setSelectedDept] = useState(() => departments[0]?.code || "")
   const [posLoading, setPosLoading] = useState(false)
 
   // Position attributes
@@ -127,22 +127,20 @@ export function EmployeeDetailsDialog({
   const [editActive, setEditActive] = useState(true)
 
   useEffect(() => {
-    if (open) {
-      setFeedbackError(null)
-      setStatus(employee.employmentStatus || "ACTIVE")
-      setLinkedUserId(employee.userId ?? null)
-      setUserIdInput(employee.userId ?? "")
-      setExpandedPosId(null)
-      getEmployeePositions(employee.id).then(setPositions)
-      getEmployeeSchedules(employee.id).then(setSchedules)
-      if (jobTitles.length > 0 && !selectedJobTitle) {
-        setSelectedJobTitle(jobTitles[0].code)
-      }
-      if (departments.length > 0 && !selectedDept) {
-        setSelectedDept(departments[0].code)
-      }
+    if (!open) return
+    let cancelled = false
+    Promise.all([
+      getEmployeePositions(employee.id),
+      getEmployeeSchedules(employee.id),
+    ]).then(([pos, sched]) => {
+      if (cancelled) return
+      setPositions(pos)
+      setSchedules(sched)
+    })
+    return () => {
+      cancelled = true
     }
-  }, [open, employee.id, employee.employmentStatus, employee.userId, jobTitles, departments, selectedJobTitle, selectedDept])
+  }, [open, employee.id])
 
   const handleStatusChange = async (newStatus: EmploymentStatus) => {
     setFeedbackError(null)

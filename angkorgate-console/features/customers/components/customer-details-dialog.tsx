@@ -103,16 +103,22 @@ export function CustomerDetailsDialog({
   const [attrLoading, setAttrLoading] = useState(false)
 
   useEffect(() => {
-    if (open) {
-      setFeedbackError(null)
-      setStatus(customer.status || "ACTIVE")
-      setLinkedUserId(customer.userId ?? null)
-      setUserIdInput(customer.userId ?? "")
-      getCustomerContacts(customer.id).then(setContacts)
-      getCustomerAttributes(customer.id).then(setAttributes)
-      getCustomerAttributeSchemas().then(setSchemaMap)
+    if (!open) return
+    let cancelled = false
+    Promise.all([
+      getCustomerContacts(customer.id),
+      getCustomerAttributes(customer.id),
+      getCustomerAttributeSchemas(),
+    ]).then(([c, a, s]) => {
+      if (cancelled) return
+      setContacts(c)
+      setAttributes(a)
+      setSchemaMap(s)
+    })
+    return () => {
+      cancelled = true
     }
-  }, [open, customer.id, customer.status, customer.userId])
+  }, [open, customer.id])
 
   const suggestedSchema = schemaMap[customer.type] || {}
 

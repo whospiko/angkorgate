@@ -473,6 +473,7 @@ export function EmployeesOverview({
       {/* Details Dialog */}
       {selectedViewEmployee && (
         <EmployeeDetailsDialog
+          key={selectedViewEmployee.id}
           employee={selectedViewEmployee}
           departments={departments}
           jobTitles={jobTitles}
@@ -484,6 +485,7 @@ export function EmployeesOverview({
       {/* Edit Dialog */}
       {selectedEditEmployee && (
         <EditEmployeeDialog
+          key={selectedEditEmployee.id}
           employee={selectedEditEmployee}
           open={Boolean(selectedEditEmployee)}
           onOpenChange={(open) => !open && setSelectedEditEmployee(null)}

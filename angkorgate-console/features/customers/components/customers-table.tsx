@@ -352,6 +352,7 @@ export function CustomersTable({
 
       {selectedViewCustomer && (
         <CustomerDetailsDialog
+          key={selectedViewCustomer.id}
           customer={selectedViewCustomer}
           open={Boolean(selectedViewCustomer)}
           onOpenChange={(open) => !open && setSelectedViewCustomer(null)}
@@ -360,6 +361,7 @@ export function CustomersTable({
 
       {selectedEditCustomer && (
         <EditCustomerDialog
+          key={selectedEditCustomer.id}
           customer={selectedEditCustomer}
           open={Boolean(selectedEditCustomer)}
           onOpenChange={(open) => !open && setSelectedEditCustomer(null)}

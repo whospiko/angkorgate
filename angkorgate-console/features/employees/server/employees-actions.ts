@@ -45,6 +45,10 @@ function cleanOptionalStrings<T extends Record<string, unknown>>(obj: T): T {
   return out as T
 }
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback
+}
+
 // --- Departments ---
 
 export async function getDepartments(): Promise<Department[]> {
@@ -70,8 +74,8 @@ export async function createDepartmentAction(
     )
     revalidatePath("/employees")
     return { success: true, data: created }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to create department" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to create department") }
   }
 }
 
@@ -87,8 +91,8 @@ export async function updateDepartmentAction(
     )
     revalidatePath("/employees")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to update department" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to update department") }
   }
 }
 
@@ -99,8 +103,8 @@ export async function deleteDepartmentAction(
     await apiClient.delete(`/departments/${encodeURIComponent(code)}`)
     revalidatePath("/employees")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to delete department" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to delete department") }
   }
 }
 
@@ -113,8 +117,8 @@ export async function seedDepartmentsAction(
     )
     revalidatePath("/employees")
     return { success: true, data: res }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to seed departments template" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to seed departments template") }
   }
 }
 
@@ -146,8 +150,8 @@ export async function createJobTitleAction(
     )
     revalidatePath("/employees")
     return { success: true, data: created }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to create job title" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to create job title") }
   }
 }
 
@@ -163,8 +167,8 @@ export async function updateJobTitleAction(
     )
     revalidatePath("/employees")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to update job title" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to update job title") }
   }
 }
 
@@ -175,8 +179,8 @@ export async function deleteJobTitleAction(
     await apiClient.delete(`/job-titles/${encodeURIComponent(code)}`)
     revalidatePath("/employees")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to delete job title" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to delete job title") }
   }
 }
 
@@ -200,12 +204,16 @@ export async function getEmployees(query?: {
     if (query?.limit) params.set("limit", query.limit.toString())
 
     const queryStr = params.toString() ? `?${params.toString()}` : ""
-    const res = await apiClient.get<any>(`/employees${queryStr}`)
+    const res = await apiClient.get<
+      | Employee[]
+      | { data: Employee[]; total?: number; page?: number; limit?: number }
+      | PaginatedEmployees
+    >(`/employees${queryStr}`)
 
     if (Array.isArray(res)) {
       return { items: res, total: res.length, page: 1, limit: res.length }
     }
-    if (res && Array.isArray(res.data)) {
+    if (res && "data" in res && Array.isArray(res.data)) {
       return {
         items: res.data,
         total: res.total ?? res.data.length,
@@ -213,8 +221,8 @@ export async function getEmployees(query?: {
         limit: res.limit ?? 20,
       }
     }
-    if (res && Array.isArray(res.items)) {
-      return res as PaginatedEmployees
+    if (res && "items" in res && Array.isArray(res.items)) {
+      return res
     }
     return { items: [], total: 0, page: 1, limit: 20 }
   } catch (error) {
@@ -264,10 +272,16 @@ export async function createEmployeeAction(
       }
     }
 
-    const { provisionUser: _unused, ...rest } = parsed
     const payload = cleanOptionalStrings({
-      ...rest,
-      employeeCode: rest.employeeCode ? rest.employeeCode.toUpperCase() : undefined,
+      fullName: parsed.fullName,
+      gender: parsed.gender,
+      dateOfBirth: parsed.dateOfBirth,
+      nationalId: parsed.nationalId,
+      phone: parsed.phone,
+      address: parsed.address,
+      avatarUrl: parsed.avatarUrl,
+      hireDate: parsed.hireDate,
+      employeeCode: parsed.employeeCode ? parsed.employeeCode.toUpperCase() : undefined,
       userId: targetUserId,
     })
 
@@ -275,8 +289,8 @@ export async function createEmployeeAction(
     revalidatePath("/employees")
     revalidatePath("/dashboard")
     return { success: true, data: created }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to create employee profile" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to create employee profile") }
   }
 }
 
@@ -291,8 +305,8 @@ export async function updateEmployeeAction(
     await apiClient.patch(`/employees/${encodeURIComponent(id)}`, payload)
     revalidatePath("/employees")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to update employee" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to update employee") }
   }
 }
 
@@ -308,8 +322,8 @@ export async function linkEmployeeUserAction(
     revalidatePath("/employees")
     revalidatePath("/users")
     return { success: true, data: updated }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to update linked user" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to update linked user") }
   }
 }
 
@@ -321,8 +335,8 @@ export async function deleteEmployeeAction(
     revalidatePath("/employees")
     revalidatePath("/dashboard")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to delete employee" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to delete employee") }
   }
 }
 
@@ -337,8 +351,8 @@ export async function updateEmployeeStatusAction(
     )
     revalidatePath("/employees")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to update employment status" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to update employment status") }
   }
 }
 
@@ -369,8 +383,8 @@ export async function assignPositionAction(
     )
     revalidatePath("/employees")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to assign position" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to assign position") }
   }
 }
 
@@ -386,8 +400,8 @@ export async function updatePositionAction(
     )
     revalidatePath("/employees")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to update position" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to update position") }
   }
 }
 
@@ -401,8 +415,8 @@ export async function removePositionAction(
     )
     revalidatePath("/employees")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to remove position" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to remove position") }
   }
 }
 
@@ -433,8 +447,8 @@ export async function setPositionAttributeAction(
     )
     revalidatePath("/employees")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to set position attribute" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to set position attribute") }
   }
 }
 
@@ -449,8 +463,8 @@ export async function deletePositionAttributeAction(
     )
     revalidatePath("/employees")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to delete position attribute" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to delete position attribute") }
   }
 }
 
@@ -481,8 +495,8 @@ export async function createScheduleAction(
     )
     revalidatePath("/employees")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to create shift schedule" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to create shift schedule") }
   }
 }
 
@@ -499,8 +513,8 @@ export async function updateScheduleAction(
     )
     revalidatePath("/employees")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to update shift schedule" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to update shift schedule") }
   }
 }
 
@@ -514,7 +528,7 @@ export async function deleteScheduleAction(
     )
     revalidatePath("/employees")
     return { success: true }
-  } catch (error: any) {
-    return { success: false, message: error.message || "Failed to delete schedule" }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to delete schedule") }
   }
 }
