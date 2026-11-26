@@ -17,13 +17,37 @@
   - JWT Access Token customization for microservices & Resource Servers (e.g., Spring Boot `@PreAuthorize`)
   - Token Introspection (RFC 7662) & Token Revocation (RFC 7009)
   - End Session / Logout (OpenID Connect RP-Initiated Logout 1.0)
-- **Multi-Factor Authentication (MFA)**:
-  - Time-based One-Time Passwords (TOTP)
-  - Encrypted secrets & backup codes
+- **Multi-Factor, Passkeys & Passwordless**:
+  - Time-based One-Time Passwords (TOTP) with encrypted secrets & backup codes
+  - WebAuthn / FIDO2 Passkeys (`@simplewebauthn/server`)
+  - Magic Links, 6-digit Email OTP, and SMS OTP
+- **Session Security & Token Lifecycle**:
+  - Refresh Token Rotation with **Reuse Detection** (revokes the token family on replay)
+  - Enriched session metadata (OS, browser, device type, IP, last active) & `POST /auth/sessions/revoke-others`
+  - **Google-aligned default lifetimes** (`3600s` / 1h access & ID tokens; `15552000s` / 180d refresh tokens), live-configurable in Runtime Config
+- **Step-Up Verification ("Sudo Mode") & Secret Masking**:
+  - 5-minute `auth:step_up:<userId>` verification window supporting **Passkey**, **Password**, **TOTP**, and **Email OTP** (for OAuth-only accounts)
+  - Server-side masking (`••••••••`) on client secrets, OAuth provider secrets, and AES-256-GCM runtime secrets, with step-up-gated reveal endpoints
 - **Role-Based Access Control (RBAC)**:
   - Roles, permissions, and user permission overrides
 - **Identity Federation**:
-  - Inbound social logins (Google, Apple)
+  - Inbound social logins (Google, GitHub, Discord, Microsoft Entra ID, Telegram, Apple)
+
+---
+
+## 🛡️ Step-Up & Secret Reveal Endpoints
+
+| Endpoint | Auth | Description |
+|---|---|---|
+| `GET /auth/step-up/status` | JWT | Returns current sudo window status and available methods (`password`, `passkey`, `totp`, `emailOtp`) |
+| `POST /auth/step-up/verify` | JWT | Verifies `password`, `totp`, or `email_otp` to open a 5-minute sudo window |
+| `POST /auth/step-up/email-otp/request` | JWT | Sends a 6-digit step-up OTP to the user's email (60s cooldown) |
+| `POST /auth/step-up/passkey/options` | JWT | Issues WebAuthn challenge for in-session step-up |
+| `POST /auth/step-up/passkey/verify` | JWT | Verifies WebAuthn assertion and opens a 5-minute sudo window |
+| `DELETE /auth/step-up` | JWT | Immediately locks/clears the active sudo window |
+| `GET /admin/apps/:code/reveal-secret` | JWT + Step-Up | Reveals plaintext `clientSecret` & `secondaryClientSecret` |
+| `GET /admin/oauth/providers/:code/reveal-secret` | JWT + Step-Up | Reveals OAuth provider `clientSecret` / `privateKey` |
+| `GET /system/runtime-config/:key/reveal` | JWT + Step-Up | Decrypts and reveals a single AES-256-GCM runtime secret |
 
 ---
 
@@ -101,9 +125,13 @@ OIDC_CLIENT_SECRET=your-secret-key
 # Run unit tests
 npm test
 
-# Run e2e tests
-npm run test:e2e
+# Run full in-memory SQLite system smoke test
+npm run smoke:sqlite
 
-# Run all test suites
-npm run test:all
+# Run linter and production build
+npm run lint
+npm run build
+
+# Run e2e tests (requires PostgreSQL)
+npm run test:e2e
 ```

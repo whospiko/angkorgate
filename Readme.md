@@ -28,10 +28,13 @@ AngkorGate gives developers and organizations a clean, self-hosted alternative t
 
 | Category | Capabilities |
 | :--- | :--- |
-| **Authentication & SSO** | Email/password auth, RS256 JWT access & refresh tokens, first-time Setup Wizard, and OAuth 2.0 / OpenID Connect (OIDC Discovery & JWKS). |
-| **Passkeys & MFA** | Passwordless WebAuthn / FIDO2 Passkeys (Touch ID, Face ID, Security Keys) and Time-based One-Time Passwords (MFA / TOTP). |
-| **Pluggable Social Identity Hub** | Dynamic, DB-managed OAuth & social login supporting **Google**, **GitHub**, **Discord**, **Microsoft Entra ID**, and **Telegram** with per-provider credentials and global callback/redirect settings. |
-| **Self-Service Account Portal** | Hosted `/account` portal for end users (`CUSTOMER` / non-admin roles) to manage their profile, registered passkeys, and active sessions without accessing the admin dashboard. |
+| **Authentication & SSO** | Email/password auth, RS256 JWT access & refresh tokens, **Refresh Token Rotation & Reuse Detection** (family revocation), first-time Setup Wizard, and OAuth 2.0 / OpenID Connect (OIDC Discovery & JWKS). |
+| **Passkeys, Passwordless & MFA** | Passwordless WebAuthn / FIDO2 Passkeys (Touch ID, Face ID, Security Keys), Magic Links, Email/SMS OTP, and Time-based One-Time Passwords (MFA / TOTP). |
+| **Step-Up Auth & Masked Secrets** | All client secrets, API keys, OAuth secrets, and runtime credentials are masked (`••••••••`) by default and gated behind a **5-minute Step-Up ("Sudo") window** supporting **Passkey**, **Password**, **TOTP**, or **Email OTP** (for OAuth-only accounts). |
+| **Google-Aligned Token Lifetimes** | Live-configurable JWT & OIDC token TTLs in **Settings → Environment** (`/settings/environment`), defaulting to **1 hour (`3600s`)** access/ID tokens and **180 days (`15552000s`)** refresh tokens. |
+| **Pluggable Social Identity Hub** | Dynamic, DB-managed OAuth & social login supporting **Google**, **GitHub**, **Discord**, **Microsoft Entra ID**, **Telegram**, and **Apple** with per-provider credentials and global callback/redirect settings. |
+| **Self-Service Account Portal** | Hosted `/account` portal for end users (`CUSTOMER` / non-admin roles) to manage their profile, registered passkeys, and active sessions (parsed OS/browser, IP, last active, and **Revoke All Other Sessions**). |
+| **Official SDK & Adapters** | `@angkorgate/sdk` core client plus React hooks, Next.js middleware/session helpers, and Express middleware (`packages/*`) with full-stack examples (`examples/*`). |
 | **RBAC & Governance** | Granular `resource:action` permissions, role assignment, per-user permission overrides, and configurable console access roles. |
 | **User, Staff & CRM Directory** | Manage auth accounts, sign-in method visibility, Employee profiles, and Customer CRM records in one place. |
 | **API Keys & Audit Logs** | Developer API Keys gateway and tamper-evident audit logging for authentication and administrative events. |
@@ -47,8 +50,10 @@ AngkorGate gives developers and organizations a clean, self-hosted alternative t
 
 ```text
 angkorgate/
-├── angkorgate-core/       # NestJS 12 IAM Engine (Auth, OIDC Provider, WebAuthn, RBAC, Audit, CRM)
+├── angkorgate-core/       # NestJS 12 IAM Engine (Auth, Step-Up, OIDC Provider, WebAuthn, RBAC, Audit, CRM)
 ├── angkorgate-console/    # Next.js 16 Admin Console, Account Portal (/account), Docs & Legal Pages
+├── packages/              # Official SDK & framework integrations (sdk, react, next, express)
+├── examples/              # End-to-end sample apps (next-js-fetch, next-sdk, simple-todo-list, simple-todo-list-sdk)
 ├── docs/                  # Architecture & integration documentation
 └── docker-compose.example.yaml
 ```
@@ -125,10 +130,12 @@ npm test
 npm run typecheck
 npm run build
 
-# Core unit tests, e2e tests & linting
+# Core unit tests, SQLite full-system smoke test, linting & build
 cd ../angkorgate-core
 npm test
+npm run smoke:sqlite
 npm run lint
+npm run build
 ```
 
 ---
