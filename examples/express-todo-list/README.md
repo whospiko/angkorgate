@@ -23,16 +23,16 @@ A minimal Express + TypeScript backend API backed by **TypeORM** and **`better-s
 ## Quick Start
 
 1. Start **AngkorGate Core** on `http://localhost:8080`.
-2. Install dependencies and start the API on `http://localhost:4001`:
+2. Install dependencies and start the API on `http://localhost:3001`:
    ```bash
    cp .env.example .env
    npm install
    npm run dev
    ```
-3. Test with a Bearer token from AngkorGate SSO:
+3. Open Swagger UI at `http://localhost:3001/docs` or test with a Bearer token from AngkorGate SSO:
    ```bash
-   curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" http://localhost:4001/me
-   curl -X POST http://localhost:4001/todos \
+   curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" http://localhost:3001/me
+   curl -X POST http://localhost:3001/todos \
      -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"title":"Wire Express Todo API with AngkorGate SSO"}'
