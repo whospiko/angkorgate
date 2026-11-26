@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ANGKORGATE_CONSOLE_URL,
   AngkorGateError,
   buildEndSessionUrl,
   fetchUserInfo,
@@ -125,6 +126,14 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <a
+            href={`${ANGKORGATE_CONSOLE_URL}/account`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg border border-indigo-500/40 bg-indigo-500/15 px-3.5 py-2 text-xs font-medium text-indigo-200 transition hover:bg-indigo-500/25"
+          >
+            Manage Account ↗
+          </a>
           <button
             type="button"
             onClick={handleRefreshToken}
