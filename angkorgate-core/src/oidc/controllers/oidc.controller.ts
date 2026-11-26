@@ -10,6 +10,7 @@ import {
     Logger,
     HttpStatus,
     HttpCode,
+    UseGuards,
 } from '@nestjs/common';
 import {
     ApiOperation,
@@ -26,6 +27,8 @@ import { MfaService } from '../../auth/services/mfa.service';
 import { SkipTransform } from '../../common/decorators/skip-transform.decorator';
 import { OidcLoginDto } from '../dto/oidc-login.dto';
 import { extractClientContext } from '../../auth/utils/client-context.util';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 
 @ApiTags('OIDC')
 @SkipTransform()
@@ -311,6 +314,42 @@ export class OidcController {
         await this.oidcService.oidc.interactionFinished(req, res, result, {
             mergeWithLastSubmission: false,
         });
+    }
+
+    @Post('interaction/:uid/token-login')
+    @UseGuards(JwtAuthGuard)
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Complete an OIDC login interaction using a verified Core JWT (Passkey / Magic Link / OTP)' })
+    @ApiParam({ name: 'uid', description: 'Interaction session UID' })
+    @ApiResponse({ status: 200, description: 'Interaction finished, returns redirect target' })
+    @ApiResponse({ status: 400, description: 'Interaction expired or invalid' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    async tokenLogin(
+        @Param('uid') uid: string,
+        @CurrentUser('id') userId: string,
+        @Req() req: Request,
+        @Res() res: Response,
+    ) {
+        try {
+            await this.oidcService.oidc.interactionDetails(req, res);
+        } catch (err) {
+            this.logger.error(`Token login interaction verification failed for ${uid}`, err);
+            return res.status(HttpStatus.BAD_REQUEST).json({ error: 'Interaction expired or invalid' });
+        }
+
+        const redirectTo = await this.oidcService.oidc.interactionResult(
+            req,
+            res,
+            {
+                login: {
+                    accountId: userId,
+                    remember: true,
+                },
+            },
+            { mergeWithLastSubmission: false },
+        );
+
+        return res.json({ success: true, redirectTo });
     }
 
     @Post('interaction/:uid/confirm')
