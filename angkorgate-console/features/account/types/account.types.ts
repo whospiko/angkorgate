@@ -32,10 +32,23 @@ export interface UpdateProfileInput {
   phone?: string
 }
 
+export type SessionDeviceType =
+  | "desktop"
+  | "mobile"
+  | "tablet"
+  | "cli"
+  | "bot"
+  | "unknown"
+
 export interface AccountSession {
   id: string
+  familyId?: string
   userAgent?: string | null
+  browser?: string
+  os?: string
+  deviceType?: SessionDeviceType
   ipAddress?: string | null
+  lastActiveAt?: string
   createdAt: string
   expiresAt: string
   isCurrent: boolean

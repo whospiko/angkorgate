@@ -2,9 +2,11 @@
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+import { cookies } from "next/headers"
 import { apiClient, ApiError } from "@/lib/api-client"
 import {
   type User,
+  type UserSession,
   type CreateUserInput,
   type UpdateUserInput,
   type AdminResetPasswordInput,
@@ -348,6 +350,112 @@ export async function adminUnlinkUserOAuthAction(
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Failed to unlink social account"
+    return { success: false, message }
+  }
+}
+
+export async function getAdminUserSessions(
+  userId: string
+): Promise<UserSession[]> {
+  try {
+    let currentRefreshToken: string | undefined
+    try {
+      const cookieStore = await cookies()
+      currentRefreshToken = cookieStore.get("angkorgate_refresh_token")?.value
+    } catch {
+      // Non-cookie context
+    }
+
+    const queryStr = currentRefreshToken
+      ? `?currentRefreshToken=${encodeURIComponent(currentRefreshToken)}`
+      : ""
+
+    const sessions = await apiClient.get<UserSession[]>(
+      `/users/${encodeURIComponent(userId)}/sessions${queryStr}`
+    )
+    return Array.isArray(sessions) ? sessions : []
+  } catch (error) {
+    if (error instanceof ApiError && error.statusCode === 401) {
+      redirect(`/login?unauthorized=1&redirect=/users/${encodeURIComponent(userId)}`)
+    }
+    return []
+  }
+}
+
+export async function adminRevokeUserSessionAction(
+  userId: string,
+  sessionId: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    await apiClient.delete(
+      `/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(sessionId)}`
+    )
+    revalidatePath(`/users/${userId}`)
+    return { success: true, message: "Session revoked successfully." }
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Failed to revoke user session"
+    return { success: false, message }
+  }
+}
+
+export async function adminRevokeOtherUserSessionsAction(
+  userId: string,
+  keepSessionId?: string
+): Promise<{ success: boolean; message?: string; revokedCount?: number }> {
+  try {
+    let currentRefreshToken: string | undefined
+    if (!keepSessionId) {
+      try {
+        const cookieStore = await cookies()
+        currentRefreshToken = cookieStore.get("angkorgate_refresh_token")?.value
+      } catch {
+        // Non-cookie context
+      }
+    }
+
+    const res = await apiClient.post<{ revokedCount: number }>(
+      `/users/${encodeURIComponent(userId)}/sessions/revoke-others`,
+      keepSessionId ? { keepSessionId } : { currentRefreshToken }
+    )
+    revalidatePath(`/users/${userId}`)
+    const count = res?.revokedCount ?? 0
+    return {
+      success: true,
+      revokedCount: count,
+      message:
+        count > 0
+          ? `Revoked ${count} other active ${count === 1 ? "session" : "sessions"}.`
+          : "No other active sessions to revoke.",
+    }
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Failed to revoke other sessions"
+    return { success: false, message }
+  }
+}
+
+export async function adminRevokeAllUserSessionsAction(
+  userId: string
+): Promise<{ success: boolean; message?: string; revokedCount?: number }> {
+  try {
+    const res = await apiClient.post<{ revokedCount: number }>(
+      `/users/${encodeURIComponent(userId)}/sessions/revoke-all`,
+      {}
+    )
+    revalidatePath(`/users/${userId}`)
+    const count = res?.revokedCount ?? 0
+    return {
+      success: true,
+      revokedCount: count,
+      message:
+        count > 0
+          ? `Revoked all ${count} active ${count === 1 ? "session" : "sessions"}.`
+          : "All active sessions revoked.",
+    }
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Failed to revoke all sessions"
     return { success: false, message }
   }
 }

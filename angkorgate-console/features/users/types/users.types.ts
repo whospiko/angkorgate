@@ -1,4 +1,19 @@
 import { z } from "zod"
+import type { SessionDeviceType } from "@/lib/session-metadata"
+
+export interface UserSession {
+  id: string
+  familyId?: string
+  userAgent?: string | null
+  browser?: string
+  os?: string
+  deviceType?: SessionDeviceType
+  ipAddress?: string | null
+  lastActiveAt?: string
+  createdAt: string
+  expiresAt: string
+  isCurrent: boolean
+}
 
 export interface LinkedSocialAccount {
   id: string

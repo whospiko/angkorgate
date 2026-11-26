@@ -3,6 +3,7 @@ import {
   getUserById,
   getUserLinkedAccount,
   getAdminUserOAuthAccounts,
+  getAdminUserSessions,
   UserDetailTabsView,
 } from "@/features/users"
 import { getRoles, getPermissions } from "@/features/rbac"
@@ -33,12 +34,13 @@ export default async function UserDetailPage({
       ? "security"
       : "information"
 
-  const [user, allRoles, allPermissions, linkedAccount, oauthAccounts] = await Promise.all([
+  const [user, allRoles, allPermissions, linkedAccount, oauthAccounts, sessions] = await Promise.all([
     getUserById(id),
     getRoles(),
     getPermissions(),
     getUserLinkedAccount(id),
     getAdminUserOAuthAccounts(id),
+    getAdminUserSessions(id),
   ])
 
   if (!user) {
@@ -52,6 +54,7 @@ export default async function UserDetailPage({
       allPermissions={allPermissions}
       linkedAccount={linkedAccount}
       oauthAccounts={oauthAccounts}
+      sessions={sessions}
       defaultTab={defaultTab}
     />
   )

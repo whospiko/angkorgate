@@ -133,6 +133,49 @@ export async function revokeSessionAction(
 }
 
 /**
+ * Revoke all other active sessions while preserving the current session
+ */
+export async function revokeOtherSessionsAction(): Promise<AccountActionResult<{ revokedCount: number }>> {
+  try {
+    let currentRefreshToken: string | undefined
+    try {
+      const cookieStore = await cookies()
+      currentRefreshToken = cookieStore.get("angkorgate_refresh_token")?.value
+    } catch {
+      // In non-cookie context
+    }
+
+    if (!currentRefreshToken) {
+      return {
+        success: false,
+        message: "Unable to identify your current session token. Please sign in again.",
+      }
+    }
+
+    const result = await apiClient.post<{ revokedCount: number }>(
+      "/auth/sessions/revoke-others",
+      { currentRefreshToken }
+    )
+    revalidatePath("/account")
+    const count = result?.revokedCount ?? 0
+    return {
+      success: true,
+      message:
+        count > 0
+          ? `Revoked ${count} other active ${count === 1 ? "session" : "sessions"}.`
+          : "No other active sessions to revoke.",
+      data: result,
+    }
+  } catch (error) {
+    const message =
+      error instanceof ApiError
+        ? error.message
+        : "Failed to revoke other sessions."
+    return { success: false, message }
+  }
+}
+
+/**
  * Log out from all active devices and sessions
  */
 export async function logoutAllSessionsAction(): Promise<AccountActionResult> {

@@ -7,8 +7,10 @@ import {
   AdminResetPasswordSchema,
   type User,
   type LinkedAccount,
+  type UserSession,
 } from "../types/users.types"
 import { UserDetailTabsView } from "./user-detail-tabs-view"
+import { UserSessionsCard } from "./user-sessions-card"
 import type { Role, Permission } from "@/features/rbac/types/rbac.types"
 
 describe("features/users: User Detail Schemas & Tabs View", () => {
@@ -195,6 +197,52 @@ describe("features/users: User Detail Schemas & Tabs View", () => {
       )
 
       assert.ok(html.includes("Non-Linked Auth Account"))
+    })
+
+    test("renders user detail security tab with enriched active sessions and Revoke All Other Sessions", () => {
+      const mockSessions: UserSession[] = [
+        {
+          id: "sess-1",
+          familyId: "fam-1",
+          userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/131.0.0.0 Safari/537.36",
+          browser: "Chrome 131",
+          os: "macOS 10.15",
+          deviceType: "desktop",
+          ipAddress: "203.0.113.10",
+          lastActiveAt: new Date().toISOString(),
+          createdAt: "2026-11-26T00:00:00Z",
+          expiresAt: "2026-12-03T00:00:00Z",
+          isCurrent: true,
+        },
+        {
+          id: "sess-2",
+          familyId: "fam-2",
+          userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) Version/18.1 Mobile/15E148 Safari/604.1",
+          browser: "Safari 18",
+          os: "iOS 18.1",
+          deviceType: "mobile",
+          ipAddress: "198.51.100.42",
+          lastActiveAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+          createdAt: "2026-11-25T10:00:00Z",
+          expiresAt: "2026-12-02T10:00:00Z",
+          isCurrent: false,
+        },
+      ]
+
+      const html = ReactDOMServer.renderToString(
+        React.createElement(UserSessionsCard, {
+          userId: mockUser.id,
+          initialSessions: mockSessions,
+        })
+      )
+
+      assert.ok(html.includes("Chrome 131 on macOS 10.15"))
+      assert.ok(html.includes("Safari 18 on iOS 18.1"))
+      assert.ok(html.includes("203.0.113.10"))
+      assert.ok(html.includes("198.51.100.42"))
+      assert.ok(html.includes("Last Active:"))
+      assert.ok(html.includes("THIS DEVICE"))
+      assert.ok(html.includes("Revoke All Other Sessions"))
     })
   })
 })

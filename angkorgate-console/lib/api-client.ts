@@ -50,11 +50,21 @@ async function request<T>(
     }
   } else {
     try {
-      const { cookies } = await import("next/headers")
+      const { cookies, headers: getNextHeaders } = await import("next/headers")
       const cookieStore = await cookies()
       const token = cookieStore.get("angkorgate_token")?.value
       if (token) {
         headers.set("Authorization", `Bearer ${token}`)
+      }
+      const reqHeaders = await getNextHeaders()
+      const ua = reqHeaders.get("user-agent")
+      if (ua && !headers.has("User-Agent")) {
+        headers.set("User-Agent", ua)
+      }
+      const forwardedFor =
+        reqHeaders.get("x-forwarded-for") || reqHeaders.get("x-real-ip")
+      if (forwardedFor && !headers.has("X-Forwarded-For")) {
+        headers.set("X-Forwarded-For", forwardedFor)
       }
     } catch {
       // Build-time or non-request context

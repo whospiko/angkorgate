@@ -21,7 +21,7 @@ import {
   RiErrorWarningLine,
   RiTimeLine,
 } from "@remixicon/react"
-import type { User } from "../types/users.types"
+import type { User, UserSession } from "../types/users.types"
 import {
   adminResetPasswordAction,
   unlockUserAction,
@@ -29,12 +29,14 @@ import {
   deleteUserAction,
 } from "../server/users-actions"
 import { PasskeyManager } from "./passkey-manager"
+import { UserSessionsCard } from "./user-sessions-card"
 
 interface UserSecurityTabProps {
   user: User
+  sessions?: UserSession[]
 }
 
-export function UserSecurityTab({ user }: UserSecurityTabProps) {
+export function UserSecurityTab({ user, sessions = [] }: UserSecurityTabProps) {
   const router = useRouter()
 
   // Reset password state
@@ -346,8 +348,11 @@ export function UserSecurityTab({ user }: UserSecurityTabProps) {
         </CardContent>
       </Card>
 
+      {/* Active Refresh Token Sessions */}
+      <UserSessionsCard userId={user.id} initialSessions={sessions} />
+
       {/* Passkeys & FIDO2 Biometrics Manager */}
-      <PasskeyManager userId={user.id} userEmail={user.email} />
+      <PasskeyManager userId={user.id} isAdminView={true} userEmail={user.email} />
 
       {/* Account Lifecycle & Activation State */}
       <Card className="border-border/60 shadow-xs">

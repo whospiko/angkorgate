@@ -16,7 +16,7 @@ import {
   RiCloseLine,
   RiErrorWarningLine,
 } from "@remixicon/react"
-import type { User, LinkedAccount, LinkedSocialAccount } from "../types/users.types"
+import type { User, LinkedAccount, LinkedSocialAccount, UserSession } from "../types/users.types"
 import type { Role, Permission } from "@/features/rbac/types/rbac.types"
 import { OAuthProviderIcon } from "@/components/oauth-provider-icon"
 import { UserInfoTab } from "./user-info-tab"
@@ -29,6 +29,7 @@ interface UserDetailTabsViewProps {
   allPermissions: Permission[]
   linkedAccount: LinkedAccount
   oauthAccounts?: LinkedSocialAccount[]
+  sessions?: UserSession[]
   defaultTab?: "information" | "assign" | "security"
 }
 
@@ -38,6 +39,7 @@ export function UserDetailTabsView({
   allPermissions,
   linkedAccount,
   oauthAccounts = [],
+  sessions = [],
   defaultTab = "information",
 }: UserDetailTabsViewProps) {
   const [activeTab, setActiveTab] = useState<string>(defaultTab)
@@ -153,6 +155,10 @@ export function UserDetailTabsView({
           {/* Quick Header Summary Pills */}
           <div className="flex items-center gap-2 shrink-0 font-mono text-xs">
             <div className="px-3 py-2 rounded-lg bg-muted/30 border border-border/40 text-center">
+              <span className="text-[10px] text-muted-foreground block uppercase">Active Sessions</span>
+              <span className="font-bold text-foreground text-sm">{sessions.length}</span>
+            </div>
+            <div className="px-3 py-2 rounded-lg bg-muted/30 border border-border/40 text-center">
               <span className="text-[10px] text-muted-foreground block uppercase">Assigned Roles</span>
               <span className="font-bold text-foreground text-sm">{(user.roles || []).length}</span>
             </div>
@@ -233,7 +239,7 @@ export function UserDetailTabsView({
 
         {/* Security Tab Content */}
         <TabsContent value="security" className="mt-0 space-y-4 focus-visible:outline-none">
-          <UserSecurityTab user={user} />
+          <UserSecurityTab user={user} sessions={sessions} />
         </TabsContent>
       </Tabs>
     </div>
