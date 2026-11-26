@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RiLoader4Line } from "@remixicon/react"
 import { updateEmployeeAction } from "../server/employees-actions"
+import { UpdateEmployeeSchema } from "../types/employees.schemas"
 import type { Employee, EmployeeGender } from "../types/employees.types"
 
 interface EditEmployeeDialogProps {
@@ -42,12 +43,22 @@ export function EditEmployeeDialog({
     employee.hireDate ? employee.hireDate.split("T")[0] : ""
   )
 
+  useEffect(() => {
+    setFullName(employee.fullName || "")
+    setGender(employee.gender || "FEMALE")
+    setDateOfBirth(employee.dateOfBirth ? employee.dateOfBirth.split("T")[0] : "")
+    setPhone(employee.phone || "")
+    setNationalId(employee.nationalId || "")
+    setAddress(employee.address || "")
+    setHireDate(employee.hireDate ? employee.hireDate.split("T")[0] : "")
+    setError(null)
+  }, [employee])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setError(null)
 
-    const res = await updateEmployeeAction(employee.id, {
+    const parsed = UpdateEmployeeSchema.safeParse({
       fullName,
       gender,
       dateOfBirth: dateOfBirth || undefined,
@@ -55,6 +66,22 @@ export function EditEmployeeDialog({
       nationalId: nationalId || undefined,
       address: address || undefined,
       hireDate: hireDate || undefined,
+    })
+
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message || "Please check the form inputs")
+      return
+    }
+
+    setLoading(true)
+    const res = await updateEmployeeAction(employee.id, {
+      fullName: parsed.data.fullName,
+      gender: parsed.data.gender,
+      dateOfBirth: parsed.data.dateOfBirth || undefined,
+      phone: parsed.data.phone || undefined,
+      nationalId: parsed.data.nationalId || undefined,
+      address: parsed.data.address || undefined,
+      hireDate: parsed.data.hireDate || undefined,
     })
 
     setLoading(false)

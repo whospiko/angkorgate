@@ -1,12 +1,12 @@
-export type EmploymentStatus = 'PROBATION' | 'ACTIVE' | 'SUSPENDED' | 'TERMINATED'
-export type EmployeeGender = 'MALE' | 'FEMALE' | 'OTHER'
+export type EmploymentStatus = "ACTIVE" | "ON_LEAVE" | "RESIGNED" | "TERMINATED"
+export type EmployeeGender = "MALE" | "FEMALE" | "OTHER"
 
 export interface Department {
   id?: string
   code: string
   name: string
   description?: string | null
-  parentCode?: string | null
+  isActive?: boolean
   createdAt?: string
 }
 
@@ -14,19 +14,21 @@ export interface JobTitle {
   id?: string
   code: string
   name: string
-  category?: string
-  departmentCode?: string | null
+  category?: string | null
   description?: string | null
+  isActive?: boolean
   createdAt?: string
 }
 
 export interface EmployeePosition {
   id: string
   employeeId: string
-  jobTitleCode: string
-  departmentCode?: string | null
+  jobTitleId?: string
+  departmentId?: string | null
+  jobTitle?: JobTitle
+  department?: Department | null
   isPrimary: boolean
-  startDate?: string
+  startDate?: string | null
   endDate?: string | null
   createdAt?: string
 }
@@ -38,42 +40,47 @@ export interface EmployeeSchedule {
   dayOfWeek: number
   startTime: string
   endTime: string
-  isRecurring: boolean
+  isActive: boolean
   createdAt?: string
 }
 
 export interface Employee {
   id: string
-  userId?: string
+  userId?: string | null
   employeeCode: string
   fullName: string
-  gender?: EmployeeGender
-  dateOfBirth?: string
+  gender?: EmployeeGender | null
+  dateOfBirth?: string | null
   nationalId?: string | null
   phone?: string | null
   address?: string | null
   avatarUrl?: string | null
-  hireDate?: string
-  status?: EmploymentStatus
-  department?: string
-  position?: string
+  hireDate?: string | null
+  employmentStatus: EmploymentStatus
   positions?: EmployeePosition[]
   schedules?: EmployeeSchedule[]
   createdAt?: string
   updatedAt?: string
 }
 
+export interface PaginatedEmployees {
+  items: Employee[]
+  total: number
+  page: number
+  limit: number
+}
+
 export interface CreateDepartmentInput {
   code: string
   name: string
   description?: string
-  parentCode?: string
+  isActive?: boolean
 }
 
 export interface UpdateDepartmentInput {
   name?: string
   description?: string
-  parentCode?: string
+  isActive?: boolean
 }
 
 export interface CreateJobTitleInput {
@@ -92,9 +99,13 @@ export interface UpdateJobTitleInput {
 }
 
 export interface CreateEmployeeInput {
-  userId?: string
-  userEmail?: string
-  employeeCode: string
+  userId?: string | null
+  provisionUser?: {
+    email: string
+    password: string
+    roles?: string[]
+  }
+  employeeCode?: string
   fullName: string
   gender?: EmployeeGender
   dateOfBirth?: string
@@ -124,10 +135,19 @@ export interface AssignPositionInput {
   endDate?: string
 }
 
+export interface UpdatePositionInput {
+  departmentCode?: string | null
+  isPrimary?: boolean
+  startDate?: string | null
+  endDate?: string | null
+}
+
 export interface CreateScheduleInput {
   dayOfWeek: number
   startTime: string
   endTime: string
   departmentId?: string
-  isRecurring?: boolean
+  isActive?: boolean
 }
+
+export type UpdateScheduleInput = Partial<CreateScheduleInput>

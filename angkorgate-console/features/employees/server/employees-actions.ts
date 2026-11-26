@@ -8,6 +8,7 @@ import type {
   Department,
   JobTitle,
   Employee,
+  PaginatedEmployees,
   EmployeePosition,
   EmployeeSchedule,
   CreateDepartmentInput,
@@ -17,8 +18,32 @@ import type {
   CreateEmployeeInput,
   UpdateEmployeeInput,
   AssignPositionInput,
+  UpdatePositionInput,
   CreateScheduleInput,
+  UpdateScheduleInput,
 } from "../types/employees.types"
+import {
+  CreateDepartmentSchema,
+  UpdateDepartmentSchema,
+  CreateJobTitleSchema,
+  UpdateJobTitleSchema,
+  CreateEmployeeSchema,
+  UpdateEmployeeSchema,
+  EmploymentStatusSchema,
+  AssignPositionSchema,
+  CreateScheduleSchema,
+  UpdateScheduleSchema,
+} from "../types/employees.schemas"
+
+function cleanOptionalStrings<T extends Record<string, unknown>>(obj: T): T {
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined && v !== "") {
+      out[k] = v
+    }
+  }
+  return out as T
+}
 
 // --- Departments ---
 
@@ -26,7 +51,10 @@ export async function getDepartments(): Promise<Department[]> {
   try {
     const res = await apiClient.get<Department[]>("/departments")
     return Array.isArray(res) ? res : []
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiError && error.statusCode === 401) {
+      redirect("/login?unauthorized=1&redirect=/employees")
+    }
     return []
   }
 }
@@ -35,7 +63,11 @@ export async function createDepartmentAction(
   data: CreateDepartmentInput
 ): Promise<{ success: boolean; message?: string; data?: Department }> {
   try {
-    const created = await apiClient.post<Department>("/departments", data)
+    const parsed = CreateDepartmentSchema.parse(data)
+    const created = await apiClient.post<Department>(
+      "/departments",
+      cleanOptionalStrings(parsed)
+    )
     revalidatePath("/employees")
     return { success: true, data: created }
   } catch (error: any) {
@@ -48,7 +80,11 @@ export async function updateDepartmentAction(
   data: UpdateDepartmentInput
 ): Promise<{ success: boolean; message?: string }> {
   try {
-    await apiClient.patch(`/departments/${encodeURIComponent(code)}`, data)
+    const parsed = UpdateDepartmentSchema.parse(data)
+    await apiClient.patch(
+      `/departments/${encodeURIComponent(code)}`,
+      cleanOptionalStrings(parsed)
+    )
     revalidatePath("/employees")
     return { success: true }
   } catch (error: any) {
@@ -70,11 +106,13 @@ export async function deleteDepartmentAction(
 
 export async function seedDepartmentsAction(
   template: string = "clinic"
-): Promise<{ success: boolean; message?: string }> {
+): Promise<{ success: boolean; message?: string; data?: { departments: number; jobTitles: number } }> {
   try {
-    await apiClient.post(`/departments/seed/${encodeURIComponent(template)}`)
+    const res = await apiClient.post<{ departments: number; jobTitles: number }>(
+      `/departments/seed/${encodeURIComponent(template)}`
+    )
     revalidatePath("/employees")
-    return { success: true }
+    return { success: true, data: res }
   } catch (error: any) {
     return { success: false, message: error.message || "Failed to seed departments template" }
   }
@@ -89,7 +127,10 @@ export async function getJobTitles(category?: string): Promise<JobTitle[]> {
       : "/job-titles"
     const res = await apiClient.get<JobTitle[]>(url)
     return Array.isArray(res) ? res : []
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiError && error.statusCode === 401) {
+      redirect("/login?unauthorized=1&redirect=/employees")
+    }
     return []
   }
 }
@@ -98,7 +139,11 @@ export async function createJobTitleAction(
   data: CreateJobTitleInput
 ): Promise<{ success: boolean; message?: string; data?: JobTitle }> {
   try {
-    const created = await apiClient.post<JobTitle>("/job-titles", data)
+    const parsed = CreateJobTitleSchema.parse(data)
+    const created = await apiClient.post<JobTitle>(
+      "/job-titles",
+      cleanOptionalStrings(parsed)
+    )
     revalidatePath("/employees")
     return { success: true, data: created }
   } catch (error: any) {
@@ -111,7 +156,11 @@ export async function updateJobTitleAction(
   data: UpdateJobTitleInput
 ): Promise<{ success: boolean; message?: string }> {
   try {
-    await apiClient.patch(`/job-titles/${encodeURIComponent(code)}`, data)
+    const parsed = UpdateJobTitleSchema.parse(data)
+    await apiClient.patch(
+      `/job-titles/${encodeURIComponent(code)}`,
+      cleanOptionalStrings(parsed)
+    )
     revalidatePath("/employees")
     return { success: true }
   } catch (error: any) {
@@ -137,29 +186,42 @@ export async function getEmployees(query?: {
   status?: string
   departmentCode?: string
   jobTitleCode?: string
+  search?: string
   page?: number
   limit?: number
-}): Promise<Employee[]> {
+}): Promise<PaginatedEmployees> {
   try {
     const params = new URLSearchParams()
     if (query?.status) params.set("status", query.status)
     if (query?.departmentCode) params.set("departmentCode", query.departmentCode)
     if (query?.jobTitleCode) params.set("jobTitleCode", query.jobTitleCode)
+    if (query?.search) params.set("search", query.search)
     if (query?.page) params.set("page", query.page.toString())
     if (query?.limit) params.set("limit", query.limit.toString())
 
     const queryStr = params.toString() ? `?${params.toString()}` : ""
     const res = await apiClient.get<any>(`/employees${queryStr}`)
 
-    if (Array.isArray(res)) return res
-    if (res && Array.isArray(res.data)) return res.data
-    if (res && Array.isArray(res.items)) return res.items
-    return []
+    if (Array.isArray(res)) {
+      return { items: res, total: res.length, page: 1, limit: res.length }
+    }
+    if (res && Array.isArray(res.data)) {
+      return {
+        items: res.data,
+        total: res.total ?? res.data.length,
+        page: res.page ?? 1,
+        limit: res.limit ?? 20,
+      }
+    }
+    if (res && Array.isArray(res.items)) {
+      return res as PaginatedEmployees
+    }
+    return { items: [], total: 0, page: 1, limit: 20 }
   } catch (error) {
     if (error instanceof ApiError && error.statusCode === 401) {
       redirect("/login?unauthorized=1&redirect=/employees")
     }
-    return []
+    return { items: [], total: 0, page: 1, limit: 20 }
   }
 }
 
@@ -175,20 +237,22 @@ export async function createEmployeeAction(
   input: CreateEmployeeInput
 ): Promise<{ success: boolean; message?: string; data?: Employee }> {
   try {
-    let targetUserId = input.userId
+    const parsed = CreateEmployeeSchema.parse(input)
+    let targetUserId = parsed.userId || undefined
 
-    // If userId not provided, provision a user account for this staff member
-    if (!targetUserId) {
-      const email =
-        input.userEmail ||
-        `emp.${input.employeeCode.toLowerCase()}@angkorgate.local`
+    // Provision a new login user only when explicitly requested
+    if (!targetUserId && parsed.provisionUser) {
       const userRes = await createUserAction({
-        email,
-        password: "StaffPassword@1234",
-        phoneNumber: input.phone || undefined,
-        roles: ["ASSISTANT"],
+        email: parsed.provisionUser.email,
+        password: parsed.provisionUser.password,
+        phoneNumber: parsed.phone || undefined,
+        roles:
+          parsed.provisionUser.roles && parsed.provisionUser.roles.length > 0
+            ? parsed.provisionUser.roles
+            : ["ASSISTANT"],
         isActive: true,
         isEmailVerified: true,
+        mustChangePassword: true,
       })
       if (userRes.success && userRes.data?.id) {
         targetUserId = userRes.data.id
@@ -200,15 +264,12 @@ export async function createEmployeeAction(
       }
     }
 
-    const { userEmail, ...rest } = input
-    const payload = {
+    const { provisionUser: _unused, ...rest } = parsed
+    const payload = cleanOptionalStrings({
       ...rest,
+      employeeCode: rest.employeeCode ? rest.employeeCode.toUpperCase() : undefined,
       userId: targetUserId,
-    }
-    // Clean undefined fields
-    Object.keys(payload).forEach(
-      (key) => (payload as any)[key] === undefined && delete (payload as any)[key]
-    )
+    })
 
     const created = await apiClient.post<Employee>("/employees", payload)
     revalidatePath("/employees")
@@ -224,16 +285,31 @@ export async function updateEmployeeAction(
   data: UpdateEmployeeInput
 ): Promise<{ success: boolean; message?: string }> {
   try {
-    const payload = { ...data }
-    Object.keys(payload).forEach(
-      (key) => (payload as any)[key] === undefined && delete (payload as any)[key]
-    )
+    const parsed = UpdateEmployeeSchema.parse(data)
+    const payload = cleanOptionalStrings(parsed)
 
     await apiClient.patch(`/employees/${encodeURIComponent(id)}`, payload)
     revalidatePath("/employees")
     return { success: true }
   } catch (error: any) {
     return { success: false, message: error.message || "Failed to update employee" }
+  }
+}
+
+export async function linkEmployeeUserAction(
+  employeeId: string,
+  userId: string | null
+): Promise<{ success: boolean; message?: string; data?: Employee }> {
+  try {
+    const updated = await apiClient.patch<Employee>(
+      `/employees/${encodeURIComponent(employeeId)}/user`,
+      { userId }
+    )
+    revalidatePath("/employees")
+    revalidatePath("/users")
+    return { success: true, data: updated }
+  } catch (error: any) {
+    return { success: false, message: error.message || "Failed to update linked user" }
   }
 }
 
@@ -255,8 +331,9 @@ export async function updateEmployeeStatusAction(
   status: string
 ): Promise<{ success: boolean; message?: string }> {
   try {
+    const validStatus = EmploymentStatusSchema.parse(status.toUpperCase())
     await apiClient.patch(
-      `/employees/${encodeURIComponent(id)}/status/${encodeURIComponent(status)}`
+      `/employees/${encodeURIComponent(id)}/status/${encodeURIComponent(validStatus)}`
     )
     revalidatePath("/employees")
     return { success: true }
@@ -265,7 +342,7 @@ export async function updateEmployeeStatusAction(
   }
 }
 
-// --- Positions ---
+// --- Positions & Position Attributes ---
 
 export async function getEmployeePositions(
   employeeId: string
@@ -285,14 +362,32 @@ export async function assignPositionAction(
   data: AssignPositionInput
 ): Promise<{ success: boolean; message?: string }> {
   try {
+    const parsed = AssignPositionSchema.parse(data)
     await apiClient.post(
       `/employees/${encodeURIComponent(employeeId)}/positions`,
-      data
+      cleanOptionalStrings(parsed)
     )
     revalidatePath("/employees")
     return { success: true }
   } catch (error: any) {
     return { success: false, message: error.message || "Failed to assign position" }
+  }
+}
+
+export async function updatePositionAction(
+  employeeId: string,
+  positionId: string,
+  data: UpdatePositionInput
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    await apiClient.patch(
+      `/employees/${encodeURIComponent(employeeId)}/positions/${encodeURIComponent(positionId)}`,
+      data
+    )
+    revalidatePath("/employees")
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, message: error.message || "Failed to update position" }
   }
 }
 
@@ -308,6 +403,54 @@ export async function removePositionAction(
     return { success: true }
   } catch (error: any) {
     return { success: false, message: error.message || "Failed to remove position" }
+  }
+}
+
+export async function getPositionAttributes(
+  employeeId: string,
+  positionId: string
+): Promise<Record<string, unknown>> {
+  try {
+    const res = await apiClient.get<Record<string, unknown>>(
+      `/employees/${encodeURIComponent(employeeId)}/positions/${encodeURIComponent(positionId)}/attributes`
+    )
+    return res || {}
+  } catch {
+    return {}
+  }
+}
+
+export async function setPositionAttributeAction(
+  employeeId: string,
+  positionId: string,
+  key: string,
+  value: unknown
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    await apiClient.put(
+      `/employees/${encodeURIComponent(employeeId)}/positions/${encodeURIComponent(positionId)}/attributes/${encodeURIComponent(key)}`,
+      { value }
+    )
+    revalidatePath("/employees")
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, message: error.message || "Failed to set position attribute" }
+  }
+}
+
+export async function deletePositionAttributeAction(
+  employeeId: string,
+  positionId: string,
+  key: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    await apiClient.delete(
+      `/employees/${encodeURIComponent(employeeId)}/positions/${encodeURIComponent(positionId)}/attributes/${encodeURIComponent(key)}`
+    )
+    revalidatePath("/employees")
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, message: error.message || "Failed to delete position attribute" }
   }
 }
 
@@ -331,14 +474,33 @@ export async function createScheduleAction(
   data: CreateScheduleInput
 ): Promise<{ success: boolean; message?: string }> {
   try {
+    const parsed = CreateScheduleSchema.parse(data)
     await apiClient.post(
       `/employees/${encodeURIComponent(employeeId)}/schedules`,
-      data
+      parsed
     )
     revalidatePath("/employees")
     return { success: true }
   } catch (error: any) {
     return { success: false, message: error.message || "Failed to create shift schedule" }
+  }
+}
+
+export async function updateScheduleAction(
+  employeeId: string,
+  scheduleId: string,
+  data: UpdateScheduleInput
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    const parsed = UpdateScheduleSchema.parse(data)
+    await apiClient.patch(
+      `/employees/${encodeURIComponent(employeeId)}/schedules/${encodeURIComponent(scheduleId)}`,
+      parsed
+    )
+    revalidatePath("/employees")
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, message: error.message || "Failed to update shift schedule" }
   }
 }
 

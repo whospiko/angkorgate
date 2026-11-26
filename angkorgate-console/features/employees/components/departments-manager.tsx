@@ -56,6 +56,9 @@ export function DepartmentsManager({ departments }: DepartmentsManagerProps) {
 
   const [seeding, setSeeding] = useState<string | null>(null)
   const [deletingCode, setDeletingCode] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(
+    null
+  )
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -92,24 +95,47 @@ export function DepartmentsManager({ departments }: DepartmentsManagerProps) {
     setEditLoading(false)
     if (res.success) {
       setEditDept(null)
+    } else {
+      setFeedback({ type: "error", message: res.message || "Failed to update department" })
     }
   }
 
   const handleDelete = async (code: string) => {
     if (!confirm(`Are you sure you want to delete department "${code}"?`)) return
     setDeletingCode(code)
+    setFeedback(null)
     try {
-      await deleteDepartmentAction(code)
+      const res = await deleteDepartmentAction(code)
+      if (!res.success) {
+        setFeedback({ type: "error", message: res.message || "Failed to delete department" })
+      }
     } finally {
       setDeletingCode(null)
     }
   }
 
   const handleSeed = async (template: string) => {
-    if (!confirm(`Seed standard ${template.toUpperCase()} department hierarchy? Existing departments will be preserved.`)) return
+    if (
+      !confirm(
+        `Seed standard ${template.toUpperCase()} departments & job titles? Existing records will be preserved.`
+      )
+    )
+      return
     setSeeding(template)
+    setFeedback(null)
     try {
-      await seedDepartmentsAction(template)
+      const res = await seedDepartmentsAction(template)
+      if (res.success) {
+        const counts = res.data
+          ? ` (+${res.data.departments} departments, +${res.data.jobTitles} job titles)`
+          : ""
+        setFeedback({
+          type: "success",
+          message: `Seeded ${template.toUpperCase()} template${counts}.`,
+        })
+      } else {
+        setFeedback({ type: "error", message: res.message || "Failed to seed template" })
+      }
     } finally {
       setSeeding(null)
     }
@@ -125,37 +151,24 @@ export function DepartmentsManager({ departments }: DepartmentsManagerProps) {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Seed Quick Actions */}
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={Boolean(seeding)}
-            onClick={() => handleSeed("clinic")}
-            className="font-mono text-xs"
-          >
-            {seeding === "clinic" ? (
-              <RiLoader4Line className="mr-1 size-3.5 animate-spin" />
-            ) : (
-              <RiSeedlingLine className="mr-1 size-3.5 text-primary" />
-            )}
-            Seed Clinic
-          </Button>
-
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={Boolean(seeding)}
-            onClick={() => handleSeed("hotel")}
-            className="font-mono text-xs"
-          >
-            {seeding === "hotel" ? (
-              <RiLoader4Line className="mr-1 size-3.5 animate-spin" />
-            ) : (
-              <RiSeedlingLine className="mr-1 size-3.5 text-primary" />
-            )}
-            Seed Hotel
-          </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {(["clinic", "hotel", "pos"] as const).map((tpl) => (
+            <Button
+              key={tpl}
+              size="sm"
+              variant="outline"
+              disabled={Boolean(seeding)}
+              onClick={() => handleSeed(tpl)}
+              className="font-mono text-xs uppercase"
+            >
+              {seeding === tpl ? (
+                <RiLoader4Line className="mr-1 size-3.5 animate-spin" />
+              ) : (
+                <RiSeedlingLine className="mr-1 size-3.5 text-primary" />
+              )}
+              Seed {tpl}
+            </Button>
+          ))}
 
           {/* Create Department Dialog */}
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -242,12 +255,24 @@ export function DepartmentsManager({ departments }: DepartmentsManagerProps) {
         </div>
       </div>
 
+      {feedback && (
+        <div
+          className={`font-mono text-xs p-2.5 rounded-md border ${
+            feedback.type === "success"
+              ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+              : "text-destructive bg-destructive/10 border-destructive/20"
+          }`}
+        >
+          {feedback.message}
+        </div>
+      )}
+
       {departments.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border/60 p-10 text-center bg-card">
           <RiCommunityLine className="size-8 text-muted-foreground/60 mb-2" />
           <h4 className="font-heading text-sm font-semibold">No Departments Configured</h4>
           <p className="font-mono text-xs text-muted-foreground max-w-sm mt-1">
-            Click &quot;Seed Clinic&quot; or &quot;Add Department&quot; above to initialize organizational units.
+            Click &quot;Seed Clinic&quot;, &quot;Seed Hotel&quot;, &quot;Seed POS&quot;, or &quot;Add Department&quot; above to initialize organizational units.
           </p>
         </div>
       ) : (

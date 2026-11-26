@@ -29,7 +29,7 @@ import {
   RiEditLine,
   RiLoader4Line,
 } from "@remixicon/react"
-import type { JobTitle, Department } from "../types/employees.types"
+import type { JobTitle } from "../types/employees.types"
 import {
   createJobTitleAction,
   updateJobTitleAction,
@@ -38,15 +38,15 @@ import {
 
 interface JobTitlesManagerProps {
   jobTitles: JobTitle[]
-  departments: Department[]
 }
 
-export function JobTitlesManager({ jobTitles, departments }: JobTitlesManagerProps) {
+export function JobTitlesManager({ jobTitles }: JobTitlesManagerProps) {
+  const [categoryFilter, setCategoryFilter] = useState("")
+
   const [createOpen, setCreateOpen] = useState(false)
   const [createCode, setCreateCode] = useState("")
   const [createName, setCreateName] = useState("")
   const [createCategory, setCreateCategory] = useState("CLINIC")
-  const [createDept, setCreateDept] = useState("")
   const [createDesc, setCreateDesc] = useState("")
   const [createLoading, setCreateLoading] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -54,11 +54,15 @@ export function JobTitlesManager({ jobTitles, departments }: JobTitlesManagerPro
   const [editJt, setEditJt] = useState<JobTitle | null>(null)
   const [editName, setEditName] = useState("")
   const [editCategory, setEditCategory] = useState("CLINIC")
-  const [editDept, setEditDept] = useState("")
   const [editDesc, setEditDesc] = useState("")
   const [editLoading, setEditLoading] = useState(false)
 
   const [deletingCode, setDeletingCode] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+
+  const filteredJobTitles = categoryFilter
+    ? jobTitles.filter((jt) => (jt.category || "GENERAL") === categoryFilter)
+    : jobTitles
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -87,6 +91,7 @@ export function JobTitlesManager({ jobTitles, departments }: JobTitlesManagerPro
     e.preventDefault()
     if (!editJt) return
     setEditLoading(true)
+    setActionError(null)
 
     const res = await updateJobTitleAction(editJt.code, {
       name: editName.trim(),
@@ -97,14 +102,20 @@ export function JobTitlesManager({ jobTitles, departments }: JobTitlesManagerPro
     setEditLoading(false)
     if (res.success) {
       setEditJt(null)
+    } else {
+      setActionError(res.message || "Failed to update job title")
     }
   }
 
   const handleDelete = async (code: string) => {
     if (!confirm(`Are you sure you want to delete job title "${code}"?`)) return
     setDeletingCode(code)
+    setActionError(null)
     try {
-      await deleteJobTitleAction(code)
+      const res = await deleteJobTitleAction(code)
+      if (!res.success) {
+        setActionError(res.message || "Failed to delete job title (it may be assigned to an employee)")
+      }
     } finally {
       setDeletingCode(null)
     }
@@ -120,129 +131,132 @@ export function JobTitlesManager({ jobTitles, departments }: JobTitlesManagerPro
           </p>
         </div>
 
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger
-            render={
-              <Button size="sm" className="font-mono text-xs">
-                <RiAddLine className="mr-1.5 size-4" /> Add Job Title
-              </Button>
-            }
-          />
-          <DialogContent className="sm:max-w-md">
-            <form onSubmit={handleCreate}>
-              <DialogHeader>
-                <DialogTitle className="font-heading text-lg">Create Job Title</DialogTitle>
-                <DialogDescription className="font-mono text-xs">
-                  Define an employee job title or designation.
-                </DialogDescription>
-              </DialogHeader>
+        <div className="flex items-center gap-2">
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="h-8 rounded-md border border-input bg-background/90 dark:bg-black/25 px-2.5 text-xs font-mono text-foreground outline-none"
+          >
+            <option value="">All Categories</option>
+            <option value="CLINIC">CLINIC</option>
+            <option value="HOTEL">HOTEL</option>
+            <option value="POS">POS</option>
+            <option value="GENERAL">GENERAL</option>
+          </select>
 
-              {createError && (
-                <div className="font-mono text-xs text-destructive bg-destructive/10 p-2.5 rounded-md my-2 border border-destructive/20">
-                  {createError}
-                </div>
-              )}
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogTrigger
+              render={
+                <Button size="sm" className="font-mono text-xs">
+                  <RiAddLine className="mr-1.5 size-4" /> Add Job Title
+                </Button>
+              }
+            />
+            <DialogContent className="sm:max-w-md">
+              <form onSubmit={handleCreate}>
+                <DialogHeader>
+                  <DialogTitle className="font-heading text-lg">Create Job Title</DialogTitle>
+                  <DialogDescription className="font-mono text-xs">
+                    Define an employee job title or designation.
+                  </DialogDescription>
+                </DialogHeader>
 
-              <div className="grid gap-3.5 py-4 font-mono text-xs">
-                <div className="grid grid-cols-2 gap-3">
+                {createError && (
+                  <div className="font-mono text-xs text-destructive bg-destructive/10 p-2.5 rounded-md my-2 border border-destructive/20">
+                    {createError}
+                  </div>
+                )}
+
+                <div className="grid gap-3.5 py-4 font-mono text-xs">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="jt-code">Job Title Code *</Label>
+                      <Input
+                        id="jt-code"
+                        placeholder="e.g. NURSE"
+                        value={createCode}
+                        onChange={(e) => setCreateCode(e.target.value)}
+                        required
+                      />
+                    </div>
+
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="jt-category">Category</Label>
+                      <select
+                        id="jt-category"
+                        value={createCategory}
+                        onChange={(e) => setCreateCategory(e.target.value)}
+                        className="flex h-9 w-full min-w-0 rounded-md border border-input bg-background/90 dark:bg-black/25 px-3 py-1.5 text-xs font-mono text-foreground transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 outline-none"
+                      >
+                        <option value="CLINIC">CLINIC</option>
+                        <option value="HOTEL">HOTEL</option>
+                        <option value="POS">POS</option>
+                        <option value="GENERAL">GENERAL</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <div className="grid gap-1.5">
-                    <Label htmlFor="jt-code">Job Title Code *</Label>
+                    <Label htmlFor="jt-name">Display Name *</Label>
                     <Input
-                      id="jt-code"
-                      placeholder="e.g. NURSE"
-                      value={createCode}
-                      onChange={(e) => setCreateCode(e.target.value)}
+                      id="jt-name"
+                      placeholder="e.g. Registered Nurse"
+                      value={createName}
+                      onChange={(e) => setCreateName(e.target.value)}
                       required
                     />
                   </div>
 
                   <div className="grid gap-1.5">
-                    <Label htmlFor="jt-category">Category</Label>
-                    <select
-                      id="jt-category"
-                      value={createCategory}
-                      onChange={(e) => setCreateCategory(e.target.value)}
-                      className="flex h-9 w-full min-w-0 rounded-md border border-input bg-background/90 dark:bg-black/25 px-3 py-1.5 text-xs font-mono text-foreground transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 outline-none"
-                    >
-                      <option value="CLINIC">CLINIC</option>
-                      <option value="HOTEL">HOTEL</option>
-                      <option value="POS">POS</option>
-                      <option value="GENERAL">GENERAL</option>
-                    </select>
+                    <Label htmlFor="jt-desc">Description</Label>
+                    <Input
+                      id="jt-desc"
+                      placeholder="Job responsibilities or scope"
+                      value={createDesc}
+                      onChange={(e) => setCreateDesc(e.target.value)}
+                    />
                   </div>
                 </div>
 
-                <div className="grid gap-1.5">
-                  <Label htmlFor="jt-name">Display Name *</Label>
-                  <Input
-                    id="jt-name"
-                    placeholder="e.g. Registered Nurse"
-                    value={createName}
-                    onChange={(e) => setCreateName(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-1.5">
-                  <Label htmlFor="jt-dept">Department Association</Label>
-                  <select
-                    id="jt-dept"
-                    value={createDept}
-                    onChange={(e) => setCreateDept(e.target.value)}
-                    className="flex h-9 w-full min-w-0 rounded-md border border-input bg-background/90 dark:bg-black/25 px-3 py-1.5 text-xs font-mono text-foreground transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 outline-none"
+                <DialogFooter className="gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setCreateOpen(false)}
+                    disabled={createLoading}
+                    className="font-mono text-xs"
                   >
-                    <option value="">None (Universal)</option>
-                    {departments.map((d) => (
-                      <option key={d.code} value={d.code}>
-                        {d.name} ({d.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid gap-1.5">
-                  <Label htmlFor="jt-desc">Description</Label>
-                  <Input
-                    id="jt-desc"
-                    placeholder="Job responsibilities or scope"
-                    value={createDesc}
-                    onChange={(e) => setCreateDesc(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <DialogFooter className="gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setCreateOpen(false)}
-                  disabled={createLoading}
-                  className="font-mono text-xs"
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={createLoading} className="font-mono text-xs">
-                  {createLoading ? (
-                    <>
-                      <RiLoader4Line className="mr-1.5 size-4 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    "Create Job Title"
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={createLoading} className="font-mono text-xs">
+                    {createLoading ? (
+                      <>
+                        <RiLoader4Line className="mr-1.5 size-4 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Job Title"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      {jobTitles.length === 0 ? (
+      {actionError && (
+        <div className="font-mono text-xs text-destructive bg-destructive/10 p-2.5 rounded-md border border-destructive/20">
+          {actionError}
+        </div>
+      )}
+
+      {filteredJobTitles.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border/60 p-10 text-center bg-card">
           <RiSuitcaseLine className="size-8 text-muted-foreground/60 mb-2" />
-          <h4 className="font-heading text-sm font-semibold">No Job Titles Defined</h4>
+          <h4 className="font-heading text-sm font-semibold">No Job Titles Found</h4>
           <p className="font-mono text-xs text-muted-foreground max-w-sm mt-1">
-            Add job titles or seed templates to assign professional roles to employees.
+            Add job titles or seed templates from the Departments tab.
           </p>
         </div>
       ) : (
@@ -253,12 +267,12 @@ export function JobTitlesManager({ jobTitles, departments }: JobTitlesManagerPro
                 <TableHead className="font-mono text-xs">Code</TableHead>
                 <TableHead className="font-mono text-xs">Title Name</TableHead>
                 <TableHead className="font-mono text-xs">Category</TableHead>
-                <TableHead className="font-mono text-xs">Department</TableHead>
+                <TableHead className="font-mono text-xs">Description</TableHead>
                 <TableHead className="font-mono text-xs text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {jobTitles.map((jt) => (
+              {filteredJobTitles.map((jt) => (
                 <TableRow key={jt.code} className="font-mono text-xs">
                   <TableCell className="font-bold text-primary">{jt.code}</TableCell>
                   <TableCell className="font-sans text-sm font-medium">{jt.name}</TableCell>
@@ -268,7 +282,7 @@ export function JobTitlesManager({ jobTitles, departments }: JobTitlesManagerPro
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {jt.departmentCode || "Universal"}
+                    {jt.description || "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -279,7 +293,6 @@ export function JobTitlesManager({ jobTitles, departments }: JobTitlesManagerPro
                           setEditJt(jt)
                           setEditName(jt.name)
                           setEditCategory(jt.category || "CLINIC")
-                          setEditDept(jt.departmentCode || "")
                           setEditDesc(jt.description || "")
                         }}
                       >
@@ -326,38 +339,19 @@ export function JobTitlesManager({ jobTitles, departments }: JobTitlesManagerPro
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="edit-jt-cat">Category</Label>
-                    <select
-                      id="edit-jt-cat"
-                      value={editCategory}
-                      onChange={(e) => setEditCategory(e.target.value)}
-                      className="flex h-9 w-full min-w-0 rounded-md border border-input bg-background/90 dark:bg-black/25 px-3 py-1.5 text-xs font-mono text-foreground transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 outline-none"
-                    >
-                      <option value="CLINIC">CLINIC</option>
-                      <option value="HOTEL">HOTEL</option>
-                      <option value="POS">POS</option>
-                      <option value="GENERAL">GENERAL</option>
-                    </select>
-                  </div>
-
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="edit-jt-dept">Department</Label>
-                    <select
-                      id="edit-jt-dept"
-                      value={editDept}
-                      onChange={(e) => setEditDept(e.target.value)}
-                      className="flex h-9 w-full min-w-0 rounded-md border border-input bg-background/90 dark:bg-black/25 px-3 py-1.5 text-xs font-mono text-foreground transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 outline-none"
-                    >
-                      <option value="">Universal</option>
-                      {departments.map((d) => (
-                        <option key={d.code} value={d.code}>
-                          {d.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="edit-jt-cat">Category</Label>
+                  <select
+                    id="edit-jt-cat"
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value)}
+                    className="flex h-9 w-full min-w-0 rounded-md border border-input bg-background/90 dark:bg-black/25 px-3 py-1.5 text-xs font-mono text-foreground transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 outline-none"
+                  >
+                    <option value="CLINIC">CLINIC</option>
+                    <option value="HOTEL">HOTEL</option>
+                    <option value="POS">POS</option>
+                    <option value="GENERAL">GENERAL</option>
+                  </select>
                 </div>
 
                 <div className="grid gap-1.5">

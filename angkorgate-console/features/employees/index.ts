@@ -1,4 +1,5 @@
 export * from "./types/employees.types"
+export * from "./types/employees.schemas"
 export * from "./server/employees-actions"
 export * from "./components/employees-overview"
 export * from "./components/create-employee-dialog"

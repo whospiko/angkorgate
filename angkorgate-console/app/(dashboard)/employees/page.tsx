@@ -9,11 +9,31 @@ export const metadata = {
   title: "Organization & Staff | AngkorGate",
 }
 
-export default async function EmployeesPage() {
-  const [departments, jobTitles, employees] = await Promise.all([
+interface EmployeesPageProps {
+  searchParams?: Promise<{
+    search?: string
+    status?: string
+    departmentCode?: string
+    jobTitleCode?: string
+    page?: string
+  }>
+}
+
+export default async function EmployeesPage({ searchParams }: EmployeesPageProps) {
+  const params = (await searchParams) || {}
+  const page = params.page ? Math.max(1, parseInt(params.page, 10) || 1) : 1
+
+  const [departments, jobTitles, employeesData] = await Promise.all([
     getDepartments(),
     getJobTitles(),
-    getEmployees(),
+    getEmployees({
+      search: params.search,
+      status: params.status,
+      departmentCode: params.departmentCode,
+      jobTitleCode: params.jobTitleCode,
+      page,
+      limit: 20,
+    }),
   ])
 
   return (
@@ -32,7 +52,14 @@ export default async function EmployeesPage() {
       <EmployeesOverview
         departments={departments}
         jobTitles={jobTitles}
-        employees={employees}
+        employees={employeesData.items}
+        total={employeesData.total}
+        page={employeesData.page}
+        limit={employeesData.limit}
+        initialSearch={params.search || ""}
+        initialStatus={params.status || ""}
+        initialDepartment={params.departmentCode || ""}
+        initialJobTitle={params.jobTitleCode || ""}
       />
     </div>
   )
