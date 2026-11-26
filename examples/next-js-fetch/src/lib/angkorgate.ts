@@ -16,11 +16,25 @@ export const ANGKORGATE_URL = (
 export const OIDC_CLIENT_ID =
   process.env.NEXT_PUBLIC_OIDC_CLIENT_ID || "demo-app";
 
-export const OIDC_REDIRECT_URI =
-  process.env.NEXT_PUBLIC_OIDC_REDIRECT_URI || "http://localhost:3000/callback";
+export function getOidcRedirectUri(): string {
+  if (process.env.NEXT_PUBLIC_OIDC_REDIRECT_URI) {
+    return process.env.NEXT_PUBLIC_OIDC_REDIRECT_URI;
+  }
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}/callback`;
+  }
+  return "http://localhost:3001/callback";
+}
 
-export const OIDC_POST_LOGOUT_REDIRECT_URI =
-  process.env.NEXT_PUBLIC_OIDC_POST_LOGOUT_REDIRECT_URI || "http://localhost:3000";
+export function getOidcPostLogoutRedirectUri(): string {
+  if (process.env.NEXT_PUBLIC_OIDC_POST_LOGOUT_REDIRECT_URI) {
+    return process.env.NEXT_PUBLIC_OIDC_POST_LOGOUT_REDIRECT_URI;
+  }
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  return "http://localhost:3001";
+}
 
 export const OIDC_SCOPES =
   process.env.NEXT_PUBLIC_OIDC_SCOPES ||
@@ -68,7 +82,7 @@ export async function buildAuthorizationUrl(redirectTo = "/dashboard"): Promise<
   const params = new URLSearchParams({
     response_type: "code",
     client_id: OIDC_CLIENT_ID,
-    redirect_uri: OIDC_REDIRECT_URI,
+    redirect_uri: getOidcRedirectUri(),
     scope: OIDC_SCOPES,
     state,
     nonce,
@@ -125,7 +139,7 @@ export async function exchangeCodeForTokens(
     grant_type: "authorization_code",
     client_id: OIDC_CLIENT_ID,
     code,
-    redirect_uri: OIDC_REDIRECT_URI,
+    redirect_uri: getOidcRedirectUri(),
     code_verifier: tx.codeVerifier,
   });
 
@@ -225,7 +239,7 @@ export function buildEndSessionUrl(): string {
   clearAuthTokens();
 
   const params = new URLSearchParams({
-    post_logout_redirect_uri: OIDC_POST_LOGOUT_REDIRECT_URI,
+    post_logout_redirect_uri: getOidcPostLogoutRedirectUri(),
   });
   if (idToken) {
     params.set("id_token_hint", idToken);

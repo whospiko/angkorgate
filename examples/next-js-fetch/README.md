@@ -8,7 +8,7 @@ A minimal Next.js (App Router + TypeScript) example that integrates with **Angko
    - Visiting `/login` (or being redirected from `/dashboard`) generates a PKCE `code_verifier` + `S256` `code_challenge`, `state`, and `nonce`, then routes the browser to `http://localhost:8080/oidc/auth`.
    - AngkorGate handles the login UI and SSO session.
 2. **Authorization Code Exchange (`/callback` -> `POST /oidc/token`)**
-   - AngkorGate redirects back to `http://localhost:3000/callback?code=...&state=...`.
+   - AngkorGate redirects back to `http://localhost:3001/callback?code=...&state=...`.
    - [src/app/callback/page.tsx](src/app/callback/page.tsx) verifies `state` and exchanges `code` + `code_verifier` via native `fetch` against `POST /oidc/token`.
 3. **Protected Route (`/dashboard`)**
    - [src/middleware.ts](src/middleware.ts) checks the `angkorgate_token` cookie on `/dashboard` (and `/dashboard/*`) and redirects unauthenticated requests to `/login?redirect=/dashboard`.
@@ -17,14 +17,14 @@ A minimal Next.js (App Router + TypeScript) example that integrates with **Angko
 ## Quick Start
 
 1. Start **AngkorGate Core** (`http://localhost:8080`) and **AngkorGate Console** (`http://localhost:4000`).
-   - Uses the pre-seeded public OIDC client `demo-app`, which already allows `http://localhost:3000/callback` and `http://localhost:3000`.
+   - Uses the pre-seeded public OIDC client `demo-app`, which allows `http://localhost:3001/callback` and `http://localhost:3001`.
 2. Configure environment variables (already pre-filled in `.env.local`):
    ```bash
    cp .env.example .env.local
    ```
-3. Install dependencies and run on `http://localhost:3000`:
+3. Install dependencies and run on `http://localhost:3001`:
    ```bash
    npm install
    npm run dev
    ```
-4. Open `http://localhost:3000/dashboard` — you will be routed to AngkorGate SSO to sign in, then returned to `/dashboard`.
+4. Open `http://localhost:3001/dashboard` — you will be routed to AngkorGate SSO to sign in, then returned to `/dashboard`.

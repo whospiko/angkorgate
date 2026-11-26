@@ -257,11 +257,12 @@ export class DevBootstrapService {
                 validRedirectUris: [
                     'https://oidcdebugger.com/debug',
                     'http://localhost:3000/callback',
+                    'http://localhost:3001/callback',
                     'http://localhost:4000/callback',
                     'http://localhost:5173/callback',
                 ],
-                validPostLogoutRedirectUris: ['https://oidcdebugger.com', 'http://localhost:3000', 'http://localhost:4000'],
-                webOrigins: ['https://oidcdebugger.com', 'http://localhost:3000', 'http://localhost:4000'],
+                validPostLogoutRedirectUris: ['https://oidcdebugger.com', 'http://localhost:3000', 'http://localhost:3001', 'http://localhost:4000'],
+                webOrigins: ['https://oidcdebugger.com', 'http://localhost:3000', 'http://localhost:3001', 'http://localhost:4000'],
                 allowedScopes: defaultScopes,
             });
             await appRepo.save(demoApp);
