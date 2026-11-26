@@ -1,9 +1,22 @@
 import { z } from "zod"
 
+export interface LinkedSocialAccount {
+  id: string
+  provider: string
+  providerUserId: string
+  email: string | null
+  emailVerifiedAt?: string | null
+  rawProfile?: Record<string, unknown> | null
+  linkedAt: string
+  lastLoginAt?: string | null
+}
+
 export interface User {
   id: string
   email: string | null
   phone?: string | null
+  fullName?: string | null
+  oauthProviders?: string[]
   phoneNumber?: string | null
   isActive: boolean
   isEmailVerified: boolean

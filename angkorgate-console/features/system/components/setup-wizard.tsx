@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import {
-  RiCommandLine,
   RiShieldUserLine,
   RiPaletteLine,
   RiCheckDoubleLine,
@@ -26,6 +25,7 @@ import {
 } from "@remixicon/react"
 import { executeSetupAction } from "../server/system-actions"
 import type { SetupActionResult } from "../types/branding.types"
+import { BrandLogo } from "./brand-logo"
 
 export function SetupWizard() {
   const [step, setStep] = React.useState<1 | 2 | 3>(1)
@@ -452,17 +452,12 @@ export function SetupWizard() {
                       <div className="flex flex-col items-center justify-center p-3 rounded-md border border-border/40 bg-card">
                         <span className="font-mono text-[10px] text-muted-foreground mb-1">Live Preview</span>
                         <div className="flex aspect-square size-12 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 overflow-hidden">
-                          {logoUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={logoUrl}
-                              alt="Logo Preview"
-                              className="size-8 object-contain"
-                              onError={() => setClientErrors((p) => ({ ...p, logo: "Invalid image URL" }))}
-                            />
-                          ) : (
-                            <RiCommandLine className="size-6 text-primary" />
-                          )}
+                          <BrandLogo
+                            logoUrl={logoUrl}
+                            alt="Logo Preview"
+                            customClassName="size-8 object-contain"
+                            onError={() => setClientErrors((p) => ({ ...p, logo: "Invalid image URL" }))}
+                          />
                         </div>
                         <span className="font-heading text-xs font-semibold mt-1 truncate max-w-[120px]">
                           {appName || "AngkorGate"}
@@ -566,7 +561,7 @@ export function SetupWizard() {
                     <div className="p-3 grid grid-cols-3 gap-2">
                       <span className="text-muted-foreground">Logo Asset:</span>
                       <span className="col-span-2 text-foreground">
-                        {logoUrl ? "Custom Logo Attached" : "Default AngkorGate Symbol"}
+                        {logoUrl ? "Custom Logo Attached" : "Default AngkorGate Logo"}
                       </span>
                     </div>
                     <div className="p-3 grid grid-cols-3 gap-2">

@@ -119,7 +119,7 @@ describe("features/auth: Passkey Server Actions", () => {
     assert.equal(res.options?.challengeId, "cid-123")
   })
 
-  test("verifyPasskeyAuthAction rejects users without authorized dashboard role", async () => {
+  test("verifyPasskeyAuthAction routes users without authorized dashboard role to /account", async () => {
     apiClient.post = async (url: string) => {
       if (url === "/auth/passkey/authenticate/verify") {
         return {
@@ -148,8 +148,8 @@ describe("features/auth: Passkey Server Actions", () => {
     }
 
     const res = await verifyPasskeyAuthAction("cid-1", { id: "cred-1" })
-    assert.equal(res.success, false)
-    assert.match(res.message || "", /Access denied/)
+    assert.equal(res.success, true)
+    assert.equal(res.redirectUrl, "/account")
   })
 
   test("verifyPasskeyAuthAction authorizes admins and returns redirectUrl", async () => {

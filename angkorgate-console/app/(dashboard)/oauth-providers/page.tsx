@@ -1,5 +1,7 @@
 import {
   getOAuthProviders,
+  getOAuthSettings,
+  OAuthSettingsCard,
   OAuthProvidersTable,
   CreateOAuthProviderDialog,
 } from "@/features/oauth-providers"
@@ -9,7 +11,10 @@ export const metadata = {
 }
 
 export default async function OAuthProvidersPage() {
-  const providers = await getOAuthProviders()
+  const [providers, settings] = await Promise.all([
+    getOAuthProviders(),
+    getOAuthSettings(),
+  ])
 
   return (
     <div className="flex flex-1 flex-col gap-6">
@@ -19,13 +24,18 @@ export default async function OAuthProvidersPage() {
             OAuth Identity Providers
           </h1>
           <p className="text-xs text-muted-foreground">
-            Configure federated social identity providers (Google, Apple, Microsoft, etc.).
+            Configure and toggle federated social identity providers (Google, GitHub, Discord, Microsoft Entra ID, Telegram).
           </p>
         </div>
-        <CreateOAuthProviderDialog />
+        <CreateOAuthProviderDialog callbackBaseUrl={settings.callbackBaseUrl} />
       </div>
 
-      <OAuthProvidersTable providers={providers} />
+      <OAuthSettingsCard initialSettings={settings} />
+
+      <OAuthProvidersTable
+        providers={providers}
+        callbackBaseUrl={settings.callbackBaseUrl}
+      />
     </div>
   )
 }

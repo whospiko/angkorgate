@@ -1,11 +1,23 @@
-import { getOidcDiscovery, getOidcJwks, OidcDiscoveryCard } from "@/features/oidc"
+import {
+  getOidcDiscovery,
+  getOidcJwks,
+  getOidcSettings,
+  OidcDiscoveryCard,
+  OidcSettingsCard,
+} from "@/features/oidc"
+
+export const dynamic = "force-dynamic"
 
 export const metadata = {
   title: "OIDC Server Discovery | AngkorGate",
 }
 
 export default async function OidcPage() {
-  const [discovery, jwks] = await Promise.all([getOidcDiscovery(), getOidcJwks()])
+  const [discovery, jwks, settings] = await Promise.all([
+    getOidcDiscovery(),
+    getOidcJwks(),
+    getOidcSettings(),
+  ])
 
   return (
     <div className="flex flex-1 flex-col gap-6">
@@ -19,6 +31,8 @@ export default async function OidcPage() {
           </p>
         </div>
       </div>
+
+      <OidcSettingsCard initialSettings={settings} />
 
       <OidcDiscoveryCard discovery={discovery} jwks={jwks} />
     </div>

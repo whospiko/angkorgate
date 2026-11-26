@@ -37,7 +37,7 @@ export default async function DashboardLayout({
   )
 
   if (!hasAccess) {
-    redirect("/forbidden")
+    redirect("/account")
   }
 
   return (

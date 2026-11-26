@@ -178,7 +178,7 @@ export function CreateClientWizard({ availableScopes = [] }: CreateClientWizardP
         requirePkce,
         scopeIds: selectedScopeIds,
         oauthEnabled: true,
-        enabledProviders: ["google", "apple"],
+        enabledProviders: ["google", "github", "discord", "microsoft", "telegram", "apple"],
         passwordLoginEnabled: true,
         registrationEnabled: true,
         emailVerificationRequired: true,

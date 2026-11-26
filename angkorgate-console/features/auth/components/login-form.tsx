@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
-  RiCommandLine,
   RiLoader4Line,
   RiEyeLine,
   RiEyeOffLine,
@@ -23,6 +22,7 @@ import {
   RiTimerLine,
   RiFingerprintLine,
 } from "@remixicon/react"
+import { BrandLogo } from "@/features/system"
 import { startAuthentication, browserSupportsWebAuthn } from "@simplewebauthn/browser"
 import { loginAction } from "../server/auth-actions"
 import {
@@ -30,8 +30,12 @@ import {
   verifyPasskeyAuthAction,
 } from "../server/passkey-actions"
 import { OAuthProviders } from "./oauth-providers"
+import type { PublicOAuthProvider } from "@/features/oauth-providers"
 
 export interface LoginFormProps extends React.ComponentProps<"div"> {
+  oauthProviders?: PublicOAuthProvider[]
+  oauthBaseUrl?: string | null
+  oauthWebUrl?: string | null
   branding?: {
     appName: string
     appDescription?: string | null
@@ -46,6 +50,9 @@ export interface LoginFormProps extends React.ComponentProps<"div"> {
 export function LoginForm({
   className,
   branding,
+  oauthProviders = [],
+  oauthBaseUrl,
+  oauthWebUrl,
   ...props
 }: LoginFormProps) {
   const appName = branding?.appName || "AngkorGate"
@@ -195,12 +202,11 @@ export function LoginForm({
               className="flex flex-col items-center gap-2 font-medium"
             >
               <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm overflow-hidden">
-                {logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={logoUrl} alt={appName} className="size-6 object-contain" />
-                ) : (
-                  <RiCommandLine className="size-6" />
-                )}
+                <BrandLogo
+                  logoUrl={logoUrl}
+                  alt={appName}
+                  customClassName="size-6 object-contain"
+                />
               </div>
               <span className="sr-only">{appName}</span>
             </Link>
@@ -389,19 +395,25 @@ export function LoginForm({
             )}
           </Button>
 
-          <OAuthProviders interaction={interactionParam} redirect={redirectParam} />
+          <OAuthProviders
+            providers={oauthProviders}
+            coreBaseUrl={oauthBaseUrl}
+            defaultWebUrl={oauthWebUrl}
+            interaction={interactionParam}
+            redirect={redirectParam}
+          />
         </FieldGroup>
       </form>
 
       <FieldDescription className="px-6 text-center font-mono text-xs text-muted-foreground">
         By clicking continue, you agree to the{" "}
-        <a href="#" className="underline underline-offset-4 hover:text-primary">
+        <Link href="/terms" className="underline underline-offset-4 hover:text-primary">
           Terms of Service
-        </a>{" "}
+        </Link>{" "}
         and{" "}
-        <a href="#" className="underline underline-offset-4 hover:text-primary">
+        <Link href="/privacy" className="underline underline-offset-4 hover:text-primary">
           Privacy Policy
-        </a>
+        </Link>
         .
       </FieldDescription>
     </div>

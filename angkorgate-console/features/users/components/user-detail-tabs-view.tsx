@@ -16,8 +16,9 @@ import {
   RiCloseLine,
   RiErrorWarningLine,
 } from "@remixicon/react"
-import type { User, LinkedAccount } from "../types/users.types"
+import type { User, LinkedAccount, LinkedSocialAccount } from "../types/users.types"
 import type { Role, Permission } from "@/features/rbac/types/rbac.types"
+import { OAuthProviderIcon } from "@/components/oauth-provider-icon"
 import { UserInfoTab } from "./user-info-tab"
 import { UserAssignTab } from "./user-assign-tab"
 import { UserSecurityTab } from "./user-security-tab"
@@ -27,6 +28,7 @@ interface UserDetailTabsViewProps {
   allRoles: Role[]
   allPermissions: Permission[]
   linkedAccount: LinkedAccount
+  oauthAccounts?: LinkedSocialAccount[]
   defaultTab?: "information" | "assign" | "security"
 }
 
@@ -35,6 +37,7 @@ export function UserDetailTabsView({
   allRoles,
   allPermissions,
   linkedAccount,
+  oauthAccounts = [],
   defaultTab = "information",
 }: UserDetailTabsViewProps) {
   const [activeTab, setActiveTab] = useState<string>(defaultTab)
@@ -68,7 +71,11 @@ export function UserDetailTabsView({
             <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
-                  {user.email || user.phone || "User Account"}
+                  {user.email ||
+                    user.phone ||
+                    (linkedAccount.type !== "none" ? linkedAccount.data.fullName : undefined) ||
+                    user.fullName ||
+                    "User Account"}
                 </h1>
 
                 {/* Status Badge */}
@@ -115,6 +122,17 @@ export function UserDetailTabsView({
                     Customer ({linkedAccount.data.customerCode || linkedAccount.data.type})
                   </Badge>
                 )}
+
+                {oauthAccounts.map((acc) => (
+                  <Badge
+                    key={acc.id}
+                    variant="outline"
+                    className="font-mono text-[10px] gap-1 capitalize border-primary/30 bg-primary/5 text-primary"
+                  >
+                    <OAuthProviderIcon code={acc.provider} className="size-3" />
+                    {acc.provider}
+                  </Badge>
+                ))}
               </div>
 
               <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground flex-wrap">
@@ -201,7 +219,11 @@ export function UserDetailTabsView({
 
         {/* Information Tab Content */}
         <TabsContent value="information" className="mt-0 space-y-4 focus-visible:outline-none">
-          <UserInfoTab user={user} linkedAccount={linkedAccount} />
+          <UserInfoTab
+            user={user}
+            linkedAccount={linkedAccount}
+            oauthAccounts={oauthAccounts}
+          />
         </TabsContent>
 
         {/* Assign Tab Content */}

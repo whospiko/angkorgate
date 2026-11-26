@@ -15,15 +15,18 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import {
-  RiCommandLine,
   RiDashboardLine,
   RiShieldKeyholeLine,
   RiFileList3Line,
   RiBookOpenLine,
   RiServerLine,
   RiRadarLine,
+  RiUserLine,
 } from "@remixicon/react"
-import { useBranding } from "@/features/system"
+import { BrandLogo, useBranding } from "@/features/system"
+import { getPublicCoreUrl } from "@/lib/env"
+
+const publicCoreUrl = getPublicCoreUrl()
 
 const defaultNavData = {
   navMain: [
@@ -106,24 +109,29 @@ const defaultNavData = {
         },
         {
           title: "Swagger API Explorer",
-          url: "http://localhost:8080/api#",
+          url: `${publicCoreUrl}/api#`,
         },
         {
           title: "OpenID Discovery JSON",
-          url: "http://localhost:8080/oidc/.well-known/openid-configuration",
+          url: `${publicCoreUrl}/oidc/.well-known/openid-configuration`,
         },
       ],
     },
   ],
   navSecondary: [
     {
+      title: "Account Portal",
+      url: "/account",
+      icon: <RiUserLine className="size-4" />,
+    },
+    {
       title: "Core API Health",
-      url: "http://localhost:8080/",
+      url: `${publicCoreUrl}/`,
       icon: <RiServerLine className="size-4" />,
     },
     {
       title: "Cache Metrics",
-      url: "http://localhost:8080/cache/status",
+      url: `${publicCoreUrl}/cache/status`,
       icon: <RiRadarLine className="size-4" />,
     },
   ],
@@ -157,12 +165,11 @@ export function AppSidebar({ currentUser, ...props }: AppSidebarProps) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<Link href="/dashboard" />}>
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs overflow-hidden">
-                {logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={logoUrl} alt={appName} className="size-5 object-contain" />
-                ) : (
-                  <RiCommandLine className="size-4" />
-                )}
+                <BrandLogo
+                  logoUrl={logoUrl}
+                  alt={appName}
+                  customClassName="size-5 object-contain"
+                />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold tracking-wide font-heading">{appName}</span>

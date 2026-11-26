@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { RiAddLine, RiLoader4Line } from "@remixicon/react"
 import { createAppAction } from "../server/apps-actions"
+import { OAUTH_PROVIDER_CODES } from "@/features/oauth-providers"
 
 export function CreateAppDialog() {
   const [open, setOpen] = useState(false)
@@ -42,7 +43,7 @@ export function CreateAppDialog() {
       appCode,
       name,
       oauthEnabled,
-      enabledProviders: oauthEnabled ? ["google", "apple"] : [],
+      enabledProviders: oauthEnabled ? [...OAUTH_PROVIDER_CODES] : [],
       passwordLoginEnabled,
       registrationEnabled: true,
       emailVerificationRequired: true,
@@ -119,7 +120,7 @@ export function CreateAppDialog() {
             <div className="flex items-center justify-between pt-2">
               <div>
                 <Label htmlFor="oauth-toggle" className="text-sm font-sans font-medium">OAuth Federation</Label>
-                <p className="text-muted-foreground text-[11px]">Enable Google & Apple authentication</p>
+                <p className="text-muted-foreground text-[11px]">Enable social identity providers</p>
               </div>
               <Switch
                 id="oauth-toggle"

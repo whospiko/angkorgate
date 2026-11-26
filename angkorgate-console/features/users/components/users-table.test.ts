@@ -27,10 +27,12 @@ describe("features/users: UsersTable & DropdownMenu rendering", () => {
     },
     {
       id: "usr-002",
-      email: "customer@example.com",
-      isActive: false,
+      email: null,
+      fullName: "Heng Kakada",
+      oauthProviders: ["telegram"],
+      isActive: true,
       isEmailVerified: false,
-      roles: [],
+      roles: ["CUSTOMER"],
       createdAt: "2026-11-22T00:00:00Z",
       updatedAt: "2026-11-22T00:00:00Z",
     },
@@ -41,7 +43,9 @@ describe("features/users: UsersTable & DropdownMenu rendering", () => {
       React.createElement(UsersTable, { users: mockUsers })
     )
     assert.ok(html.includes("admin@angkorgate.local"))
-    assert.ok(html.includes("customer@example.com"))
+    assert.ok(html.includes("Heng Kakada"))
+    assert.ok(html.includes("telegram"))
+    assert.ok(html.includes("Password"))
     assert.ok(html.includes("User Actions") === false) // Dropdown content is not open by default
   })
 

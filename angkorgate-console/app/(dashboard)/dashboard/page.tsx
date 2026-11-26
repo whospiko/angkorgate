@@ -13,6 +13,7 @@ import {
 import { getSystemHealth, getCacheStatus, SystemStatusCard } from "@/features/system"
 import { getApps } from "@/features/apps"
 import { getUsers } from "@/features/users"
+import { getCoreApiUrl } from "@/lib/env"
 import { getAuditLogs } from "@/features/audit"
 
 export const metadata = {
@@ -143,7 +144,7 @@ export default async function DashboardPage() {
               </div>
               <div className="flex justify-between py-1 border-b border-border/40">
                 <span className="text-muted-foreground">API Core URL:</span>
-                <span className="font-mono">http://localhost:8080</span>
+                <span className="font-mono">{getCoreApiUrl()}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-border/40">
                 <span className="text-muted-foreground">Icons:</span>

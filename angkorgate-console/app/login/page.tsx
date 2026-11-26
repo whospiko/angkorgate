@@ -1,6 +1,7 @@
 import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import { LoginForm } from "@/features/auth"
+import { getPublicOAuthConfig } from "@/features/oauth-providers"
 import { getSetupStatus, getBranding } from "@/features/system"
 
 export const dynamic = "force-dynamic"
@@ -12,7 +13,10 @@ export default async function LoginPage() {
     redirect("/setup")
   }
 
-  const branding = await getBranding()
+  const [branding, oauthConfig] = await Promise.all([
+    getBranding(),
+    getPublicOAuthConfig(),
+  ])
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
@@ -24,7 +28,12 @@ export default async function LoginPage() {
             </div>
           }
         >
-          <LoginForm branding={branding} />
+          <LoginForm
+            branding={branding}
+            oauthProviders={oauthConfig.providers}
+            oauthBaseUrl={oauthConfig.callbackBaseUrl}
+            oauthWebUrl={oauthConfig.webUrl}
+          />
         </Suspense>
       </div>
     </div>

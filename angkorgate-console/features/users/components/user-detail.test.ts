@@ -145,6 +145,42 @@ describe("features/users: User Detail Schemas & Tabs View", () => {
       assert.ok(html.includes("CRM Customer"))
     })
 
+    test("renders user detail view with connected social identities", () => {
+      const html = ReactDOMServer.renderToString(
+        React.createElement(UserDetailTabsView, {
+          user: { ...mockUser, email: null, phone: null },
+          allRoles: mockRoles,
+          allPermissions: mockPermissions,
+          linkedAccount: {
+            type: "customer",
+            data: {
+              id: "cust-tg",
+              customerCode: "CUS-0003",
+              fullName: "Heng Kakada",
+              type: "CUSTOMER",
+              status: "ACTIVE",
+            },
+          },
+          oauthAccounts: [
+            {
+              id: "oa-1",
+              provider: "telegram",
+              providerUserId: "2109292535",
+              email: null,
+              rawProfile: { username: "hengkakada01" },
+              linkedAt: "2026-11-26T00:00:00Z",
+            },
+          ],
+          defaultTab: "information",
+        })
+      )
+
+      assert.ok(html.includes("Heng Kakada"))
+      assert.ok(html.includes("Connected Social Identities"))
+      assert.ok(html.includes("@hengkakada01"))
+      assert.ok(html.includes("2109292535"))
+    })
+
     test("renders user detail view with unlinked account", () => {
       const unlinked: LinkedAccount = { type: "none" }
 

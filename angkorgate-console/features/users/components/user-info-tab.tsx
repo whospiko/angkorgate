@@ -18,16 +18,27 @@ import {
   RiExternalLinkLine,
   RiInformationLine,
   RiShieldCheckLine,
+  RiLinksLine,
+  RiDeleteBinLine,
+  RiLockPasswordLine,
 } from "@remixicon/react"
-import type { User, LinkedAccount } from "../types/users.types"
-import { updateUserAction } from "../server/users-actions"
+import { OAuthProviderIcon } from "@/components/oauth-provider-icon"
+import type { User, LinkedAccount, LinkedSocialAccount } from "../types/users.types"
+import { updateUserAction, adminUnlinkUserOAuthAction } from "../server/users-actions"
 
 interface UserInfoTabProps {
   user: User
   linkedAccount: LinkedAccount
+  oauthAccounts?: LinkedSocialAccount[]
 }
 
-export function UserInfoTab({ user, linkedAccount }: UserInfoTabProps) {
+export function UserInfoTab({
+  user,
+  linkedAccount,
+  oauthAccounts = [],
+}: UserInfoTabProps) {
+  const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(null)
+  const [unlinkFeedback, setUnlinkFeedback] = useState<string | null>(null)
   const [email, setEmail] = useState(user.email || "")
   const [phone, setPhone] = useState(user.phone || user.phoneNumber || "")
   const [isActive, setIsActive] = useState(user.isActive)
@@ -193,6 +204,112 @@ export function UserInfoTab({ user, linkedAccount }: UserInfoTabProps) {
                   Employees Staff
                 </Button>
               </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Connected Social Identities Card */}
+      <Card className="border-border/60 shadow-xs">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <RiLinksLine className="size-5 text-primary" />
+              <CardTitle className="font-heading text-base font-semibold">
+                Connected Social Identities
+              </CardTitle>
+            </div>
+            {oauthAccounts.length > 0 ? (
+              <Badge variant="outline" className="font-mono text-xs w-fit">
+                {oauthAccounts.length} Provider{oauthAccounts.length > 1 ? "s" : ""} Linked
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="font-mono text-xs gap-1 w-fit">
+                <RiLockPasswordLine className="size-3.5" />
+                Password / Local Auth
+              </Badge>
+            )}
+          </div>
+          <CardDescription className="text-xs font-mono">
+            Federated identity providers (Google, GitHub, Discord, Microsoft, Telegram) linked to this account.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          {unlinkFeedback && (
+            <div className="mb-3 rounded-md border border-destructive/30 bg-destructive/10 p-2 font-mono text-xs text-destructive">
+              {unlinkFeedback}
+            </div>
+          )}
+
+          {oauthAccounts.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border/60 bg-muted/10 p-4 font-mono text-xs text-muted-foreground">
+              No external social providers linked. This user signs in using local credentials (email/phone + password or passkey).
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {oauthAccounts.map((acc) => {
+                const rawUsername =
+                  typeof acc.rawProfile?.username === "string"
+                    ? `@${acc.rawProfile.username}`
+                    : null
+                return (
+                  <div
+                    key={acc.id}
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-border/50 bg-muted/20 p-3.5 font-mono text-xs"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border/60 bg-card text-foreground">
+                        <OAuthProviderIcon code={acc.provider} className="size-4" />
+                      </div>
+                      <div className="min-w-0 space-y-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-foreground uppercase">
+                            {acc.provider}
+                          </span>
+                          {rawUsername && (
+                            <Badge variant="secondary" className="font-mono text-[10px]">
+                              {rawUsername}
+                            </Badge>
+                          )}
+                          {acc.email && (
+                            <span className="text-muted-foreground truncate">
+                              {acc.email}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground truncate">
+                          Provider ID: {acc.providerUserId}
+                          {acc.lastLoginAt
+                            ? ` · Last login: ${new Date(acc.lastLoginAt).toLocaleString()}`
+                            : ""}
+                        </div>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive font-mono text-xs gap-1.5 shrink-0 w-fit"
+                      disabled={unlinkingProvider === acc.provider}
+                      onClick={async () => {
+                        if (!confirm(`Unlink ${acc.provider} from this user?`)) return
+                        setUnlinkingProvider(acc.provider)
+                        setUnlinkFeedback(null)
+                        const res = await adminUnlinkUserOAuthAction(user.id, acc.provider)
+                        setUnlinkingProvider(null)
+                        if (!res.success && res.message) {
+                          setUnlinkFeedback(res.message)
+                        }
+                      }}
+                    >
+                      <RiDeleteBinLine className="size-3.5" />
+                      Unlink
+                    </Button>
+                  </div>
+                )
+              })}
             </div>
           )}
         </CardContent>

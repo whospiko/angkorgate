@@ -178,14 +178,18 @@ export async function verifyPasskeyAuthAction(
     allowedRoles.some((allowed: string) => allowed.toUpperCase() === r.toUpperCase())
   )
 
-  if (!hasAccess && !redirectUrl.startsWith("/account")) {
-    return {
-      success: false,
-      message: `Access denied. Your assigned role (${
-        userRoles.length > 0 ? userRoles.join(", ") : "CUSTOMER"
-      }) is not authorized to access the Admin Console. Configured access roles: ${allowedRoles.join(
-        ", "
-      )}.`,
+  const defaultPath = hasAccess ? "/dashboard" : "/account"
+  let targetPath = defaultPath
+
+  if (
+    typeof redirectUrl === "string" &&
+    redirectUrl.startsWith("/") &&
+    !redirectUrl.startsWith("//")
+  ) {
+    if (!hasAccess && !redirectUrl.startsWith("/account")) {
+      targetPath = "/account"
+    } else {
+      targetPath = redirectUrl
     }
   }
 
@@ -209,7 +213,7 @@ export async function verifyPasskeyAuthAction(
         secure: isProd,
         sameSite: "lax",
         path: "/",
-        maxAge: 7 * 24 * 60 * 60,
+        maxAge: authData.refreshTokenExpiresIn || 7 * 24 * 60 * 60,
       })
     }
 
@@ -219,14 +223,14 @@ export async function verifyPasskeyAuthAction(
         secure: isProd,
         sameSite: "lax",
         path: "/",
-        maxAge: 7 * 24 * 60 * 60,
+        maxAge: authData.refreshTokenExpiresIn || 7 * 24 * 60 * 60,
       })
     }
   } catch {
     // Non-request context (e.g. unit testing)
   }
 
-  return { success: true, redirectUrl }
+  return { success: true, redirectUrl: targetPath }
 }
 
 /**

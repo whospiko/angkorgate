@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import {
   getUserById,
   getUserLinkedAccount,
+  getAdminUserOAuthAccounts,
   UserDetailTabsView,
 } from "@/features/users"
 import { getRoles, getPermissions } from "@/features/rbac"
@@ -32,11 +33,12 @@ export default async function UserDetailPage({
       ? "security"
       : "information"
 
-  const [user, allRoles, allPermissions, linkedAccount] = await Promise.all([
+  const [user, allRoles, allPermissions, linkedAccount, oauthAccounts] = await Promise.all([
     getUserById(id),
     getRoles(),
     getPermissions(),
     getUserLinkedAccount(id),
+    getAdminUserOAuthAccounts(id),
   ])
 
   if (!user) {
@@ -49,6 +51,7 @@ export default async function UserDetailPage({
       allRoles={allRoles}
       allPermissions={allPermissions}
       linkedAccount={linkedAccount}
+      oauthAccounts={oauthAccounts}
       defaultTab={defaultTab}
     />
   )

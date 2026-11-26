@@ -1,15 +1,45 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { apiClient } from "@/lib/api-client"
+import { getConsoleUrl } from "@/lib/env"
 import type { UserSummary } from "@/features/auth/types/auth.schemas"
 import type { BrandingConfig } from "@/features/system/types/branding.types"
+
+function isLocalHost(host: string): boolean {
+  return host.startsWith("localhost") || host.startsWith("127.0.0.1")
+}
+
+function getPublicOrigin(request: NextRequest, fallbackWebUrl?: string): string {
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim()
+  if (forwardedHost && !isLocalHost(forwardedHost)) {
+    const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https"
+    return `${forwardedProto}://${forwardedHost}`
+  }
+
+  const host = request.headers.get("host")?.split(",")[0]?.trim()
+  if (host && !isLocalHost(host)) {
+    const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https"
+    return `${forwardedProto}://${host}`
+  }
+
+  if (fallbackWebUrl && fallbackWebUrl.startsWith("http")) {
+    return fallbackWebUrl
+  }
+
+  if (process.env.NEXT_PUBLIC_CONSOLE_URL || process.env.CONSOLE_URL) {
+    return getConsoleUrl()
+  }
+
+  return request.url
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
   const ticket = searchParams.get("ticket")
   const targetRedirect = searchParams.get("redirect") || "/dashboard"
+  const originBase = getPublicOrigin(request)
 
   if (!ticket) {
-    return NextResponse.redirect(new URL("/login?error=missing_ticket", request.url))
+    return NextResponse.redirect(new URL("/login?error=missing_ticket", originBase))
   }
 
   try {
@@ -19,13 +49,15 @@ export async function GET(request: NextRequest) {
       refreshToken: string
       userId: string
       provider: string
+      webUrl?: string
     }>("/auth/oauth/ticket", { ticket })
 
-    const { accessToken, refreshToken, userId } = ticketData
+    const { accessToken, refreshToken, userId, webUrl } = ticketData
+    const effectiveOrigin = getPublicOrigin(request, webUrl)
 
     if (!accessToken) {
       console.error("Ticket redemption did not return an access token:", ticketData)
-      return NextResponse.redirect(new URL("/login?error=invalid_ticket", request.url))
+      return NextResponse.redirect(new URL("/login?error=invalid_ticket", effectiveOrigin))
     }
 
     // 2. Fetch authenticated user profile
@@ -61,20 +93,17 @@ export async function GET(request: NextRequest) {
       allowedRoles.some((allowed: string) => allowed.toUpperCase() === r.toUpperCase())
     )
 
-    if (!hasAccess) {
-      console.warn(
-        `User ${user.email || userId} (${userRoles.join(", ")}) is not authorized for dashboard.`
-      )
-      return NextResponse.redirect(new URL("/login?unauthorized=1", request.url))
-    }
-
-    // 4. Set session cookies directly on the redirect response
-    const destination =
-      targetRedirect.startsWith("/") && !targetRedirect.startsWith("//")
+    // 4. Route dashboard-authorized users to destination (default /dashboard);
+    //    route non-dashboard users (e.g. CUSTOMER) to self-service /account portal.
+    const destination = hasAccess
+      ? targetRedirect.startsWith("/") && !targetRedirect.startsWith("//")
         ? targetRedirect
         : "/dashboard"
+      : targetRedirect.startsWith("/account")
+      ? targetRedirect
+      : "/account"
 
-    const response = NextResponse.redirect(new URL(destination, request.url))
+    const response = NextResponse.redirect(new URL(destination, effectiveOrigin))
     const isProd = process.env.NODE_ENV === "production"
 
     response.cookies.set("angkorgate_token", accessToken, {
@@ -106,6 +135,6 @@ export async function GET(request: NextRequest) {
     return response
   } catch (err) {
     console.error("OAuth ticket redemption failed:", err)
-    return NextResponse.redirect(new URL("/login?error=oauth_failed", request.url))
+    return NextResponse.redirect(new URL("/login?error=oauth_failed", originBase))
   }
 }

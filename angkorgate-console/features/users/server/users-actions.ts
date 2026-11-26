@@ -10,6 +10,7 @@ import {
   type AdminResetPasswordInput,
   type PaginatedUsers,
   type LinkedAccount,
+  type LinkedSocialAccount,
   CreateUserSchema,
   UpdateUserSchema,
   AdminResetPasswordSchema,
@@ -314,5 +315,39 @@ export async function replaceUserRolesAction(
     return { success: true }
   } catch (error: any) {
     return { success: false, message: error.message || "Failed to update user roles" }
+  }
+}
+
+export async function getAdminUserOAuthAccounts(
+  userId: string
+): Promise<LinkedSocialAccount[]> {
+  try {
+    const res = await apiClient.get<LinkedSocialAccount[]>(
+      `/admin/oauth/providers/users/${encodeURIComponent(userId)}/accounts`
+    )
+    return Array.isArray(res) ? res : []
+  } catch (error) {
+    if (error instanceof ApiError && error.statusCode === 401) {
+      redirect(`/login?unauthorized=1&redirect=/users/${encodeURIComponent(userId)}`)
+    }
+    return []
+  }
+}
+
+export async function adminUnlinkUserOAuthAction(
+  userId: string,
+  provider: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    await apiClient.delete(
+      `/admin/oauth/providers/users/${encodeURIComponent(userId)}/accounts/${encodeURIComponent(provider)}`
+    )
+    revalidatePath("/users")
+    revalidatePath(`/users/${userId}`)
+    return { success: true }
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Failed to unlink social account"
+    return { success: false, message }
   }
 }

@@ -23,10 +23,10 @@ import {
   RiLogoutBoxLine,
   RiSunLine,
   RiMoonLine,
-  RiCommandLine,
   RiDashboardLine,
   RiExternalLinkLine,
 } from "@remixicon/react"
+import { BrandLogo } from "@/features/system"
 import type { UserProfile } from "../types/account.types"
 import { AccountProfileTab } from "./account-profile-tab"
 import { AccountSecurityTab } from "./account-security-tab"
@@ -71,8 +71,12 @@ export function AccountPortalShell({
         {/* Brand & Return Link */}
         <div className="flex items-center gap-4">
           <Link href="/account" className="flex items-center gap-2.5 font-bold text-lg font-sans">
-            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-              <RiCommandLine className="size-4" />
+            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm overflow-hidden">
+              <BrandLogo
+                logoUrl={logoUrl}
+                alt={appName}
+                customClassName="size-5 object-contain"
+              />
             </div>
             <span>{appName}</span>
           </Link>

@@ -226,11 +226,14 @@ export async function updateBrandingAction(
 ): Promise<BrandingActionResult> {
   const allowedRolesRaw = formData.getAll("allowedDashboardRoles").map(String).filter(Boolean)
 
+  const logoUrlRaw = formData.get("logoUrl")
+  const faviconUrlRaw = formData.get("faviconUrl")
+
   const rawData = {
     appName: formData.get("appName"),
     appDescription: formData.get("appDescription") || undefined,
-    logoUrl: formData.get("logoUrl") || undefined,
-    faviconUrl: formData.get("faviconUrl") || undefined,
+    logoUrl: logoUrlRaw !== null ? String(logoUrlRaw) : undefined,
+    faviconUrl: faviconUrlRaw !== null ? String(faviconUrlRaw) : undefined,
     organizationName: formData.get("organizationName") || undefined,
     supportEmail: formData.get("supportEmail") || undefined,
     footerText: formData.get("footerText") || undefined,
@@ -249,10 +252,12 @@ export async function updateBrandingAction(
 
   try {
     const cleanData = Object.fromEntries(
-      Object.entries(result.data).map(([k, v]) => [
-        k,
-        typeof v === "string" && v.trim() === "" ? undefined : v,
-      ])
+      Object.entries(result.data).map(([k, v]) => {
+        if ((k === "logoUrl" || k === "faviconUrl") && typeof v === "string" && v.trim() === "") {
+          return [k, ""]
+        }
+        return [k, typeof v === "string" && v.trim() === "" ? undefined : v]
+      })
     )
 
     const updated = await apiClient.patch<BrandingConfig>(

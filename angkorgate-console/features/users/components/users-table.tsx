@@ -29,7 +29,9 @@ import {
   RiCloseLine,
   RiDeleteBinLine,
   RiEyeLine,
+  RiLockPasswordLine,
 } from "@remixicon/react"
+import { OAuthProviderIcon } from "@/components/oauth-provider-icon"
 import type { User } from "../types/users.types"
 import { toggleUserStatusAction, unlockUserAction, deleteUserAction } from "../server/users-actions"
 
@@ -86,6 +88,7 @@ export function UsersTable({ users }: UsersTableProps) {
         <TableHeader>
           <TableRow className="bg-muted/30">
             <TableHead className="font-mono text-xs">Email / User ID</TableHead>
+            <TableHead className="font-mono text-xs">Sign-In Method</TableHead>
             <TableHead className="font-mono text-xs">Status</TableHead>
             <TableHead className="font-mono text-xs">Email Verified</TableHead>
             <TableHead className="font-mono text-xs">Assigned Roles</TableHead>
@@ -100,10 +103,34 @@ export function UsersTable({ users }: UsersTableProps) {
                   href={`/users/${u.id}`}
                   className="font-sans font-medium text-sm text-foreground hover:text-primary hover:underline transition-colors block"
                 >
-                  {u.email || u.phone || "Unnamed User"}
+                  {u.fullName || u.email || u.phone || "Unnamed User"}
                 </Link>
                 <div className="font-mono text-[11px] text-muted-foreground truncate max-w-[220px]">
-                  {u.id}
+                  {u.fullName && (u.email || u.phone) ? (u.email || u.phone) : u.id}
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-wrap gap-1">
+                  {u.oauthProviders && u.oauthProviders.length > 0 ? (
+                    u.oauthProviders.map((provider) => (
+                      <Badge
+                        key={provider}
+                        variant="outline"
+                        className="font-mono text-[10px] gap-1 capitalize"
+                      >
+                        <OAuthProviderIcon code={provider} className="size-3" />
+                        {provider}
+                      </Badge>
+                    ))
+                  ) : (
+                    <Badge
+                      variant="secondary"
+                      className="font-mono text-[10px] gap-1 text-muted-foreground"
+                    >
+                      <RiLockPasswordLine className="size-3" />
+                      Password
+                    </Badge>
+                  )}
                 </div>
               </TableCell>
               <TableCell>

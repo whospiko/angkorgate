@@ -67,7 +67,7 @@ describe("app/auth/callback/route: OAuth Ticket Callback Handler", () => {
     }
   })
 
-  test("redirects to unauthorized if user lacks dashboard role", async () => {
+  test("sets session cookies and redirects non-dashboard user to /account", async () => {
     const origPost = apiClient.post
     const origGet = apiClient.get
 
@@ -107,11 +107,13 @@ describe("app/auth/callback/route: OAuth Ticket Callback Handler", () => {
       const res = await GET(req)
 
       assert.strictEqual(res.status, 307)
-      assert.ok(res.headers.get("location")?.includes("/login?unauthorized=1"))
+      assert.ok(res.headers.get("location")?.endsWith("/account"))
 
-      // Verify NO auth token cookie is set
+      // Verify session cookies ARE set for the /account portal
       const setCookies = res.headers.getSetCookie()
-      assert.ok(!setCookies.some((c) => c.includes("angkorgate_token=")))
+      assert.ok(setCookies.some((c) => c.includes("angkorgate_token=mock.jwt.token")))
+      assert.ok(setCookies.some((c) => c.includes("angkorgate_refresh_token=mock-refresh-token")))
+      assert.ok(setCookies.some((c) => c.includes("angkorgate_user=")))
     } finally {
       apiClient.post = origPost
       apiClient.get = origGet

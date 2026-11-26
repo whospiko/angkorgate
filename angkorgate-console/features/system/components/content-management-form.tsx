@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
-  RiCommandLine,
   RiUpload2Line,
   RiCheckLine,
   RiAlertLine,
@@ -23,6 +22,7 @@ import { updateBrandingAction } from "../server/system-actions"
 import type { BrandingConfig, BrandingActionResult } from "../types/branding.types"
 import type { Role } from "@/features/rbac/types/rbac.types"
 import { useBranding } from "./branding-provider"
+import { BrandLogo } from "./brand-logo"
 
 export interface ContentManagementFormProps {
   initialBranding: BrandingConfig
@@ -389,12 +389,11 @@ export function ContentManagementForm({ initialBranding, allRoles }: ContentMana
                 </span>
                 <div className="flex items-center gap-3 rounded-lg border border-border/40 bg-card p-2">
                   <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs overflow-hidden">
-                    {logoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={logoUrl} alt="Logo" className="size-5 object-contain" />
-                    ) : (
-                      <RiCommandLine className="size-4" />
-                    )}
+                    <BrandLogo
+                      logoUrl={logoUrl}
+                      alt="Logo"
+                      customClassName="size-5 object-contain"
+                    />
                   </div>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-semibold tracking-wide font-heading">
@@ -414,12 +413,11 @@ export function ContentManagementForm({ initialBranding, allRoles }: ContentMana
                 </span>
                 <div className="flex flex-col items-center gap-2">
                   <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm overflow-hidden">
-                    {logoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={logoUrl} alt="Logo" className="size-6 object-contain" />
-                    ) : (
-                      <RiCommandLine className="size-6" />
-                    )}
+                    <BrandLogo
+                      logoUrl={logoUrl}
+                      alt="Logo"
+                      customClassName="size-6 object-contain"
+                    />
                   </div>
                   <h3 className="font-heading text-base font-bold text-foreground">
                     Welcome to {appName || "AngkorGate"}

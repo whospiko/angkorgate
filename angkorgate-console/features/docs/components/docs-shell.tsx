@@ -9,7 +9,6 @@ import { DocsContentView } from "./docs-content-view"
 import { DocsToc } from "./docs-toc"
 import { Badge } from "@/components/ui/badge"
 import {
-  RiCommandLine,
   RiArrowLeftLine,
   RiTranslate2,
   RiGithubLine,
@@ -17,13 +16,20 @@ import {
   RiShieldCheckLine,
   RiCompass3Line,
 } from "@remixicon/react"
+import { BrandLogo } from "@/features/system"
 import { cn } from "cn"
 
 interface DocsShellProps {
   initialArticleId?: string
+  appName?: string
+  logoUrl?: string | null
 }
 
-export function DocsShell({ initialArticleId = "overview" }: DocsShellProps) {
+export function DocsShell({
+  initialArticleId = "overview",
+  appName = "AngkorGate",
+  logoUrl,
+}: DocsShellProps) {
   const [activeArticleId, setActiveArticleId] = useState<string>(initialArticleId)
   const [language, setLanguage] = useState<DocsLanguage>("en")
   const [searchQuery, setSearchQuery] = useState<string>("")
@@ -81,11 +87,15 @@ export function DocsShell({ initialArticleId = "overview" }: DocsShellProps) {
         {/* Left: Brand + Back to Console */}
         <div className="flex items-center gap-3">
           <Link href="/dashboard" className="flex items-center gap-2 group">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
-              <RiCommandLine className="size-4" />
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs overflow-hidden">
+              <BrandLogo
+                logoUrl={logoUrl}
+                alt={appName}
+                customClassName="size-5 object-contain"
+              />
             </div>
             <div className="flex items-center gap-1.5 font-heading font-bold text-sm tracking-wide">
-              <span>AngkorGate</span>
+              <span>{appName}</span>
               <span className="text-primary">Docs</span>
             </div>
           </Link>
