@@ -97,6 +97,13 @@ export class OidcController {
         return this.oidcService.callback()(req, res);
     }
 
+    @All('session/end/confirm')
+    @ApiOperation({ summary: 'OpenID Connect End Session Confirmation Endpoint' })
+    @ApiResponse({ status: 302, description: 'Redirect to post_logout_redirect_uri' })
+    async endSessionConfirm(@Req() req: Request, @Res() res: Response) {
+        return this.oidcService.callback()(req, res);
+    }
+
     @Post(['introspect', 'token/introspection'])
     @ApiOperation({ summary: 'OAuth 2.0 Token Introspection Endpoint (RFC 7662)' })
     @ApiResponse({ status: 200, description: 'Active status and metadata of token' })

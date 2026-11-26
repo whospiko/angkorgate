@@ -159,7 +159,30 @@ export class OidcService implements OnModuleInit {
                 introspection: { enabled: true },
                 revocation: { enabled: true },
                 userinfo: { enabled: true },
-                rpInitiatedLogout: { enabled: true },
+                rpInitiatedLogout: {
+                    enabled: true,
+                    logoutSource: (ctx: KoaContextWithOIDC, form: string) => {
+                        ctx.body = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Signing out...</title></head>
+<body style="background:#09090b;color:#f4f4f5;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0">
+  <p style="font-size:14px;color:#a1a1aa">Signing out of AngkorGate...</p>
+  ${form}
+  <script>
+    const f = document.getElementById('op.logoutForm');
+    if (f) {
+      const i = document.createElement('input');
+      i.type = 'hidden';
+      i.name = 'logout';
+      i.value = 'yes';
+      f.appendChild(i);
+      f.submit();
+    }
+  </script>
+</body>
+</html>`;
+                    },
+                },
             },
 
             formats: {
