@@ -1,10 +1,14 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppSetting } from '../../apps/entities/app-setting.entity';
+import { OauthConfigService } from './oauth-config.service';
 
 @Injectable()
 export class OauthRedirectService {
-    constructor(private readonly config: ConfigService) { }
+    constructor(
+        private readonly config: ConfigService,
+        @Optional() private readonly oauthConfig?: OauthConfigService,
+    ) { }
 
     /**
      * Validates `redirect` against the calling app's whitelist.
@@ -23,6 +27,7 @@ export class OauthRedirectService {
         app: AppSetting | null,
     ): string {
         const fallback =
+            this.oauthConfig?.getWebUrl() ??
             this.config.get<string>('CONSOLE_URL') ??
             this.config.get<string>('APP_WEB_URL') ??
             this.config.get<string>('oauth.webUrl') ??
@@ -51,10 +56,13 @@ export class OauthRedirectService {
         }
 
         if (!app) {
-            const consoleUrl =
-                this.config.get<string>('CONSOLE_URL') ||
-                this.config.get<string>('APP_WEB_URL');
-            if (consoleUrl) {
+            const consoleUrls = [
+                this.oauthConfig?.getWebUrl(),
+                this.config.get<string>('CONSOLE_URL'),
+                this.config.get<string>('APP_WEB_URL'),
+            ].filter((u): u is string => Boolean(u));
+
+            for (const consoleUrl of consoleUrls) {
                 try {
                     const consoleParsed = new URL(consoleUrl);
                     if (parsed.origin === consoleParsed.origin) {

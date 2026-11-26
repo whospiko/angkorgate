@@ -8,14 +8,15 @@ import {
     Matches,
     MaxLength,
 } from 'class-validator';
+import { SUPPORTED_PROVIDER_CODES } from '../oauth-providers.constants';
 
-export const SUPPORTED_PROVIDER_CODES = ['google', 'apple'] as const;
+export { SUPPORTED_PROVIDER_CODES };
 
 export class CreateProviderDto {
     @ApiProperty({
         description: 'Unique provider code',
         enum: SUPPORTED_PROVIDER_CODES,
-        example: 'google',
+        example: 'github',
     })
     @IsString()
     @IsIn(SUPPORTED_PROVIDER_CODES, {
@@ -25,7 +26,7 @@ export class CreateProviderDto {
 
     @ApiProperty({
         description: 'Display name of the OAuth provider',
-        example: 'Google OAuth',
+        example: 'GitHub',
         maxLength: 100,
     })
     @IsString()
@@ -41,24 +42,24 @@ export class CreateProviderDto {
     isActive?: boolean;
 
     @ApiProperty({
-        description: 'Client ID provided by the OAuth identity provider',
-        example: '1234567890-abcdefg.apps.googleusercontent.com',
+        description: 'Client ID (or Telegram Bot Username/ID) provided by the identity provider',
+        example: 'Ov23liAbCdEfGhIjKlMn',
     })
     @IsString()
     @Matches(/^[^\s]+$/, { message: 'clientId must not contain whitespace' })
     clientId: string;
 
     @ApiPropertyOptional({
-        description: 'Client secret provided by the OAuth identity provider (optional for Apple)',
-        example: 'GOCSPX-mySecretClientValue123',
+        description: 'Client secret (or Telegram Bot Token) provided by the identity provider',
+        example: 'super-secret-value',
     })
     @IsOptional()
     @IsString()
-    clientSecret?: string; // not required for Apple (JWT-generated)
+    clientSecret?: string;
 
     @ApiPropertyOptional({
         description: 'Space-delimited OAuth scopes to request from the identity provider',
-        example: 'openid email profile',
+        example: 'read:user user:email',
         maxLength: 255,
     })
     @IsOptional()
@@ -67,10 +68,10 @@ export class CreateProviderDto {
     scopes?: string;
 
     @ApiPropertyOptional({
-        description: 'Provider-specific configuration object (e.g. Apple teamId, keyId, privateKey)',
-        example: { teamId: 'ABC123XYZ', keyId: 'KEY123XYZ' },
+        description: 'Provider-specific configuration (e.g. Microsoft tenantId, Telegram botUsername, Apple teamId/keyId/privateKey)',
+        example: { tenantId: 'common' },
     })
     @IsOptional()
     @IsObject()
-    extraConfig?: Record<string, unknown>; // Apple teamId/keyId/privateKey
+    extraConfig?: Record<string, unknown>;
 }

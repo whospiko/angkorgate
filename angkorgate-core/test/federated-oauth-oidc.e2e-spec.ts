@@ -5,7 +5,7 @@ import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { AuditService } from '../src/audit/services/audit.service';
-import { GoogleOauthGuard } from '../src/oauth/guards/google-oauth.guard';
+import { DynamicOauthGuard } from '../src/oauth/guards/dynamic-oauth.guard';
 import { seedAdmin, truncateAll, loginAs } from './e2e-utils';
 import { decodeJwt } from 'jose';
 
@@ -19,7 +19,7 @@ describe('Federated Google OAuth to Downstream OIDC (e2e)', () => {
         const moduleRef = await Test.createTestingModule({
             imports: [AppModule],
         })
-            .overrideGuard(GoogleOauthGuard)
+            .overrideGuard(DynamicOauthGuard)
             .useValue({
                 canActivate: (context: ExecutionContext) => {
                     const req = context.switchToHttp().getRequest();

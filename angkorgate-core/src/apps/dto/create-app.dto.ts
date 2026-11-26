@@ -10,7 +10,9 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export const KNOWN_OAUTH_PROVIDERS = ['google', 'apple'] as const;
+import { SUPPORTED_PROVIDER_CODES } from '../../oauth/oauth-providers.constants';
+
+export const KNOWN_OAUTH_PROVIDERS = SUPPORTED_PROVIDER_CODES;
 
 export class CreateAppDto {
     @ApiProperty({

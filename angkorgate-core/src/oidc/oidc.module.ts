@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OidcController } from './controllers/oidc.controller';
+import { OidcAdminController } from './controllers/oidc-admin.controller';
 import { OidcService } from './services/oidc.service';
 import { OidcAdapterService } from './adapters/oidc.adapter';
 import { OidcSession } from './entities/oidc-session.entity';
@@ -17,7 +18,7 @@ import { AuthModule } from '../auth/auth.module';
         RbacModule,
         AuthModule,
     ],
-    controllers: [OidcController],
+    controllers: [OidcController, OidcAdminController],
     providers: [OidcService, OidcAdapterService],
     exports: [OidcService, OidcAdapterService],
 })

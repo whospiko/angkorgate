@@ -52,20 +52,24 @@ export class OauthLoginService {
         });
 
         if (existing) {
-            await this.accountsRepo.update(existing.id, { lastLoginAt: new Date() });
-            const user = await this.users.findByIdOrFail(existing.userId);
-            if (!user.isActive) throw new ForbiddenException('Account disabled');
+            const user = await this.users.findById(existing.userId);
+            if (user) {
+                await this.accountsRepo.update(existing.id, { lastLoginAt: new Date() });
+                if (!user.isActive) throw new ForbiddenException('Account disabled');
 
-            void this.audit.log({
-                actorId: user.id,
-                action: `auth.oauth.${profile.provider}.login`,
-                entity: 'user',
-                entityId: user.id,
-                ipAddress: ctx.ip ?? null,
-            });
+                void this.audit.log({
+                    actorId: user.id,
+                    action: `auth.oauth.${profile.provider}.login`,
+                    entity: 'user',
+                    entityId: user.id,
+                    ipAddress: ctx.ip ?? null,
+                });
 
-            const tokens = await this.auth.issueTokensForUser(user.id, user.email, user.phone, ctx);
-            return { tokens, userId: user.id };
+                const tokens = await this.auth.issueTokensForUser(user.id, user.email, user.phone, ctx);
+                return { tokens, userId: user.id };
+            }
+            // Linked user was soft-deleted: remove stale oauth_accounts row and re-provision
+            await this.accountsRepo.delete(existing.id);
         }
 
         // 2. Existing user by email?
@@ -149,7 +153,8 @@ export class OauthLoginService {
         profile: OauthProfile,
         ctx: { ip?: string; userAgent?: string },
     ): Promise<{ tokens: unknown; userId: string }> {
-        if (!profile.email) {
+        const allowEmailLess = profile.provider === 'telegram';
+        if (!profile.email && !allowEmailLess) {
             throw new ForbiddenException(
                 `Provider '${profile.provider}' did not return an email. Cannot auto-create account.`,
             );
@@ -160,19 +165,25 @@ export class OauthLoginService {
         const randomPasswordHash = '$2b$12$' + generateSecureToken(40).slice(0, 53);
 
         const user = await this.users.create({
-            email: profile.email,
+            email: profile.email ?? undefined,
             password: randomPasswordHash,
             isEmailVerified: profile.emailVerified,
         });
+
+        const fallbackName =
+            profile.fullName ??
+            (profile.username ? `@${profile.username}` : undefined) ??
+            profile.email?.split('@')[0] ??
+            `${profile.provider}_${profile.providerUserId}`;
 
         // Create customer record
         await this.customers.create(
             {
                 type: 'CUSTOMER',
                 userId: user.id,
-                fullName: profile.fullName ?? profile.email.split('@')[0],
+                fullName: fallbackName,
                 dateOfBirth: '1970-01-01', // placeholder — customer can update later
-                email: profile.email,
+                email: profile.email ?? undefined,
                 avatarUrl: profile.avatarUrl,
             },
             user.id,
@@ -186,7 +197,11 @@ export class OauthLoginService {
             action: `auth.oauth.${profile.provider}.register`,
             entity: 'user',
             entityId: user.id,
-            newValue: { email: profile.email, provider: profile.provider },
+            newValue: {
+                email: profile.email,
+                username: profile.username ?? null,
+                provider: profile.provider,
+            },
             ipAddress: ctx.ip ?? null,
         });
 

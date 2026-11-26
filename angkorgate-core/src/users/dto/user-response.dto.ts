@@ -11,6 +11,9 @@ export class UserResponseDto {
     @ApiPropertyOptional({ description: 'User phone number', example: '+85512345678', nullable: true })
     phone: string | null;
 
+    @ApiPropertyOptional({ description: 'Display name from linked Customer or Employee profile', example: 'Heng Kakada', nullable: true })
+    fullName?: string | null;
+
     @ApiProperty({ description: 'Indicates whether user account is active', example: true })
     isActive: boolean;
 
@@ -34,6 +37,9 @@ export class UserResponseDto {
 
     @ApiPropertyOptional({ description: 'Assigned role codes', example: ['ADMIN'], isArray: true })
     roles?: string[];
+
+    @ApiPropertyOptional({ description: 'Linked social OAuth provider codes', example: ['google', 'telegram'], isArray: true })
+    oauthProviders?: string[];
 
     @ApiProperty({ description: 'Account creation timestamp', example: '2026-11-21T10:00:00.000Z' })
     createdAt: Date;

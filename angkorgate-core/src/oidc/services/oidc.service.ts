@@ -1,6 +1,8 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger, Optional } from '@nestjs/common';
 import { Provider, Configuration, KoaContextWithOIDC, JWK, ClientMetadata, AccountClaims } from 'oidc-provider';
 import { ConfigService } from '@nestjs/config';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -8,21 +10,42 @@ import { importPKCS8, exportJWK } from 'jose';
 import { OidcAdapterService } from '../adapters/oidc.adapter';
 import { UsersService } from '../../users/services/users.service';
 import { RbacService } from '../../rbac/services/rbac.service';
+import { OauthProvider } from '../../oauth/entities/oauth-provider.entity';
+
+const OIDC_SETTINGS_CODE = '_oidc_settings';
 
 @Injectable()
 export class OidcService implements OnModuleInit {
     private readonly logger = new Logger(OidcService.name);
     public oidc: Provider;
+    private savedConfiguration: Configuration | null = null;
+    private consoleUrlOverride: string | null = null;
 
     constructor(
         private readonly config: ConfigService,
         private readonly adapterService: OidcAdapterService,
         private readonly usersService: UsersService,
         private readonly rbacService: RbacService,
+        @Optional() @InjectDataSource() private readonly dataSource?: DataSource,
     ) { }
 
     async onModuleInit() {
-        const issuer = this.config.get<string>('OIDC_ISSUER') || 'http://localhost:8080/oidc';
+        let issuer = this.config.get<string>('OIDC_ISSUER') || 'http://localhost:8080/oidc';
+
+        try {
+            const repo = this.dataSource?.getRepository(OauthProvider);
+            const row = await repo?.findOne({ where: { code: OIDC_SETTINGS_CODE } });
+            if (row?.extraConfig) {
+                if (typeof row.extraConfig.issuer === 'string' && row.extraConfig.issuer.trim()) {
+                    issuer = row.extraConfig.issuer.trim().replace(/\/+$/, '');
+                }
+                if (typeof row.extraConfig.consoleUrl === 'string' && row.extraConfig.consoleUrl.trim()) {
+                    this.consoleUrlOverride = row.extraConfig.consoleUrl.trim().replace(/\/+$/, '');
+                }
+            }
+        } catch {
+            // Ignore when running unit tests without DataSource
+        }
         const cookieSecret = this.config.get<string>('JWT_ACCESS_SECRET') || 'angkorgate-cookie-secret-min-32-chars';
 
         const jwkKeys = await this.resolveJwks();
@@ -193,10 +216,80 @@ export class OidcService implements OnModuleInit {
             },
         };
 
+        this.savedConfiguration = configuration;
         this.oidc = new Provider(issuer, configuration);
         this.oidc.proxy = true;
 
         this.logger.log(`OIDC Provider initialized at ${issuer}`);
+    }
+
+    getConsoleUrl(): string {
+        if (this.consoleUrlOverride) {
+            return this.consoleUrlOverride;
+        }
+        return (
+            this.config.get<string>('CONSOLE_URL') ||
+            this.config.get<string>('APP_WEB_URL') ||
+            'http://localhost:4000'
+        ).replace(/\/+$/, '');
+    }
+
+    getSettings(): { issuer: string; consoleUrl: string } {
+        return {
+            issuer: this.oidc?.issuer ?? (this.config.get<string>('OIDC_ISSUER') || 'http://localhost:8080/oidc'),
+            consoleUrl: this.getConsoleUrl(),
+        };
+    }
+
+    async updateSettings(patch: {
+        issuer?: string;
+        consoleUrl?: string;
+    }): Promise<{ issuer: string; consoleUrl: string }> {
+        const nextIssuer = patch.issuer
+            ? patch.issuer.trim().replace(/\/+$/, '')
+            : this.oidc.issuer;
+        const nextConsoleUrl = patch.consoleUrl
+            ? patch.consoleUrl.trim().replace(/\/+$/, '')
+            : this.getConsoleUrl();
+
+        try {
+            const repo = this.dataSource?.getRepository(OauthProvider);
+            if (repo) {
+                const existing = await repo.findOne({ where: { code: OIDC_SETTINGS_CODE } });
+                const record = existing
+                    ? Object.assign(existing, {
+                          extraConfig: {
+                              ...(existing.extraConfig ?? {}),
+                              issuer: nextIssuer,
+                              consoleUrl: nextConsoleUrl,
+                          },
+                      })
+                    : repo.create({
+                          code: OIDC_SETTINGS_CODE,
+                          name: 'OIDC Settings',
+                          isActive: false,
+                          clientId: null,
+                          clientSecret: null,
+                          scopes: null,
+                          extraConfig: {
+                              issuer: nextIssuer,
+                              consoleUrl: nextConsoleUrl,
+                          },
+                      });
+                await repo.save(record);
+            }
+        } catch (err) {
+            this.logger.warn(`Failed to persist OIDC settings to DB: ${(err as Error).message}`);
+        }
+
+        this.consoleUrlOverride = nextConsoleUrl;
+        if (patch.issuer && this.savedConfiguration && nextIssuer !== this.oidc.issuer) {
+            this.oidc = new Provider(nextIssuer, this.savedConfiguration);
+            this.oidc.proxy = true;
+            this.logger.log(`OIDC Provider dynamically reinitialized at ${nextIssuer}`);
+        }
+
+        return this.getSettings();
     }
 
     public callback() {

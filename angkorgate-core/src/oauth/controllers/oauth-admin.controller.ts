@@ -5,6 +5,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Optional,
     Param,
     Patch,
     Post,
@@ -20,16 +21,67 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { Permissions } from '../../rbac/decorators/permissions.decorator';
+import { OauthConfigService } from '../services/oauth-config.service';
 import { OauthProvidersService } from '../services/oauth-providers.service';
+import { OauthAccountsService } from '../services/oauth-accounts.service';
+import { OauthStrategyRegistry } from '../services/oauth-strategy.registry';
 import { CreateProviderDto } from '../dto/create-provider.dto';
 import { UpdateProviderDto } from '../dto/update-provider.dto';
+import { UpdateOauthSettingsDto } from '../dto/update-oauth-settings.dto';
 
 @ApiTags('OAuth Providers - Admin')
 @ApiBearerAuth('bearerAuth')
 @UseGuards(AuthGuard('jwt'), PermissionsGuard)
 @Controller('admin/oauth/providers')
 export class OauthAdminController {
-    constructor(private readonly providers: OauthProvidersService) { }
+    constructor(
+        private readonly providers: OauthProvidersService,
+        @Optional() private readonly config?: OauthConfigService,
+        @Optional() private readonly registry?: OauthStrategyRegistry,
+        @Optional() private readonly accounts?: OauthAccountsService,
+    ) { }
+
+    @Get('users/:userId/accounts')
+    @Permissions('oauth:read')
+    @ApiOperation({ summary: 'List social identity accounts linked to a user' })
+    @ApiResponse({ status: 200, description: 'Linked social accounts for the user' })
+    listUserAccounts(@Param('userId') userId: string) {
+        return this.accounts?.listByUser(userId) ?? [];
+    }
+
+    @Delete('users/:userId/accounts/:provider')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    @Permissions('oauth:write')
+    @ApiOperation({ summary: 'Force-unlink a social identity provider from a user' })
+    @ApiResponse({ status: 204, description: 'Social account unlinked' })
+    async unlinkUserAccount(
+        @Param('userId') userId: string,
+        @Param('provider') provider: string,
+    ) {
+        await this.accounts?.unlink(userId, provider.toLowerCase());
+    }
+
+    @Get('settings')
+    @Permissions('oauth:read')
+    @ApiOperation({ summary: 'Get global OAuth federation settings (DB-managed)' })
+    @ApiResponse({ status: 200, description: 'Global OAuth settings' })
+    async getSettings() {
+        return this.config?.getGlobalSettings() ?? {
+            oauthEnabled: true,
+            callbackBaseUrl: null,
+            webUrl: 'http://localhost:4000',
+        };
+    }
+
+    @Patch('settings')
+    @Permissions('oauth:write')
+    @ApiOperation({ summary: 'Update global OAuth federation settings without editing .env or restarting' })
+    @ApiResponse({ status: 200, description: 'Global OAuth settings updated' })
+    async updateSettings(@Body() dto: UpdateOauthSettingsDto) {
+        const updated = await this.config?.updateGlobalSettings(dto);
+        this.registry?.invalidateAll();
+        return updated;
+    }
 
     @Get()
     @Permissions('oauth:read')
@@ -44,7 +96,7 @@ export class OauthAdminController {
     @Get(':code')
     @Permissions('oauth:read')
     @ApiOperation({ summary: 'Get details of a single OAuth identity provider' })
-    @ApiParam({ name: 'code', description: 'Provider code (e.g. google, apple)' })
+    @ApiParam({ name: 'code', description: 'Provider code (e.g. google, github, discord, microsoft, telegram)' })
     @ApiResponse({ status: 200, description: 'OAuth provider details' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -67,7 +119,7 @@ export class OauthAdminController {
     @Patch(':code')
     @Permissions('oauth:write')
     @ApiOperation({ summary: 'Update an existing OAuth provider configuration' })
-    @ApiParam({ name: 'code', description: 'Provider code (e.g. google, apple)' })
+    @ApiParam({ name: 'code', description: 'Provider code (e.g. google, github, discord, microsoft, telegram)' })
     @ApiResponse({ status: 200, description: 'Provider updated successfully' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -80,7 +132,7 @@ export class OauthAdminController {
     @HttpCode(HttpStatus.NO_CONTENT)
     @Permissions('oauth:write')
     @ApiOperation({ summary: 'Toggle an OAuth provider active state' })
-    @ApiParam({ name: 'code', description: 'Provider code (e.g. google, apple)' })
+    @ApiParam({ name: 'code', description: 'Provider code (e.g. google, github, discord, microsoft, telegram)' })
     @ApiResponse({ status: 204, description: 'Provider active state toggled' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -93,7 +145,7 @@ export class OauthAdminController {
     @HttpCode(HttpStatus.NO_CONTENT)
     @Permissions('oauth:write')
     @ApiOperation({ summary: 'Remove an OAuth provider configuration' })
-    @ApiParam({ name: 'code', description: 'Provider code (e.g. google, apple)' })
+    @ApiParam({ name: 'code', description: 'Provider code (e.g. google, github, discord, microsoft, telegram)' })
     @ApiResponse({ status: 204, description: 'Provider removed successfully' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden' })

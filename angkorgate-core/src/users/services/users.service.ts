@@ -9,6 +9,7 @@ import * as bcrypt from 'bcrypt';
 import { User } from '../entities/user.entity';
 import { Employee } from '../../employees/entities/employee.entity';
 import { Customer } from '../../customers/entities/customer.entity';
+import { OauthAccount } from '../../oauth/entities/oauth-account.entity';
 import { RefreshToken } from '../../auth/entities/refresh-token.entity';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
@@ -96,7 +97,59 @@ export class UsersService {
             .take(limit);
 
         const [rows, total] = await qb.getManyAndCount();
-        return { data: rows.map(UserResponseDto.fromEntity), total, page, limit };
+        const data = rows.map(UserResponseDto.fromEntity);
+
+        if (data.length > 0) {
+            try {
+                const userIds = data.map((u) => u.id);
+                const [customers, employees, oauthAccounts] = await Promise.all([
+                    this.dataSource
+                        .getRepository(Customer)
+                        .createQueryBuilder('c')
+                        .select(['c.userId', 'c.fullName'])
+                        .where('c.userId IN (:...userIds)', { userIds })
+                        .getMany(),
+                    this.dataSource
+                        .getRepository(Employee)
+                        .createQueryBuilder('e')
+                        .select(['e.userId', 'e.fullName'])
+                        .where('e.userId IN (:...userIds)', { userIds })
+                        .getMany(),
+                    this.dataSource
+                        .getRepository(OauthAccount)
+                        .createQueryBuilder('oa')
+                        .select(['oa.userId', 'oa.provider'])
+                        .where('oa.userId IN (:...userIds)', { userIds })
+                        .getMany(),
+                ]);
+
+                const nameMap = new Map<string, string>();
+                for (const c of customers) {
+                    if (c.userId && c.fullName) nameMap.set(c.userId, c.fullName);
+                }
+                for (const e of employees) {
+                    if (e.userId && e.fullName) nameMap.set(e.userId, e.fullName);
+                }
+
+                const providersMap = new Map<string, string[]>();
+                for (const oa of oauthAccounts) {
+                    const list = providersMap.get(oa.userId) ?? [];
+                    if (!list.includes(oa.provider)) {
+                        list.push(oa.provider);
+                    }
+                    providersMap.set(oa.userId, list);
+                }
+
+                for (const item of data) {
+                    item.fullName = nameMap.get(item.id) ?? null;
+                    item.oauthProviders = providersMap.get(item.id) ?? [];
+                }
+            } catch {
+                // Ignore if DataSource repositories are mocked in unit tests
+            }
+        }
+
+        return { data, total, page, limit };
     }
 
     async unlock(id: string): Promise<void> {

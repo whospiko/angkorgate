@@ -19,13 +19,30 @@ export default () => ({
         defaultTtl: parseInt(process.env.REDIS_DEFAULT_TTL ?? '300', 10),
     },
     oauth: {
-        enabled: process.env.OAUTH_ENABLED === 'true',
-        callbackBaseUrl: process.env.OAUTH_CALLBACK_BASE_URL ?? 'http://localhost:8080',
-        webUrl: process.env.APP_WEB_URL ?? 'http://localhost:5173',
+        enabled: process.env.OAUTH_ENABLED !== 'false',
+        callbackBaseUrl: process.env.OAUTH_CALLBACK_BASE_URL,
+        webUrl: process.env.APP_WEB_URL ?? process.env.CONSOLE_URL ?? 'http://localhost:4000',
         google: {
             clientId: process.env.GOOGLE_CLIENT_ID,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET,
             callbackUrl: process.env.GOOGLE_CALLBACK_URL,
+        },
+        github: {
+            clientId: process.env.GITHUB_CLIENT_ID,
+            clientSecret: process.env.GITHUB_CLIENT_SECRET,
+        },
+        discord: {
+            clientId: process.env.DISCORD_CLIENT_ID,
+            clientSecret: process.env.DISCORD_CLIENT_SECRET,
+        },
+        microsoft: {
+            clientId: process.env.MICROSOFT_CLIENT_ID,
+            clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
+            tenantId: process.env.MICROSOFT_TENANT_ID ?? 'common',
+        },
+        telegram: {
+            botUsername: process.env.TELEGRAM_BOT_USERNAME,
+            botToken: process.env.TELEGRAM_BOT_TOKEN,
         },
         apple: {
             clientId: process.env.APPLE_CLIENT_ID,

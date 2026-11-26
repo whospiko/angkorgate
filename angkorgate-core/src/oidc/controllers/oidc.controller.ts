@@ -166,9 +166,11 @@ export class OidcController {
 
         // Login prompt
         if (promptName === 'login') {
-            const consoleUrl = this.config.get<string>('CONSOLE_URL')
-                || this.config.get<string>('APP_WEB_URL')
-                || 'http://localhost:5173';
+            const consoleUrl =
+                this.oidcService.getConsoleUrl?.() ||
+                this.config.get<string>('CONSOLE_URL') ||
+                this.config.get<string>('APP_WEB_URL') ||
+                'http://localhost:4000';
 
             // Support JSON clients requesting interaction details
             if (req.accepts('json') && !req.accepts('html')) {

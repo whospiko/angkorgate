@@ -1,8 +1,9 @@
 export interface OauthProfile {
-    provider: string; // 'google'
-    providerUserId: string; // Google 'sub'
+    provider: string; // 'google' | 'github' | 'discord' | 'microsoft' | 'telegram' | 'apple'
+    providerUserId: string;
     email: string | null;
     emailVerified: boolean;
+    username?: string;
     firstName?: string;
     lastName?: string;
     fullName?: string;
