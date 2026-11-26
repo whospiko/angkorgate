@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   AngkorGateProvider as ReactAngkorGateProvider,
@@ -12,16 +13,18 @@ export function AngkorGateProvider({
 }: AngkorGateProviderProps) {
   const router = useRouter();
 
+  const defaultNavigate = useCallback(
+    (path: string) => {
+      router.replace(path);
+      router.refresh();
+    },
+    [router]
+  );
+
   return (
     <ReactAngkorGateProvider
       persistCookie={persistCookie}
-      onNavigate={
-        onNavigate ??
-        ((path) => {
-          router.replace(path);
-          router.refresh();
-        })
-      }
+      onNavigate={onNavigate ?? defaultNavigate}
       {...rest}
     >
       {children}
