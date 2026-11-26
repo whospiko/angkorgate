@@ -13,6 +13,7 @@ import {
   createTokenStore,
   exchangeAuthorizationCode,
   fetchOidcUser,
+  isJwtUnexpired,
   refreshAccessToken,
 } from "./oidc-client";
 import type {
@@ -157,7 +158,13 @@ export function AngkorGateProvider({
 
       const existingAccess = store.getAccessToken();
       if (!existingAccess) {
-        if (active) setIsLoaded(true);
+        try {
+          if (store.getRefreshToken()) {
+            await refreshSession();
+          }
+        } finally {
+          if (active) setIsLoaded(true);
+        }
         return;
       }
 
@@ -230,7 +237,11 @@ export function AngkorGateProvider({
 
   const getToken = useCallback(async (): Promise<string | null> => {
     const current = accessToken || store.getAccessToken();
-    if (current) return current;
+    if (current) {
+      if (current.split(".").length !== 3 || isJwtUnexpired(current)) {
+        return current;
+      }
+    }
     const refreshed = await refreshSession();
     return refreshed?.access_token ?? null;
   }, [accessToken, refreshSession, store]);
