@@ -68,4 +68,23 @@ export interface AngkorGateClientConfig {
   clientId?: string;
   clientSecret?: string;
   fetchImpl?: typeof fetch;
+  /**
+   * In-memory TTL (ms) for verified token results, keyed by SHA-256 hash of the token.
+   * Defaults to 30_000 (30 seconds). Set to 0 to disable caching.
+   */
+  tokenCacheTtlMs?: number;
+  /**
+   * Maximum number of cached token entries before oldest entry is evicted.
+   * Defaults to 1000.
+   */
+  tokenCacheMaxEntries?: number;
+  /**
+   * When true, 3-part JWT access tokens are verified locally against GET /oidc/jwks
+   * using Web Crypto before falling back to /oidc/me (opaque tokens still use /oidc/me).
+   */
+  useJwks?: boolean;
+  /**
+   * In-memory TTL (ms) for cached JWKS keys. Defaults to 300_000 (5 minutes).
+   */
+  jwksCacheTtlMs?: number;
 }

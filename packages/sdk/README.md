@@ -31,6 +31,10 @@ const angkorgate = new AngkorGateClient({
   baseUrl: "http://localhost:8080",
   clientId: "my-service",       // optional (required for M2M / introspect)
   clientSecret: "my-secret",    // optional (required for M2M / introspect)
+  tokenCacheTtlMs: 30_000,      // optional SHA-256 TTL cache (default 30s; 0 disables)
+  tokenCacheMaxEntries: 1000,   // optional max cached tokens (default 1000)
+  useJwks: true,                // optional local RS256/RS384/RS512 JWT verification via /oidc/jwks
+  jwksCacheTtlMs: 300_000,      // optional JWKS cache TTL (default 5m)
   fetchImpl: fetch,             // optional custom fetch implementation
 });
 ```
@@ -39,7 +43,8 @@ const angkorgate = new AngkorGateClient({
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `verifyToken(token)` | `GET /oidc/me` → fallback `GET /auth/me` | Validates a Bearer access token (opaque OIDC token or Core JWT) and returns a normalized `AngkorGateUser \| null`. |
+| `verifyToken(token)` | `GET /oidc/me` → fallback `GET /auth/me` (or local `/oidc/jwks`) | Validates a Bearer token using the SHA-256 TTL cache, optional local JWKS verification (`useJwks: true`), and `/oidc/me` → `/auth/me` fallback. |
+| `clearTokenCache()` / `clearJwksCache()` | — | Clears in-memory token verification or JWKS caches. |
 | `getDiscovery()` | `GET /oidc/.well-known/openid-configuration` | Fetches the OIDC Discovery configuration document (`OidcDiscoveryDocument`). |
 | `getClientCredentialsToken(options?)` | `POST /oidc/token` | Performs M2M `grant_type=client_credentials` exchange using HTTP Basic auth. Accepts `{ clientId?, clientSecret?, scope? }`. |
 | `introspectToken(token, options?)` | `POST /oidc/introspect` | RFC 7662 token introspection. Returns `IntrospectionResult` (`{ active, sub, client_id, scope, exp, iat, ... }`). |
