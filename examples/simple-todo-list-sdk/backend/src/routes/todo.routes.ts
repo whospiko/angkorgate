@@ -1,18 +1,17 @@
-import { hasRole } from "@angkorgate/sdk";
-import { Router, type Response } from "express";
+import { hasRole } from "@angkorgate/express";
+import { Router, type Request, type Response } from "express";
 import { AppDataSource } from "../data-source";
 import { Todo } from "../entities/todo.entity";
 import {
   requireAuth,
   requireRoleOrPermission,
-  type AuthenticatedRequest,
 } from "../middleware/angkorgate-auth";
 
 export const todoRouter = Router();
 
 todoRouter.use(requireAuth);
 
-todoRouter.get("/", async (req: AuthenticatedRequest, res: Response) => {
+todoRouter.get("/", async (req: Request, res: Response) => {
   const repo = AppDataSource.getRepository(Todo);
   const todos = await repo.find({
     where: { userId: req.authUser!.id },
@@ -27,14 +26,14 @@ todoRouter.get(
     roles: ["ADMIN"],
     permissions: ["todos:read:all"],
   }),
-  async (_req: AuthenticatedRequest, res: Response) => {
+  async (_req: Request, res: Response) => {
     const repo = AppDataSource.getRepository(Todo);
     const todos = await repo.find({ order: { createdAt: "DESC" } });
     res.json({ data: todos });
   }
 );
 
-todoRouter.post("/", async (req: AuthenticatedRequest, res: Response) => {
+todoRouter.post("/", async (req: Request, res: Response) => {
   const title = typeof req.body?.title === "string" ? req.body.title.trim() : "";
   if (!title) {
     res.status(400).json({ error: "title is required" });
@@ -53,7 +52,7 @@ todoRouter.post("/", async (req: AuthenticatedRequest, res: Response) => {
   res.status(201).json({ data: saved });
 });
 
-todoRouter.patch("/:id", async (req: AuthenticatedRequest, res: Response) => {
+todoRouter.patch("/:id", async (req: Request, res: Response) => {
   const id = String(req.params.id);
   const repo = AppDataSource.getRepository(Todo);
   const todo = await repo.findOne({ where: { id } });
@@ -85,7 +84,7 @@ todoRouter.patch("/:id", async (req: AuthenticatedRequest, res: Response) => {
   res.json({ data: updated });
 });
 
-todoRouter.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
+todoRouter.delete("/:id", async (req: Request, res: Response) => {
   const id = String(req.params.id);
   const repo = AppDataSource.getRepository(Todo);
   const todo = await repo.findOne({ where: { id } });

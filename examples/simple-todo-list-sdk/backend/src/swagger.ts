@@ -1,10 +1,10 @@
 export const openApiSpec = {
   openapi: "3.0.3",
   info: {
-    title: "Express Todo API (@angkorgate/sdk)",
+    title: "Express Todo API (@angkorgate/express)",
     version: "0.1.0",
     description:
-      "Simple Todo API built with Express, TypeORM, better-sqlite3, and @angkorgate/sdk.",
+      "Simple Todo API built with Express, TypeORM, better-sqlite3, and @angkorgate/express.",
   },
   servers: [{ url: "/" }],
   components: {

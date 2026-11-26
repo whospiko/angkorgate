@@ -1,8 +1,8 @@
-# Simple Todo List SDK (`@angkorgate/sdk` + `@angkorgate/react`)
+# Simple Todo List SDK (`@angkorgate/express` + `@angkorgate/react`)
 
 Full-stack Todo List example powered by AngkorGate's drop-in SDK packages:
 
-- [backend/](backend/) — Express + TypeORM + `better-sqlite3` + Swagger UI (`/docs`) using **`@angkorgate/sdk`** (`AngkorGateClient`, `hasRole`, `hasAnyRole`, `hasAnyPermission`) on `http://localhost:4001`.
+- [backend/](backend/) — Express + TypeORM + `better-sqlite3` + Swagger UI (`/docs`) using **`@angkorgate/express`** (`angkorgateAuth`, `requireRoleOrPermission`, `hasRole`) on `http://localhost:4001`.
 - [frontend/](frontend/) — React + Vite + TypeScript using **`@angkorgate/react`** (`<AngkorGateProvider>`, `<SignedIn>`, `<SignedOut>`, `<SignInButton>`, `<UserProfile>`, `<Protect>`) on `http://localhost:3001`.
 
 ## Quick Start

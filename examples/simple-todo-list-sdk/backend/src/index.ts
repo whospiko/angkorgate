@@ -4,10 +4,7 @@ import cors from "cors";
 import express from "express";
 import swaggerUi from "swagger-ui-express";
 import { AppDataSource } from "./data-source";
-import {
-  requireAuth,
-  type AuthenticatedRequest,
-} from "./middleware/angkorgate-auth";
+import { requireAuth } from "./middleware/angkorgate-auth";
 import { todoRouter } from "./routes/todo.routes";
 import { openApiSpec } from "./swagger";
 
@@ -27,7 +24,7 @@ async function bootstrap() {
   app.use(express.json());
 
   app.get("/health", (_req, res) => {
-    res.json({ status: "ok", database: "better-sqlite3", sdk: "@angkorgate/sdk" });
+    res.json({ status: "ok", database: "better-sqlite3", sdk: "@angkorgate/express" });
   });
 
   app.get("/openapi.json", (_req, res) => {
@@ -42,14 +39,14 @@ async function bootstrap() {
     })
   );
 
-  app.get("/me", requireAuth, (req: AuthenticatedRequest, res) => {
+  app.get("/me", requireAuth, (req, res) => {
     res.json({ data: req.authUser });
   });
 
   app.use("/todos", todoRouter);
 
   app.listen(port, () => {
-    console.log(`Express Todo API (@angkorgate/sdk) listening on http://localhost:${port}`);
+    console.log(`Express Todo API (@angkorgate/express) listening on http://localhost:${port}`);
     console.log(`Swagger UI available at http://localhost:${port}/docs`);
   });
 }

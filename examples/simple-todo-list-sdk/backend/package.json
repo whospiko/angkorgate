@@ -9,7 +9,7 @@
     "typecheck": "./node_modules/.bin/tsc --noEmit"
   },
   "dependencies": {
-    "@angkorgate/sdk": "file:../../../packages/sdk",
+    "@angkorgate/express": "file:../../../packages/express",
     "better-sqlite3": "^11.10.0",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
