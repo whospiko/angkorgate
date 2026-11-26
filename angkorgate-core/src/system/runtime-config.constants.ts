@@ -3,7 +3,8 @@ export type RuntimeSettingCategory =
     | 'sms'
     | 'passwordless'
     | 'webauthn'
-    | 'auth';
+    | 'auth'
+    | 'system';
 
 export type RuntimeSettingInputType =
     | 'text'
@@ -269,6 +270,16 @@ export const RUNTIME_SETTING_DEFINITIONS: RuntimeSettingDefinition[] = [
         description: 'Lifetime of refresh tokens in seconds (default 604800 = 7d).',
         inputType: 'number',
         defaultValue: '604800',
+    },
+
+    // ── System & Operations ─────────────────────────────────────
+    {
+        key: 'MAINTENANCE_MODE',
+        category: 'system',
+        label: 'Maintenance Mode',
+        description: 'Temporarily pause public registration and OAuth/OIDC flows with HTTP 503 while keeping admin Console access active.',
+        inputType: 'boolean',
+        defaultValue: 'false',
     },
 ];
 

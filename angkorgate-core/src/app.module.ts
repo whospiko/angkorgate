@@ -30,6 +30,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
+import { MaintenanceMiddleware } from './system/middleware/maintenance.middleware';
 
 @Module({
   imports: [
@@ -97,6 +98,7 @@ export class AppModule implements NestModule, OnApplicationBootstrap {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(RequestIdMiddleware).forRoutes('*');
     consumer.apply(AppContextMiddleware).forRoutes('*');
+    consumer.apply(MaintenanceMiddleware).forRoutes('*');
   }
 
   async onApplicationBootstrap() {

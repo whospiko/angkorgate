@@ -5,6 +5,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Optional,
     Patch,
     Post,
     Query,
@@ -29,6 +30,7 @@ import {
     DevOutboxService,
 } from '../../notifications/services/dev-outbox.service';
 import { AuditService } from '../../audit/services/audit.service';
+import { CacheService } from '../../cache/cache.service';
 import {
     TestMailConfigDto,
     TestSmsConfigDto,
@@ -53,6 +55,8 @@ export class SystemController {
         private readonly smsService: SmsService,
         private readonly devOutbox: DevOutboxService,
         private readonly auditService: AuditService,
+        @Optional()
+        private readonly cacheService?: CacheService,
     ) { }
 
     @Get('setup-status')
@@ -199,5 +203,41 @@ export class SystemController {
     async clearDevOutbox(): Promise<{ cleared: true }> {
         this.devOutbox.clear();
         return { cleared: true };
+    }
+
+    @Get('maintenance')
+    @ApiOperation({ summary: 'Retrieve current maintenance mode status' })
+    async getMaintenanceMode(): Promise<{ maintenanceMode: boolean }> {
+        return {
+            maintenanceMode: this.runtimeConfig.getBoolean('MAINTENANCE_MODE', false),
+        };
+    }
+
+    @Post('cache/purge')
+    @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+    @Permissions('app:write')
+    @HttpCode(HttpStatus.OK)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Purge all Redis and in-memory cache entries' })
+    @ApiResponse({ status: 200, description: 'Cache purged successfully' })
+    async purgeCache(
+        @CurrentUser() user: JwtPayload,
+        @Req() req: Request,
+    ): Promise<{ purged: true; provider: string }> {
+        await this.cacheService?.reset();
+        const status = this.cacheService?.getStatus();
+        const ip = (req.headers['x-forwarded-for'] as string) || req.socket?.remoteAddress;
+        void this.auditService.log({
+            actorId: user.sub,
+            action: 'system.cache.purged',
+            entity: 'cache',
+            entityId: status?.provider ?? 'memory',
+            newValue: { provider: status?.provider ?? 'memory' },
+            ipAddress: ip ?? null,
+        });
+        return {
+            purged: true,
+            provider: status?.provider ?? 'memory',
+        };
     }
 }

@@ -81,7 +81,10 @@ export class UsersService {
 
         if (query?.search) {
             const term = `%${query.search.toLowerCase()}%`;
-            qb.andWhere('(LOWER(u.email) LIKE :term OR u.phone LIKE :term)', { term });
+            qb.andWhere(
+                '(LOWER(u.email) LIKE :term OR u.phone LIKE :term OR LOWER(CAST(u.id AS text)) LIKE :term)',
+                { term },
+            );
         }
 
         if (query?.isActive !== undefined) {
