@@ -154,3 +154,30 @@ export async function toggleOAuthProviderAction(
     return { success: false, message }
   }
 }
+
+export async function revealOAuthProviderSecretAction(code: string): Promise<{
+  success: boolean
+  clientSecret?: string | null
+  privateKey?: string | null
+  stepUpRequired?: boolean
+  message?: string
+}> {
+  try {
+    const res = await apiClient.get<{
+      clientSecret: string | null
+      privateKey: string | null
+    }>(`/admin/oauth/providers/${encodeURIComponent(code)}/reveal-secret`)
+    return {
+      success: true,
+      clientSecret: res.clientSecret,
+      privateKey: res.privateKey,
+    }
+  } catch (error: unknown) {
+    if (error instanceof ApiError && error.statusCode === 403) {
+      return { success: false, stepUpRequired: true, message: error.message }
+    }
+    const message =
+      error instanceof Error ? error.message : "Failed to reveal OAuth provider secret"
+    return { success: false, message }
+  }
+}

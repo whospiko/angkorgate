@@ -23,6 +23,7 @@ import {
 } from "../types/oauth-providers.types"
 import { createOAuthProviderAction } from "../server/oauth-providers-actions"
 import { OAuthProviderIcon } from "./provider-icon"
+import { SecretInputField } from "@/components/secret-field"
 
 const SELECTABLE_PROVIDERS: OAuthProviderCode[] = [
   "google",
@@ -228,12 +229,11 @@ export function CreateOAuthProviderDialog({
 
             <div className="grid gap-2">
               <Label htmlFor="provider-secret">{preset.clientSecretLabel}</Label>
-              <Input
+              <SecretInputField
                 id="provider-secret"
-                type="password"
                 placeholder={preset.clientSecretPlaceholder}
                 value={clientSecret}
-                onChange={(e) => setClientSecret(e.target.value)}
+                onChange={setClientSecret}
                 required={preset.requiresSecret}
               />
             </div>

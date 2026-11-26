@@ -35,6 +35,7 @@ import type { AppSetting } from "../types/apps.types"
 import type { Scope } from "@/features/scopes"
 import { deleteAppAction, regenerateSecretAction, toggleAppFeatureAction } from "../server/apps-actions"
 import { ClientDetailSheet } from "./client-detail-sheet"
+import { SecretDisplayField } from "@/components/secret-field"
 
 interface AppsTableProps {
   apps: AppSetting[]
@@ -137,8 +138,13 @@ export function AppsTable({ apps, availableScopes = [] }: AppsTableProps) {
                   <TableCell className="font-sans font-medium text-sm">
                     {app.name}
                     {revealedSecret[app.appCode] && (
-                      <div className="font-mono text-[11px] text-primary mt-1 p-1 rounded bg-primary/10 border border-primary/20 truncate max-w-[200px]">
-                        Secret: {revealedSecret[app.appCode]}
+                      <div className="mt-1.5 max-w-[260px]" onClick={(e) => e.stopPropagation()}>
+                        <SecretDisplayField
+                          value={revealedSecret[app.appCode]}
+                          maskedDots={20}
+                          requireStepUp={true}
+                          copyable={true}
+                        />
                       </div>
                     )}
                   </TableCell>

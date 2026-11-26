@@ -18,6 +18,8 @@ export interface OAuthProvider {
   isActive: boolean
   clientId: string
   clientSecret?: string | null
+  hasClientSecret?: boolean
+  hasPrivateKey?: boolean
   scopes?: string | null
   extraConfig?: Record<string, unknown> | null
   createdAt?: string

@@ -43,7 +43,9 @@ import {
   updateAppAction,
   regenerateSecretAction,
   updateAppScopesAction,
+  revealAppSecretAction,
 } from "../server/apps-actions"
+import { SecretDisplayField } from "@/components/secret-field"
 
 interface ClientDetailSheetProps {
   app: AppSetting | null
@@ -87,8 +89,7 @@ export function ClientDetailSheet({
   const [currentSecret, setCurrentSecret] = useState(app.clientSecret || "")
   const [secondarySecret, setSecondarySecret] = useState(app.secondaryClientSecret || "")
   const [secondaryExpires, setSecondaryExpires] = useState(app.secondarySecretExpiresAt || null)
-  const [showSecret, setShowSecret] = useState(false)
-  const [secretCopied, setSecretCopied] = useState(false)
+  const [revealedSnippetSecret, setRevealedSnippetSecret] = useState<string | null>(null)
   const [graceHours, setGraceHours] = useState(24)
   const [regenerating, setRegenerating] = useState(false)
 
@@ -130,7 +131,7 @@ export function ClientDetailSheet({
     setSecondarySecret(app.secondaryClientSecret || "")
     setSecondaryExpires(app.secondarySecretExpiresAt || null)
     setAssignedScopeIds(app.allowedScopes?.map((s) => s.id) || [])
-    setShowSecret(false)
+    setRevealedSnippetSecret(null)
     setSimResult(null)
   }, [app])
 
@@ -180,7 +181,7 @@ export function ClientDetailSheet({
       setCurrentSecret(res.clientSecret)
       setSecondarySecret(res.secondaryClientSecret || "")
       setSecondaryExpires(res.secondarySecretExpiresAt || null)
-      setShowSecret(true)
+      setRevealedSnippetSecret(null)
     }
   }
 
@@ -239,7 +240,7 @@ export function ClientDetailSheet({
 
   const getSnippets = () => {
     const issuer = typeof window !== "undefined" ? window.location.origin : "http://localhost:8080"
-    const secretStr = currentSecret || "YOUR_CLIENT_SECRET"
+    const secretStr = revealedSnippetSecret || "YOUR_CLIENT_SECRET"
 
     switch (sdkType) {
       case "nextauth":
@@ -669,35 +670,34 @@ curl -X POST "${issuer}/oidc/token" \\
                     </p>
                   </div>
                 ) : (
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                    <div className="flex-1 bg-black/40 border border-border/60 rounded-md px-3.5 py-2 font-mono text-xs text-primary truncate select-all">
-                      {showSecret ? currentSecret : "•".repeat(32)}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="size-9 shrink-0"
-                        title={showSecret ? "Hide secret" : "Reveal secret"}
-                        onClick={() => setShowSecret(!showSecret)}
-                      >
-                        {showSecret ? <RiEyeOffLine className="size-4" /> : <RiEyeLine className="size-4" />}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 font-mono text-xs shrink-0"
-                        onClick={() => {
-                          navigator.clipboard.writeText(currentSecret)
-                          setSecretCopied(true)
-                          setTimeout(() => setSecretCopied(false), 2000)
-                        }}
-                      >
-                        {secretCopied ? <RiCheckLine className="size-3.5 text-emerald-500" /> : <RiFileCopyLine className="size-3.5" />}
-                        {secretCopied ? "Copied" : "Copy Secret"}
-                      </Button>
-                    </div>
-                  </div>
+                  <SecretDisplayField
+                    key={`${app.appCode}:${currentSecret === "••••••••" ? "masked" : currentSecret}`}
+                    value={currentSecret === "••••••••" ? undefined : currentSecret}
+                    requireStepUp={true}
+                    onReveal={
+                      currentSecret && currentSecret !== "••••••••"
+                        ? undefined
+                        : async () => {
+                            const res = await revealAppSecretAction(app.appCode)
+                            if (res.success) {
+                              if (res.clientSecret) setCurrentSecret(res.clientSecret)
+                              if (res.secondaryClientSecret !== undefined) {
+                                setSecondarySecret(res.secondaryClientSecret || "")
+                              }
+                              if (res.secondarySecretExpiresAt !== undefined) {
+                                setSecondaryExpires(res.secondarySecretExpiresAt || null)
+                              }
+                            }
+                            return {
+                              success: res.success,
+                              value: res.clientSecret,
+                              stepUpRequired: res.stepUpRequired,
+                              message: res.message,
+                            }
+                          }
+                    }
+                    onRevealedChange={(val) => setRevealedSnippetSecret(val)}
+                  />
                 )}
               </div>
 
@@ -715,9 +715,27 @@ curl -X POST "${issuer}/oidc/token" \\
                   <p className="text-[11px] text-muted-foreground font-sans leading-relaxed">
                     Existing microservices and active tokens using this key will continue to authenticate uninterrupted until the grace window elapses.
                   </p>
-                  <div className="bg-black/30 border border-border/50 rounded-md px-3 py-1.5 font-mono text-xs text-muted-foreground truncate select-all">
-                    {secondarySecret}
-                  </div>
+                  <SecretDisplayField
+                    key={`${app.appCode}:secondary:${secondarySecret === "••••••••" ? "masked" : secondarySecret}`}
+                    value={secondarySecret === "••••••••" ? undefined : secondarySecret}
+                    requireStepUp={true}
+                    onReveal={
+                      secondarySecret !== "••••••••"
+                        ? undefined
+                        : async () => {
+                            const res = await revealAppSecretAction(app.appCode)
+                            if (res.success && res.secondaryClientSecret) {
+                              setSecondarySecret(res.secondaryClientSecret)
+                            }
+                            return {
+                              success: res.success,
+                              value: res.secondaryClientSecret,
+                              stepUpRequired: res.stepUpRequired,
+                              message: res.message,
+                            }
+                          }
+                    }
+                  />
                 </div>
               )}
 

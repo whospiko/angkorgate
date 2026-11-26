@@ -65,7 +65,6 @@ export function UserSecurityTab({ user, sessions = [] }: UserSecurityTabProps) {
       generated += chars.charAt(Math.floor(Math.random() * chars.length))
     }
     setNewPassword(generated)
-    setShowPassword(true)
   }
 
   // Handle Admin Reset Password

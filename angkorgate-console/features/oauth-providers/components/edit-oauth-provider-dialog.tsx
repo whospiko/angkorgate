@@ -21,8 +21,12 @@ import {
   type OAuthProvider,
   type OAuthProviderCode,
 } from "../types/oauth-providers.types"
-import { updateOAuthProviderAction } from "../server/oauth-providers-actions"
+import {
+  revealOAuthProviderSecretAction,
+  updateOAuthProviderAction,
+} from "../server/oauth-providers-actions"
 import { OAuthProviderIcon } from "./provider-icon"
+import { SecretInputField } from "@/components/secret-field"
 
 interface EditOAuthProviderDialogProps {
   provider: OAuthProvider
@@ -94,10 +98,13 @@ export function EditOAuthProviderDialog({
       nextExtraConfig.botUsername = cleanedClientId
     }
 
+    const trimmedSecret = clientSecret.trim()
     const payload = {
       name: name.trim(),
       clientId: cleanedClientId,
-      ...(clientSecret.trim() ? { clientSecret: clientSecret.trim() } : {}),
+      ...(trimmedSecret && trimmedSecret !== "••••••••"
+        ? { clientSecret: trimmedSecret }
+        : {}),
       scopes: scopes.trim(),
       isActive,
       extraConfig: nextExtraConfig,
@@ -199,12 +206,29 @@ export function EditOAuthProviderDialog({
               <Label htmlFor={`edit-secret-${provider.code}`}>
                 {preset?.clientSecretLabel ?? "Client Secret"}
               </Label>
-              <Input
+              <SecretInputField
                 id={`edit-secret-${provider.code}`}
-                type="password"
-                placeholder="Leave blank to keep existing secret"
+                placeholder={
+                  provider.hasClientSecret || provider.clientSecret
+                    ? "•••••••• (leave blank to keep existing secret)"
+                    : "Enter client secret"
+                }
                 value={clientSecret}
-                onChange={(e) => setClientSecret(e.target.value)}
+                onChange={setClientSecret}
+                hasStoredSecret={Boolean(
+                  provider.hasClientSecret ?? provider.clientSecret
+                )}
+                onRevealStored={async () => {
+                  const res = await revealOAuthProviderSecretAction(
+                    provider.code
+                  )
+                  return {
+                    success: res.success,
+                    value: res.clientSecret,
+                    stepUpRequired: res.stepUpRequired,
+                    message: res.message,
+                  }
+                }}
               />
             </div>
 

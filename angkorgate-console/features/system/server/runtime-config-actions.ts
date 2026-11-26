@@ -192,3 +192,25 @@ export async function purgeCacheAction(): Promise<{
     }
   }
 }
+
+export async function revealRuntimeSecretAction(key: string): Promise<{
+  success: boolean
+  value?: string
+  stepUpRequired?: boolean
+  message?: string
+}> {
+  try {
+    const res = await apiClient.get<{ key: string; value: string }>(
+      `/system/runtime-config/${encodeURIComponent(key)}/reveal`
+    )
+    return { success: true, value: res.value }
+  } catch (error) {
+    if (error instanceof ApiError && error.statusCode === 403) {
+      return { success: false, stepUpRequired: true, message: error.message }
+    }
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to reveal secret.",
+    }
+  }
+}

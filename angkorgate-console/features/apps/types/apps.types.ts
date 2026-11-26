@@ -7,7 +7,9 @@ export interface AppSetting {
   name: string
   description?: string | null
   clientSecret?: string | null
+  hasClientSecret?: boolean
   secondaryClientSecret?: string | null
+  hasSecondaryClientSecret?: boolean
   secondarySecretExpiresAt?: string | null
   rootUrl?: string | null
   homeUrl?: string | null

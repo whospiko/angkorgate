@@ -35,6 +35,7 @@ import type {
   ApiKeyCreatedResponse,
   ResourceSchemaMeta,
 } from "../types/api-keys.types"
+import { SecretDisplayField } from "@/components/secret-field"
 
 interface CreateApiKeyDialogProps {
   schemaResources?: ResourceSchemaMeta[]
@@ -113,7 +114,7 @@ export function CreateApiKeyDialog({
 
   // Step 4: Success / Secret Key Reveal
   const [createdKey, setCreatedKey] = useState<ApiKeyCreatedResponse | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [showCreatedSecret, setShowCreatedSecret] = useState(false)
   const [codeTab, setCodeTab] = useState<"curl" | "ts" | "python">("curl")
 
   // Fallback resources if backend did not supply
@@ -275,14 +276,6 @@ export function CreateApiKeyDialog({
     }
   }
 
-  const handleCopy = () => {
-    if (createdKey?.secretKey) {
-      navigator.clipboard.writeText(createdKey.secretKey)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }
-
   const handleClose = () => {
     setOpen(false)
     // Reset wizard
@@ -290,8 +283,8 @@ export function CreateApiKeyDialog({
       setStep(1)
       setName("")
       setCreatedKey(null)
+      setShowCreatedSecret(false)
       setError(null)
-      setCopied(false)
     }, 300)
   }
 
@@ -621,30 +614,12 @@ export function CreateApiKeyDialog({
               <Label className="text-xs font-mono text-muted-foreground">
                 Your Secret API Key
               </Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  readOnly
-                  value={createdKey.secretKey}
-                  className="font-mono text-xs bg-muted/50 text-foreground tracking-wide font-semibold"
-                />
-                <Button
-                  type="button"
-                  onClick={handleCopy}
-                  className="font-mono text-xs gap-1.5 shrink-0"
-                >
-                  {copied ? (
-                    <>
-                      <RiCheckLine className="size-4 text-emerald-400" />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <RiFileCopyLine className="size-4" />
-                      Copy Key
-                    </>
-                  )}
-                </Button>
-              </div>
+              <SecretDisplayField
+                key={`${createdKey.keyPrefix}:${createdKey.lastFour}`}
+                value={createdKey.secretKey}
+                requireStepUp={true}
+                onRevealedChange={(val) => setShowCreatedSecret(val !== null)}
+              />
             </div>
 
             {/* Quick Start Integration Code Snippets */}
@@ -672,7 +647,11 @@ export function CreateApiKeyDialog({
                 <TabsContent value="curl" className="mt-2">
                   <pre className="p-3 rounded-lg border border-border/50 bg-muted/40 font-mono text-xs text-foreground overflow-x-auto">
                     {`curl -X GET "http://localhost:8080/customers" \\
-  -H "x-api-key: ${createdKey.secretKey}" \\
+  -H "x-api-key: ${
+    showCreatedSecret
+      ? createdKey.secretKey
+      : `${createdKey.keyPrefix}${"•".repeat(16)}${createdKey.lastFour}`
+  }" \\
   -H "Accept: application/json"`}
                   </pre>
                 </TabsContent>
@@ -681,7 +660,11 @@ export function CreateApiKeyDialog({
                   <pre className="p-3 rounded-lg border border-border/50 bg-muted/40 font-mono text-xs text-foreground overflow-x-auto">
                     {`const response = await fetch("http://localhost:8080/customers", {
   headers: {
-    "x-api-key": "${createdKey.secretKey}",
+    "x-api-key": "${
+      showCreatedSecret
+        ? createdKey.secretKey
+        : `${createdKey.keyPrefix}${"•".repeat(16)}${createdKey.lastFour}`
+    }",
     "Accept": "application/json"
   }
 });
@@ -694,7 +677,11 @@ const data = await response.json();`}
                     {`import requests
 
 headers = {
-    "x-api-key": "${createdKey.secretKey}",
+    "x-api-key": "${
+      showCreatedSecret
+        ? createdKey.secretKey
+        : `${createdKey.keyPrefix}${"•".repeat(16)}${createdKey.lastFour}`
+    }",
     "Accept": "application/json"
 }
 response = requests.get("http://localhost:8080/customers", headers=headers)

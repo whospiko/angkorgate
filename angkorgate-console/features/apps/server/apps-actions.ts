@@ -120,3 +120,34 @@ export async function updateAppScopesAction(
     return { success: false, message: error.message || "Failed to update scopes" }
   }
 }
+
+export async function revealAppSecretAction(code: string): Promise<{
+  success: boolean
+  clientSecret?: string | null
+  secondaryClientSecret?: string | null
+  secondarySecretExpiresAt?: string | null
+  stepUpRequired?: boolean
+  message?: string
+}> {
+  try {
+    const res = await apiClient.get<{
+      clientSecret: string | null
+      secondaryClientSecret: string | null
+      secondarySecretExpiresAt: string | null
+    }>(`/admin/apps/${encodeURIComponent(code)}/reveal-secret`)
+    return {
+      success: true,
+      clientSecret: res.clientSecret,
+      secondaryClientSecret: res.secondaryClientSecret,
+      secondarySecretExpiresAt: res.secondarySecretExpiresAt,
+    }
+  } catch (error) {
+    if (error instanceof ApiError && error.statusCode === 403) {
+      return { success: false, stepUpRequired: true, message: error.message }
+    }
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to reveal app secret",
+    }
+  }
+}

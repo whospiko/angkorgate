@@ -22,20 +22,17 @@ import {
   RiShieldKeyholeLine,
   RiGlobalLine,
   RiCheckLine,
-  RiFileCopyLine,
   RiUploadCloudLine,
   RiInformationLine,
   RiArrowRightLine,
   RiArrowLeftLine,
-  RiLockLine,
-  RiEyeLine,
-  RiEyeOffLine,
   RiAlertLine,
   RiSearchLine,
 } from "@remixicon/react"
 import { createAppAction } from "../server/apps-actions"
 import type { Scope } from "@/features/scopes"
 import type { KeycloakClientExport } from "../types/apps.types"
+import { SecretDisplayField } from "@/components/secret-field"
 
 interface CreateClientWizardProps {
   availableScopes?: Scope[]
@@ -84,8 +81,6 @@ export function CreateClientWizard({ availableScopes = [] }: CreateClientWizardP
     clientSecret?: string | null
     isPublic: boolean
   } | null>(null)
-  const [secretCopied, setSecretCopied] = useState(false)
-  const [showSecret, setShowSecret] = useState(false)
 
   const handleImportJson = () => {
     try {
@@ -223,14 +218,6 @@ export function CreateClientWizard({ availableScopes = [] }: CreateClientWizardP
     setError(null)
   }
 
-  const copySecret = () => {
-    if (createdData?.clientSecret) {
-      navigator.clipboard.writeText(createdData.clientSecret)
-      setSecretCopied(true)
-      setTimeout(() => setSecretCopied(false), 2000)
-    }
-  }
-
   return (
     <>
       <Dialog
@@ -276,36 +263,10 @@ export function CreateClientWizard({ availableScopes = [] }: CreateClientWizardP
                     <span className="text-[11px] text-muted-foreground uppercase tracking-wider block mb-1">
                       Client Secret (Confidential)
                     </span>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-background border border-border/60 rounded px-2.5 py-1.5 font-mono text-xs text-primary truncate select-all">
-                        {showSecret ? createdData.clientSecret : "•".repeat(32)}
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="size-8 shrink-0"
-                        onClick={() => setShowSecret(!showSecret)}
-                        title={showSecret ? "Hide secret" : "Reveal secret"}
-                      >
-                        {showSecret ? <RiEyeOffLine className="size-4" /> : <RiEyeLine className="size-4" />}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1 font-mono text-xs shrink-0"
-                        onClick={copySecret}
-                      >
-                        {secretCopied ? (
-                          <>
-                            <RiCheckLine className="size-3.5 text-emerald-500" /> Copied
-                          </>
-                        ) : (
-                          <>
-                            <RiFileCopyLine className="size-3.5" /> Copy
-                          </>
-                        )}
-                      </Button>
-                    </div>
+                    <SecretDisplayField
+                      value={createdData.clientSecret}
+                      requireStepUp={true}
+                    />
                   </div>
                 )}
 

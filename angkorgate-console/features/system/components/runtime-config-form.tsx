@@ -33,10 +33,12 @@ import type {
   RuntimeSettingView,
 } from "../types/runtime-config.schemas"
 import {
+  revealRuntimeSecretAction,
   testMailConfigAction,
   testSmsConfigAction,
   updateRuntimeConfigAction,
 } from "../server/runtime-config-actions"
+import { SecretInputField } from "@/components/secret-field"
 
 const CATEGORIES: {
   id: RuntimeSettingCategory
@@ -372,21 +374,35 @@ export function RuntimeConfigForm({
                               </option>
                             ))}
                           </select>
-                        ) : (
-                          <Input
+                        ) : item.isSecret || item.inputType === "password" ? (
+                          <SecretInputField
                             id={item.key}
-                            type={
-                              item.inputType === "password"
-                                ? "password"
-                                : item.inputType === "number"
-                                  ? "number"
-                                  : "text"
-                            }
                             value={currentVal}
+                            onChange={(nextVal) =>
+                              setDrafts((prev) => ({
+                                ...prev,
+                                [item.key]: nextVal,
+                              }))
+                            }
+                            hasStoredSecret={item.hasSecret}
+                            onRevealStored={() =>
+                              revealRuntimeSecretAction(item.key)
+                            }
                             placeholder={
                               item.isSecret && item.hasSecret
                                 ? "•••••••• (leave unchanged to keep)"
                                 : item.placeholder || item.defaultValue
+                            }
+                          />
+                        ) : (
+                          <Input
+                            id={item.key}
+                            type={
+                              item.inputType === "number" ? "number" : "text"
+                            }
+                            value={currentVal}
+                            placeholder={
+                              item.placeholder || item.defaultValue
                             }
                             onChange={(e) =>
                               setDrafts((prev) => ({
