@@ -10,7 +10,25 @@ import type {
   UpdateCustomerInput,
   CustomerContact,
   CreateContactInput,
+  UpdateContactInput,
 } from "../types/customers.types"
+import {
+  CreateCustomerSchema,
+  UpdateCustomerSchema,
+  CreateContactSchema,
+  UpdateContactSchema,
+  CustomerStatusSchema,
+} from "../types/customers.schemas"
+
+function cleanOptionalStrings<T extends Record<string, unknown>>(obj: T): T {
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined && v !== "") {
+      out[k] = v
+    }
+  }
+  return out as T
+}
 
 export async function getCustomers(query?: {
   search?: string
@@ -34,7 +52,12 @@ export async function getCustomers(query?: {
       return { items: res, total: res.length, page: 1, limit: res.length }
     }
     if (res && Array.isArray(res.data)) {
-      return { items: res.data, total: res.total ?? res.data.length, page: res.page ?? 1, limit: res.limit ?? 20 }
+      return {
+        items: res.data,
+        total: res.total ?? res.data.length,
+        page: res.page ?? 1,
+        limit: res.limit ?? 20,
+      }
     }
     if (res && Array.isArray(res.items)) {
       return res as PaginatedCustomers
@@ -58,15 +81,23 @@ export async function getCustomer(id: string): Promise<Customer | null> {
   }
 }
 
+export async function getCustomerAttributeSchemas(): Promise<Record<string, Record<string, string>>> {
+  try {
+    const res = await apiClient.get<Record<string, Record<string, string>>>(
+      "/customers/attribute-schemas"
+    )
+    return res || {}
+  } catch {
+    return {}
+  }
+}
+
 export async function createCustomerAction(
   data: CreateCustomerInput
 ): Promise<{ success: boolean; message?: string; data?: Customer }> {
   try {
-    // Clean undefined fields
-    const payload = { ...data }
-    Object.keys(payload).forEach(
-      (key) => (payload as any)[key] === undefined && delete (payload as any)[key]
-    )
+    const parsed = CreateCustomerSchema.parse(data)
+    const payload = cleanOptionalStrings(parsed)
 
     const created = await apiClient.post<Customer>("/customers", payload)
     revalidatePath("/customers")
@@ -82,10 +113,8 @@ export async function updateCustomerAction(
   data: UpdateCustomerInput
 ): Promise<{ success: boolean; message?: string; data?: Customer }> {
   try {
-    const payload = { ...data }
-    Object.keys(payload).forEach(
-      (key) => (payload as any)[key] === undefined && delete (payload as any)[key]
-    )
+    const parsed = UpdateCustomerSchema.parse(data)
+    const payload = cleanOptionalStrings(parsed)
 
     const updated = await apiClient.patch<Customer>(
       `/customers/${encodeURIComponent(id)}`,
@@ -95,6 +124,23 @@ export async function updateCustomerAction(
     return { success: true, data: updated }
   } catch (error: any) {
     return { success: false, message: error.message || "Failed to update customer" }
+  }
+}
+
+export async function linkCustomerUserAction(
+  customerId: string,
+  userId: string | null
+): Promise<{ success: boolean; message?: string; data?: Customer }> {
+  try {
+    const updated = await apiClient.patch<Customer>(
+      `/customers/${encodeURIComponent(customerId)}/user`,
+      { userId }
+    )
+    revalidatePath("/customers")
+    revalidatePath("/users")
+    return { success: true, data: updated }
+  } catch (error: any) {
+    return { success: false, message: error.message || "Failed to update linked user" }
   }
 }
 
@@ -116,8 +162,9 @@ export async function updateCustomerStatusAction(
   status: string
 ): Promise<{ success: boolean; message?: string }> {
   try {
+    const validStatus = CustomerStatusSchema.parse(status.toUpperCase())
     await apiClient.patch(
-      `/customers/${encodeURIComponent(id)}/status/${encodeURIComponent(status)}`
+      `/customers/${encodeURIComponent(id)}/status/${encodeURIComponent(validStatus)}`
     )
     revalidatePath("/customers")
     return { success: true }
@@ -128,9 +175,9 @@ export async function updateCustomerStatusAction(
 
 export async function getCustomerAttributes(
   id: string
-): Promise<Record<string, any>> {
+): Promise<Record<string, unknown>> {
   try {
-    const res = await apiClient.get<Record<string, any>>(
+    const res = await apiClient.get<Record<string, unknown>>(
       `/customers/${encodeURIComponent(id)}/attributes`
     )
     return res || {}
@@ -142,7 +189,7 @@ export async function getCustomerAttributes(
 export async function setCustomerAttributeAction(
   id: string,
   key: string,
-  value: any
+  value: unknown
 ): Promise<{ success: boolean; message?: string }> {
   try {
     await apiClient.put(
@@ -189,14 +236,35 @@ export async function createCustomerContactAction(
   data: CreateContactInput
 ): Promise<{ success: boolean; message?: string; data?: CustomerContact }> {
   try {
+    const parsed = CreateContactSchema.parse(data)
+    const payload = cleanOptionalStrings(parsed)
     const created = await apiClient.post<CustomerContact>(
       `/customers/${encodeURIComponent(customerId)}/contacts`,
-      data
+      payload
     )
     revalidatePath("/customers")
     return { success: true, data: created }
   } catch (error: any) {
     return { success: false, message: error.message || "Failed to add contact" }
+  }
+}
+
+export async function updateCustomerContactAction(
+  customerId: string,
+  contactId: string,
+  data: UpdateContactInput
+): Promise<{ success: boolean; message?: string; data?: CustomerContact }> {
+  try {
+    const parsed = UpdateContactSchema.parse(data)
+    const payload = cleanOptionalStrings(parsed)
+    const updated = await apiClient.patch<CustomerContact>(
+      `/customers/${encodeURIComponent(customerId)}/contacts/${encodeURIComponent(contactId)}`,
+      payload
+    )
+    revalidatePath("/customers")
+    return { success: true, data: updated }
+  } catch (error: any) {
+    return { success: false, message: error.message || "Failed to update contact" }
   }
 }
 

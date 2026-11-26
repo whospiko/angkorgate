@@ -1,37 +1,37 @@
-export type CustomerType = 'PATIENT' | 'GUEST' | 'CUSTOMER'
-export type CustomerGender = 'MALE' | 'FEMALE' | 'OTHER'
-export type CustomerStatus = 'LEAD' | 'ACTIVE' | 'INACTIVE' | 'CHURNED'
+export type CustomerType = "PATIENT" | "GUEST" | "CUSTOMER"
+export type CustomerGender = "MALE" | "FEMALE" | "OTHER"
+export type CustomerStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED"
 
 export interface CustomerContact {
   id: string
   customerId: string
-  contactType?: string
   fullName: string
-  relationship?: string
+  relationship?: string | null
   phone?: string | null
   email?: string | null
+  address?: string | null
   isPrimary?: boolean
-  isEmergency?: boolean
-  attributes?: Record<string, any>
+  attributes?: Record<string, unknown>
   createdAt?: string
 }
 
 export interface Customer {
   id: string
-  code?: string
+  customerCode: string
+  userId?: string | null
   fullName: string
-  type?: CustomerType
-  gender?: CustomerGender
-  status?: CustomerStatus
-  dateOfBirth?: string
+  type: CustomerType
+  gender?: CustomerGender | null
+  status: CustomerStatus
+  dateOfBirth: string
   email?: string | null
   phone?: string | null
   address?: string | null
   nationalId?: string | null
   avatarUrl?: string | null
-  contactsCount?: number
+  isMinor?: boolean
   contacts?: CustomerContact[]
-  attributes?: Record<string, any>
+  attributes?: Record<string, unknown>
   createdAt?: string
   updatedAt?: string
 }
@@ -74,5 +74,6 @@ export interface CreateContactInput {
   email?: string
   address?: string
   isPrimary?: boolean
-  isEmergency?: boolean
 }
+
+export type UpdateContactInput = Partial<CreateContactInput>

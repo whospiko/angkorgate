@@ -8,8 +8,26 @@ export const metadata = {
   title: "Customers | AngkorGate",
 }
 
-export default async function CustomersPage() {
-  const customersData = await getCustomers()
+interface CustomersPageProps {
+  searchParams?: Promise<{
+    search?: string
+    type?: string
+    status?: string
+    page?: string
+  }>
+}
+
+export default async function CustomersPage({ searchParams }: CustomersPageProps) {
+  const params = (await searchParams) || {}
+  const page = params.page ? Math.max(1, parseInt(params.page, 10) || 1) : 1
+
+  const customersData = await getCustomers({
+    search: params.search,
+    type: params.type,
+    status: params.status,
+    page,
+    limit: 20,
+  })
 
   return (
     <div className="flex flex-1 flex-col gap-6">
@@ -25,7 +43,15 @@ export default async function CustomersPage() {
         <CreateCustomerDialog />
       </div>
 
-      <CustomersTable customers={customersData.items} />
+      <CustomersTable
+        customers={customersData.items}
+        total={customersData.total}
+        page={customersData.page}
+        limit={customersData.limit}
+        initialSearch={params.search || ""}
+        initialType={params.type || ""}
+        initialStatus={params.status || ""}
+      />
     </div>
   )
 }

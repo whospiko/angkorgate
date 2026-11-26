@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RiUserAddLine, RiLoader4Line } from "@remixicon/react"
 import { createCustomerAction } from "../server/customers-actions"
+import { CreateCustomerSchema } from "../types/customers.schemas"
 import type { CustomerType, CustomerGender } from "../types/customers.types"
 
 export function CreateCustomerDialog() {
@@ -33,10 +34,9 @@ export function CreateCustomerDialog() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setError(null)
 
-    const res = await createCustomerAction({
+    const parsed = CreateCustomerSchema.safeParse({
       fullName,
       type,
       gender,
@@ -45,6 +45,23 @@ export function CreateCustomerDialog() {
       email: email || undefined,
       address: address || undefined,
       nationalId: nationalId || undefined,
+    })
+
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message || "Please check the form inputs")
+      return
+    }
+
+    setLoading(true)
+    const res = await createCustomerAction({
+      fullName: parsed.data.fullName,
+      type: parsed.data.type,
+      gender: parsed.data.gender,
+      dateOfBirth: parsed.data.dateOfBirth,
+      phone: parsed.data.phone || undefined,
+      email: parsed.data.email || undefined,
+      address: parsed.data.address || undefined,
+      nationalId: parsed.data.nationalId || undefined,
     })
 
     setLoading(false)
@@ -105,9 +122,9 @@ export function CreateCustomerDialog() {
                   onChange={(e) => setType(e.target.value as CustomerType)}
                   className="flex h-9 w-full min-w-0 rounded-md border border-input bg-background/90 dark:bg-black/25 px-3 py-1.5 text-xs font-mono text-foreground transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 outline-none"
                 >
-                  <option value="CUSTOMER">Customer</option>
-                  <option value="PATIENT">Patient (Clinic)</option>
-                  <option value="GUEST">Guest (Hotel)</option>
+                  <option value="CUSTOMER">Customer (CUS-)</option>
+                  <option value="PATIENT">Patient (PAT-)</option>
+                  <option value="GUEST">Guest (GST-)</option>
                 </select>
               </div>
 

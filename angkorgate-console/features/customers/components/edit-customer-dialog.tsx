@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RiLoader4Line } from "@remixicon/react"
 import { updateCustomerAction } from "../server/customers-actions"
+import { UpdateCustomerSchema } from "../types/customers.schemas"
 import type { Customer, CustomerGender } from "../types/customers.types"
 
 interface EditCustomerDialogProps {
@@ -40,12 +41,22 @@ export function EditCustomerDialog({
   const [address, setAddress] = useState(customer.address || "")
   const [nationalId, setNationalId] = useState(customer.nationalId || "")
 
+  useEffect(() => {
+    setFullName(customer.fullName || "")
+    setGender(customer.gender || "MALE")
+    setDateOfBirth(customer.dateOfBirth ? customer.dateOfBirth.split("T")[0] : "")
+    setPhone(customer.phone || "")
+    setEmail(customer.email || "")
+    setAddress(customer.address || "")
+    setNationalId(customer.nationalId || "")
+    setError(null)
+  }, [customer])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setError(null)
 
-    const res = await updateCustomerAction(customer.id, {
+    const parsed = UpdateCustomerSchema.safeParse({
       fullName,
       gender,
       dateOfBirth: dateOfBirth || undefined,
@@ -53,6 +64,22 @@ export function EditCustomerDialog({
       email: email || undefined,
       address: address || undefined,
       nationalId: nationalId || undefined,
+    })
+
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message || "Please check the form inputs")
+      return
+    }
+
+    setLoading(true)
+    const res = await updateCustomerAction(customer.id, {
+      fullName: parsed.data.fullName,
+      gender: parsed.data.gender,
+      dateOfBirth: parsed.data.dateOfBirth,
+      phone: parsed.data.phone || undefined,
+      email: parsed.data.email || undefined,
+      address: parsed.data.address || undefined,
+      nationalId: parsed.data.nationalId || undefined,
     })
 
     setLoading(false)
@@ -70,7 +97,7 @@ export function EditCustomerDialog({
           <DialogHeader>
             <DialogTitle className="font-heading text-lg">Edit Customer Profile</DialogTitle>
             <DialogDescription className="font-mono text-xs">
-              Update details for customer code {customer.code || customer.id.slice(0, 8)}.
+              Update details for customer code {customer.customerCode || customer.id.slice(0, 8)}.
             </DialogDescription>
           </DialogHeader>
 

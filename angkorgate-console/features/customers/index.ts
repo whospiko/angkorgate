@@ -1,4 +1,5 @@
 export * from "./types/customers.types"
+export * from "./types/customers.schemas"
 export * from "./server/customers-actions"
 export * from "./components/customers-table"
 export * from "./components/create-customer-dialog"
