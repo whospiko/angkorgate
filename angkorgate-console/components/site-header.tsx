@@ -26,7 +26,12 @@ const routeTitles: Record<string, string> = {
   "/audit": "Audit Logs",
   "/customers": "Customer Directory",
   "/employees": "Organization & Staff",
+  "/api-keys": "API Keys & Integrations",
   "/settings/content": "Content Management",
+  "/settings/environment": "Environment & Providers",
+  "/settings/dev-inbox": "Dev Outbox",
+  "/system/health": "Core API Health",
+  "/system/cache": "Cache Metrics",
   "/oidc": "OpenID Connect Discovery",
 }
 

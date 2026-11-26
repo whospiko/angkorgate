@@ -19,8 +19,8 @@ describe("CommandPalette types & filtering", () => {
 
   it("filters static commands by title, subtitle, or keywords", () => {
     const redisMatches = filterStaticCommands(STATIC_COMMAND_ENTRIES, "redis")
-    assert.equal(redisMatches.length, 1)
-    assert.equal(redisMatches[0].id, "action:purge-cache")
+    assert.ok(redisMatches.some((e) => e.id === "action:purge-cache"))
+    assert.ok(redisMatches.some((e) => e.id === "nav:system-cache"))
 
     const maintenanceMatches = filterStaticCommands(STATIC_COMMAND_ENTRIES, "maintenance")
     assert.ok(maintenanceMatches.some((e) => e.id === "action:toggle-maintenance"))

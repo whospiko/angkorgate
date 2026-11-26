@@ -156,6 +156,22 @@ export const STATIC_COMMAND_ENTRIES: StaticCommandEntry[] = [
     keywords: ["dashboard", "overview", "home", "metrics", "health"],
     href: "/dashboard",
   },
+  {
+    id: "nav:system-health",
+    group: "navigation",
+    title: "Core API Health",
+    subtitle: "Inspect live Core API readiness, status, and maintenance gate",
+    keywords: ["health", "core", "api", "status", "probe", "uptime"],
+    href: "/system/health",
+  },
+  {
+    id: "nav:system-cache",
+    group: "navigation",
+    title: "Cache Metrics",
+    subtitle: "View Redis & in-memory cache status and purge keys",
+    keywords: ["cache", "redis", "metrics", "keys", "prefix"],
+    href: "/system/cache",
+  },
 ]
 
 export function filterStaticCommands(

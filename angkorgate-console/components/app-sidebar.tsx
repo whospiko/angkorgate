@@ -134,12 +134,12 @@ const defaultNavData = {
     },
     {
       title: "Core API Health",
-      url: `${publicCoreUrl}/`,
+      url: "/system/health",
       icon: <RiServerLine className="size-4" />,
     },
     {
       title: "Cache Metrics",
-      url: `${publicCoreUrl}/cache/status`,
+      url: "/system/cache",
       icon: <RiRadarLine className="size-4" />,
     },
   ],
