@@ -5,6 +5,7 @@ import request from 'supertest';
 import { ValidationPipe } from '@nestjs/common';
 import { generate } from 'otplib';
 import { CacheService } from '../src/cache/cache.service';
+import { AuthService } from '../src/auth/services/auth.service';
 import { User } from '../src/users/entities/user.entity';
 import { Role } from '../src/rbac/entities/role.entity';
 import { UserRole } from '../src/rbac/entities/user-role.entity';
@@ -725,6 +726,118 @@ async function runSmokeTest() {
             .delete(`/departments/${deptCode}`)
             .set('Authorization', `Bearer ${adminToken}`);
         assert('Departments DELETE /departments/:code removes department', delDept.status === 204);
+
+        // ══════════════════════════════════════════════════════════════════
+        logSection('12. Refresh Token Family Reuse Detection & Enriched Sessions');
+        // ══════════════════════════════════════════════════════════════════
+        const sessionUserEmail = `session-smoke-${Date.now()}@example.com`;
+        const sessionUserPass = 'SessionSmoke123!';
+        const createSessionUser = await request(http)
+            .post('/users')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({
+                email: sessionUserEmail,
+                password: sessionUserPass,
+                isActive: true,
+                isEmailVerified: true,
+            });
+        const sessionUser = dataOf(createSessionUser);
+        assert('Created dedicated user for session family checks', createSessionUser.status === 201 && !!sessionUser?.id);
+
+        const authService = app.get(AuthService);
+        const smokeDesktopUa =
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+        const smokeMobileUa =
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1';
+
+        const devABody = await authService.issueTokensForUser(
+            sessionUser.id,
+            sessionUserEmail,
+            null,
+            { ip: '203.0.113.10', userAgent: smokeDesktopUa },
+        );
+        assert('Device A login issues refresh token', !!devABody?.refreshToken);
+
+        const devBBody = await authService.issueTokensForUser(
+            sessionUser.id,
+            sessionUserEmail,
+            null,
+            { ip: '198.51.100.42', userAgent: smokeMobileUa },
+        );
+        assert('Device B login issues independent refresh token', !!devBBody?.refreshToken);
+
+        const devCBody = await authService.issueTokensForUser(
+            sessionUser.id,
+            sessionUserEmail,
+            null,
+            { ip: '192.0.2.77', userAgent: 'curl/8.7.1' },
+        );
+        assert('Device C login issues third session', !!devCBody?.refreshToken);
+
+        // Rotate Device A token -> rtA2
+        const rotA = await request(http)
+            .post('/auth/refresh')
+            .set('User-Agent', smokeDesktopUa)
+            .send({ refreshToken: devABody.refreshToken });
+        const rotABody = dataOf(rotA);
+        assert('Device A refresh rotates token cleanly', rotA.status === 200 && rotABody?.refreshToken && rotABody.refreshToken !== devABody.refreshToken);
+
+        // Replay old Device A token -> 401 AND revokes Family A (rtA2 fails), while Device B/C stay alive
+        const replayA = await request(http)
+            .post('/auth/refresh')
+            .send({ refreshToken: devABody.refreshToken });
+        assert('Replaying rotated Device A token fails with 401', replayA.status === 401);
+
+        const postReplayA2 = await request(http)
+            .post('/auth/refresh')
+            .send({ refreshToken: rotABody.refreshToken });
+        assert('Family A successor token is immediately revoked after replay', postReplayA2.status === 401);
+
+        // Enriched /auth/sessions check
+        const selfSessionsRes = await request(http)
+            .get(`/auth/sessions?currentRefreshToken=${encodeURIComponent(devBBody.refreshToken)}`)
+            .set('Authorization', `Bearer ${devBBody.accessToken}`);
+        const selfSessions = dataOf(selfSessionsRes);
+        const currentMobile = Array.isArray(selfSessions) ? selfSessions.find((s: any) => s.isCurrent) : null;
+        assert(
+            'GET /auth/sessions returns parsed OS/Browser, IP, Last Active, and isCurrent',
+            selfSessionsRes.status === 200 &&
+                currentMobile?.browser === 'Safari 18' &&
+                currentMobile?.os === 'iOS 18.1' &&
+                currentMobile?.ipAddress === '198.51.100.42' &&
+                !!currentMobile?.lastActiveAt,
+        );
+
+        // Admin GET /users/:id/sessions
+        const adminSessionsRes = await request(http)
+            .get(`/users/${sessionUser.id}/sessions`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        const adminSessions = dataOf(adminSessionsRes);
+        assert(
+            'GET /users/:id/sessions lists active sessions for admin',
+            adminSessionsRes.status === 200 && Array.isArray(adminSessions) && adminSessions.length === 2,
+        );
+
+        // Revoke all other sessions from Device B -> Device C dies, Device B stays active
+        const revokeOthersRes = await request(http)
+            .post('/auth/sessions/revoke-others')
+            .set('Authorization', `Bearer ${devBBody.accessToken}`)
+            .send({ currentRefreshToken: devBBody.refreshToken });
+        const revokeOthersData = dataOf(revokeOthersRes);
+        assert(
+            'POST /auth/sessions/revoke-others revokes other families while preserving current',
+            revokeOthersRes.status === 200 && revokeOthersData?.revokedCount === 1,
+        );
+
+        const devCRefreshAfter = await request(http)
+            .post('/auth/refresh')
+            .send({ refreshToken: devCBody.refreshToken });
+        assert('Device C refresh fails after revoke-others', devCRefreshAfter.status === 401);
+
+        const devBRefreshAfter = await request(http)
+            .post('/auth/refresh')
+            .send({ refreshToken: devBBody.refreshToken });
+        assert('Device B refresh still succeeds after revoke-others', devBRefreshAfter.status === 200);
 
     } catch (err) {
         console.error(`\n${c.red}💥 Smoke test crashed unexpectedly:${c.reset}`, err);

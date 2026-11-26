@@ -451,28 +451,103 @@ describe('Auth (e2e)', () => {
     // ─────────────────────────────────────────────────────────────
 
     describe('Refresh token flow', () => {
-        it('rotates tokens and detects reuse', async () => {
+        it('rotates tokens within a family, revokes only that family on replay, and preserves other sessions', async () => {
             const admin = await seedAdmin(dataSource);
-            const { refreshToken } = await loginAs(
-                app,
-                admin.email,
-                admin.password,
-            );
 
-            // First refresh — OK
+            // Device A login
+            const deviceALogin = await request(app.getHttpServer())
+                .post('/auth/login')
+                .set('User-Agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/131.0.0.0 Safari/537.36')
+                .send({ email: admin.email, password: admin.password })
+                .expect(200);
+            const rtA1 = (deviceALogin.body?.data ?? deviceALogin.body).refreshToken;
+
+            // Device B login
+            const deviceBLogin = await request(app.getHttpServer())
+                .post('/auth/login')
+                .set('User-Agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) Version/18.1 Mobile/15E148 Safari/604.1')
+                .send({ email: admin.email, password: admin.password })
+                .expect(200);
+            const rtB1 = (deviceBLogin.body?.data ?? deviceBLogin.body).refreshToken;
+
+            // Device A first refresh — rotates rtA1 -> rtA2
             const first = await request(app.getHttpServer())
                 .post('/auth/refresh')
-                .send({ refreshToken })
+                .send({ refreshToken: rtA1 })
                 .expect(200);
-            const firstBody = first.body?.data ?? first.body;
-            expect(firstBody.refreshToken).not.toBe(refreshToken);
+            const rtA2 = (first.body?.data ?? first.body).refreshToken;
+            expect(rtA2).not.toBe(rtA1);
 
-            // Reuse old refresh — fail + revoke all
+            // Replay old rtA1 — fails and revokes entire Family A
             const reuse = await request(app.getHttpServer())
                 .post('/auth/refresh')
-                .send({ refreshToken })
+                .send({ refreshToken: rtA1 })
                 .expect(401);
             expect(reuse.body.message).toMatch(/revoked/i);
+
+            // Attacker's rotated rtA2 in Family A must also now be revoked
+            await request(app.getHttpServer())
+                .post('/auth/refresh')
+                .send({ refreshToken: rtA2 })
+                .expect(401);
+
+            // Device B (independent Family B) still works!
+            const deviceBRefresh = await request(app.getHttpServer())
+                .post('/auth/refresh')
+                .send({ refreshToken: rtB1 })
+                .expect(200);
+            expect((deviceBRefresh.body?.data ?? deviceBRefresh.body).refreshToken).toBeDefined();
+        });
+
+        it('lists enriched session metadata and revokes all other sessions', async () => {
+            const admin = await seedAdmin(dataSource);
+
+            const s1 = await request(app.getHttpServer())
+                .post('/auth/login')
+                .set('User-Agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/131.0.0.0 Safari/537.36')
+                .send({ email: admin.email, password: admin.password })
+                .expect(200);
+            const s1Body = s1.body?.data ?? s1.body;
+
+            const s2 = await request(app.getHttpServer())
+                .post('/auth/login')
+                .set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/132.0')
+                .send({ email: admin.email, password: admin.password })
+                .expect(200);
+            const s2Body = s2.body?.data ?? s2.body;
+
+            // List sessions for self
+            const listRes = await request(app.getHttpServer())
+                .get(`/auth/sessions?currentRefreshToken=${encodeURIComponent(s1Body.refreshToken)}`)
+                .set('Authorization', `Bearer ${s1Body.accessToken}`)
+                .expect(200);
+            const sessions = listRes.body?.data ?? listRes.body;
+            expect(sessions).toHaveLength(2);
+            const current = sessions.find((s: any) => s.isCurrent);
+            const other = sessions.find((s: any) => !s.isCurrent);
+            expect(current.browser).toBe('Chrome 131');
+            expect(current.os).toMatch(/macOS/);
+            expect(current.lastActiveAt).toBeDefined();
+            expect(other.browser).toBe('Firefox 132');
+            expect(other.os).toMatch(/Windows/);
+
+            // Revoke all other sessions
+            const revokeOthersRes = await request(app.getHttpServer())
+                .post('/auth/sessions/revoke-others')
+                .set('Authorization', `Bearer ${s1Body.accessToken}`)
+                .send({ currentRefreshToken: s1Body.refreshToken })
+                .expect(200);
+            expect((revokeOthersRes.body?.data ?? revokeOthersRes.body).revokedCount).toBe(1);
+
+            // Other session refresh token is now revoked, current still works
+            await request(app.getHttpServer())
+                .post('/auth/refresh')
+                .send({ refreshToken: s2Body.refreshToken })
+                .expect(401);
+            await request(app.getHttpServer())
+                .post('/auth/refresh')
+                .send({ refreshToken: s1Body.refreshToken })
+                .expect(200);
         });
 
         it('rejects expired refresh token', async () => {

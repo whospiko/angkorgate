@@ -160,7 +160,7 @@ describe('EmailChangeService', () => {
             // Sessions revoked
             expect(refreshRepo.update).toHaveBeenCalledWith(
                 { userId: 'u1', revokedAt: IsNull() },
-                { revokedAt: expect.any(Date) }
+                { revokedAt: expect.any(Date), revokedReason: 'email_changed' }
             );
         });
 

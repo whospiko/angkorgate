@@ -251,7 +251,7 @@ export class UsersService {
             // Invalidate refresh tokens for security
             await manager.getRepository(RefreshToken).update(
                 { userId: id, revokedAt: IsNull() },
-                { revokedAt: new Date() },
+                { revokedAt: new Date(), revokedReason: 'user_deleted' },
             );
 
             // Soft-delete user

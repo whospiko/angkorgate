@@ -10,8 +10,9 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import { generateNumericOtp, generateSecureToken, hashSha256 } from '../../common/utils/crypto.util';
 
 import { UsersService } from '../../users/services/users.service';
@@ -20,6 +21,7 @@ import { RefreshToken } from '../entities/refresh-token.entity';
 import { LoginAttempt } from '../entities/login-attempt.entity';
 import { LoginDto } from '../dto/login.dto';
 import { AuthResponseDto, LoginResponseDto, MfaChallengeDto } from '../dto/auth-response.dto';
+import { SessionResponseDto } from '../dto/session-response.dto';
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
 import { EmailVerificationToken } from '../entities/email-verification-token.entity';
 import { PasswordResetToken } from '../entities/password-reset-token.entity';
@@ -36,6 +38,18 @@ import { UpdateProfileDto } from '../dto/update-profile.dto';
 
 import { MfaService } from './mfa.service';
 import { RuntimeConfigService } from '../../system/services/runtime-config.service';
+import { CacheService } from '../../cache/cache.service';
+import { parseUserAgent } from '../utils/user-agent.util';
+
+export interface RefreshTokenFamilyState {
+    familyId: string;
+    userId: string;
+    currentTokenHash: string;
+    revoked: boolean;
+    revokedReason?: string;
+    revokedAt?: string;
+    lastActiveAt: string;
+}
 
 
 const MAX_FAILED_ATTEMPTS = 5;
@@ -74,6 +88,7 @@ export class AuthService {
         @InjectRepository(UserPasskey)
         private readonly passkeyRepo: Repository<UserPasskey>,
         @Optional() private readonly runtimeConfig?: RuntimeConfigService,
+        @Optional() private readonly cache?: CacheService,
     ) { }
 
     async hashPassword(plain: string): Promise<string> {
@@ -319,14 +334,31 @@ export class AuthService {
         });
 
         if (!stored) throw new UnauthorizedException('Invalid refresh token');
-        if (stored.revokedAt) {
-            // Token reuse — revoke all tokens for that user (token theft signal)
-            await this.refreshRepo.update(
-                { userId: stored.userId },
-                { revokedAt: new Date() },
+
+        const familyId = stored.familyId ?? stored.id;
+        const familyState = await this.cache?.get<RefreshTokenFamilyState>(
+            this.familyCacheKey(familyId),
+        );
+        const isReplayedInRedis = Boolean(
+            familyState &&
+                (familyState.revoked ||
+                    (familyState.currentTokenHash &&
+                        familyState.currentTokenHash !== tokenHash)),
+        );
+
+        if (stored.revokedAt || isReplayedInRedis) {
+            // Refresh token reuse / replay detected — revoke the entire token family immediately
+            await this.revokeTokenFamily(
+                familyId,
+                stored.userId,
+                'reuse_detected',
+                ctx,
+                stored.id,
+                Boolean(stored.familyId),
             );
-            throw new UnauthorizedException('Refresh token has been revoked');
+            throw new UnauthorizedException('Refresh token reuse detected; session family revoked');
         }
+
         if (stored.expiresAt < new Date()) {
             throw new UnauthorizedException('Refresh token expired');
         }
@@ -334,26 +366,88 @@ export class AuthService {
         const user = await this.users.findByIdOrFail(stored.userId);
         if (!user.isActive) throw new ForbiddenException('Account disabled');
 
-        // Rotate: revoke the old, issue a new pair
-        await this.refreshRepo.update(stored.id, { revokedAt: new Date() });
-        const roles = await this.rbac.getUserRoleCodes(user.id);
+        // Atomic rotation: only one concurrent caller can consume the active token
+        const rotatedAt = new Date();
+        const rotateResult = await this.refreshRepo.update(
+            { id: stored.id, revokedAt: IsNull() },
+            { revokedAt: rotatedAt, revokedReason: 'rotated' },
+        );
+        if (rotateResult?.affected === 0) {
+            await this.revokeTokenFamily(
+                familyId,
+                stored.userId,
+                'reuse_detected',
+                ctx,
+                stored.id,
+                Boolean(stored.familyId),
+            );
+            throw new UnauthorizedException('Refresh token reuse detected; session family revoked');
+        }
 
-        return this.issueTokens(user.id, user.email, user.phone, roles, {
-            ip: ctx.ip,
-            userAgent: ctx.userAgent,
-        });
+        const roles = await this.rbac.getUserRoleCodes(user.id);
+        const { response, tokenId } = await this.issueTokensWithMeta(
+            user.id,
+            user.email,
+            user.phone,
+            roles,
+            {
+                ip: ctx.ip ?? stored.ipAddress ?? undefined,
+                userAgent: ctx.userAgent ?? stored.userAgent ?? undefined,
+            },
+            familyId,
+        );
+
+        if (tokenId) {
+            await this.refreshRepo.update(stored.id, { replacedById: tokenId });
+        }
+
+        return response;
     }
 
     async logout(refreshToken: string): Promise<void> {
         const tokenHash = this.hashToken(refreshToken);
-        await this.refreshRepo.update({ tokenHash }, { revokedAt: new Date() });
+        const stored = await this.refreshRepo.findOne({ where: { tokenHash } });
+        if (!stored) {
+            await this.refreshRepo.update(
+                { tokenHash, revokedAt: IsNull() },
+                { revokedAt: new Date(), revokedReason: 'logout' },
+            );
+            return;
+        }
+
+        const familyId = stored.familyId ?? stored.id;
+        await this.revokeTokenFamily(
+            familyId,
+            stored.userId,
+            'logout',
+            undefined,
+            stored.id,
+            Boolean(stored.familyId),
+        );
     }
 
-    async logoutAll(userId: string): Promise<void> {
+    async logoutAll(userId: string, reason = 'logout_all'): Promise<{ revokedCount: number }> {
+        const activeTokens =
+            (await this.refreshRepo.find({
+                where: { userId, revokedAt: IsNull() },
+            })) ?? [];
+
+        const now = new Date();
         await this.refreshRepo.update(
             { userId, revokedAt: IsNull() },
-            { revokedAt: new Date() },
+            { revokedAt: now, revokedReason: reason },
         );
+
+        const familyIds = Array.from(
+            new Set(activeTokens.map((t) => t.familyId ?? t.id)),
+        );
+        await Promise.all(
+            familyIds.map((fid) =>
+                this.markFamilyRevokedInCache(fid, userId, reason, now),
+            ),
+        );
+
+        return { revokedCount: familyIds.length || activeTokens.length };
     }
 
     async changePassword(
@@ -371,7 +465,7 @@ export class AuthService {
         await this.users.setPasswordHash(userId, newHash);
 
         // Revoke all refresh tokens so stolen sessions die
-        await this.logoutAll(userId);
+        await this.logoutAll(userId, 'password_changed');
     }
 
     private async issueTokens(
@@ -380,14 +474,30 @@ export class AuthService {
         phone: string | null,
         roles: string[],
         ctx: LoginContext,
+        existingFamilyId?: string,
     ): Promise<AuthResponseDto> {
+        const { response } = await this.issueTokensWithMeta(
+            userId,
+            email,
+            phone,
+            roles,
+            ctx,
+            existingFamilyId,
+        );
+        return response;
+    }
+
+    private async issueTokensWithMeta(
+        userId: string,
+        email: string | null,
+        phone: string | null,
+        roles: string[],
+        ctx: LoginContext,
+        existingFamilyId?: string,
+    ): Promise<{ response: AuthResponseDto; tokenId?: string }> {
         // Parse TTLs as integers so jsonwebtoken treats them as seconds, not milliseconds
-        const accessTtl =
-            this.runtimeConfig?.getNumber('JWT_ACCESS_TTL', 900) ??
-            parseInt(this.config.get<string>('JWT_ACCESS_TTL') ?? '900', 10);
-        const refreshTtl =
-            this.runtimeConfig?.getNumber('JWT_REFRESH_TTL', 604800) ??
-            parseInt(this.config.get<string>('JWT_REFRESH_TTL') ?? '604800', 10);
+        const accessTtl = this.getAccessTtlSeconds();
+        const refreshTtl = this.getRefreshTtlSeconds();
         const refreshSecret = this.config.get<string>('JWT_REFRESH_SECRET')!;
 
         const payload: JwtPayload = { sub: userId, email, phone, roles };
@@ -403,15 +513,31 @@ export class AuthService {
         // Refresh token = random opaque string (NOT a JWT). We store its hash.
         const refreshToken = generateSecureToken(48);
         const tokenHash = this.hashToken(refreshToken);
+        const familyId = existingFamilyId ?? randomUUID();
+        const now = new Date();
 
-        await this.refreshRepo.save(
+        const saved = await this.refreshRepo.save(
             this.refreshRepo.create({
                 userId,
+                familyId,
                 tokenHash,
                 userAgent: ctx.userAgent ?? null,
                 ipAddress: ctx.ip ?? null,
-                expiresAt: new Date(Date.now() + refreshTtl * 1000),
+                lastUsedAt: now,
+                expiresAt: new Date(now.getTime() + refreshTtl * 1000),
             }),
+        );
+
+        await this.cache?.set<RefreshTokenFamilyState>(
+            this.familyCacheKey(familyId),
+            {
+                familyId,
+                userId,
+                currentTokenHash: tokenHash,
+                revoked: false,
+                lastActiveAt: now.toISOString(),
+            },
+            refreshTtl,
         );
 
         // Touch the refresh secret so TypeScript doesn't complain — not used for JWT
@@ -420,18 +546,106 @@ export class AuthService {
         const user = await this.users.findByIdOrFail(userId);
 
         return {
-            accessToken,
-            refreshToken,
-            accessTokenExpiresIn: accessTtl,
-            refreshTokenExpiresIn: refreshTtl,
-            user: {
-                id: user.id,
-                email: user.email,
-                phone: user.phone,
-                roles,
-                mustChangePassword: user.mustChangePassword,
+            tokenId: saved?.id,
+            response: {
+                accessToken,
+                refreshToken,
+                accessTokenExpiresIn: accessTtl,
+                refreshTokenExpiresIn: refreshTtl,
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    phone: user.phone,
+                    roles,
+                    mustChangePassword: user.mustChangePassword,
+                },
             },
         };
+    }
+
+    private familyCacheKey(familyId: string): string {
+        return `auth:rt:family:${familyId}`;
+    }
+
+    private getAccessTtlSeconds(): number {
+        return (
+            this.runtimeConfig?.getNumber('JWT_ACCESS_TTL', 900) ??
+            parseInt(this.config.get<string>('JWT_ACCESS_TTL') ?? '900', 10)
+        );
+    }
+
+    private getRefreshTtlSeconds(): number {
+        return (
+            this.runtimeConfig?.getNumber('JWT_REFRESH_TTL', 604800) ??
+            parseInt(this.config.get<string>('JWT_REFRESH_TTL') ?? '604800', 10)
+        );
+    }
+
+    private async markFamilyRevokedInCache(
+        familyId: string,
+        userId: string,
+        reason: string,
+        revokedAt: Date,
+    ): Promise<void> {
+        if (!this.cache) return;
+        const existing = await this.cache.get<RefreshTokenFamilyState>(
+            this.familyCacheKey(familyId),
+        );
+        await this.cache.set<RefreshTokenFamilyState>(
+            this.familyCacheKey(familyId),
+            {
+                familyId,
+                userId,
+                currentTokenHash: existing?.currentTokenHash ?? '',
+                revoked: true,
+                revokedReason: reason,
+                revokedAt: revokedAt.toISOString(),
+                lastActiveAt: existing?.lastActiveAt ?? revokedAt.toISOString(),
+            },
+            this.getRefreshTtlSeconds(),
+        );
+    }
+
+    private async revokeTokenFamily(
+        familyId: string,
+        userId: string,
+        reason: string,
+        ctx?: LoginContext,
+        replayedTokenId?: string,
+        hasExplicitFamilyId = true,
+    ): Promise<void> {
+        const now = new Date();
+        if (hasExplicitFamilyId) {
+            await this.refreshRepo.update(
+                { familyId, revokedAt: IsNull() },
+                { revokedAt: now, revokedReason: reason },
+            );
+        } else {
+            await this.refreshRepo.update(
+                { id: familyId, revokedAt: IsNull() },
+                { revokedAt: now, revokedReason: reason },
+            );
+        }
+
+        await this.markFamilyRevokedInCache(familyId, userId, reason, now);
+
+        if (reason === 'reuse_detected') {
+            this.logger.warn(
+                `Refresh token reuse detected for user=${userId} family=${familyId}; family revoked.`,
+            );
+            void this.audit.log({
+                actorId: userId,
+                action: 'auth.refresh.reuse_detected',
+                entity: 'refresh_token_family',
+                entityId: familyId,
+                ipAddress: ctx?.ip ?? null,
+                newValue: {
+                    familyId,
+                    replayedTokenId: replayedTokenId ?? null,
+                    userAgent: ctx?.userAgent ?? null,
+                },
+            });
+        }
     }
 
     private hashToken(token: string): string {
@@ -650,36 +864,149 @@ export class AuthService {
         return { message: 'Password reset successful. You can now log in.' };
     }
 
-    async listSessions(userId: string, currentRefreshToken?: string) {
+    async listSessions(
+        userId: string,
+        currentRefreshToken?: string,
+    ): Promise<SessionResponseDto[]> {
         const tokens = await this.refreshRepo.find({
             where: { userId, revokedAt: IsNull() },
-            order: { createdAt: 'DESC' },
+            order: { lastUsedAt: 'DESC', createdAt: 'DESC' },
         });
 
         const currentHash = currentRefreshToken
             ? this.hashToken(currentRefreshToken)
             : null;
+        const now = new Date();
+        const seenFamilies = new Set<string>();
+        const sessions: SessionResponseDto[] = [];
 
-        return tokens
-            .filter((t) => t.expiresAt > new Date())
-            .map((t) => ({
+        for (const t of tokens) {
+            if (t.expiresAt <= now) continue;
+            const familyId = t.familyId ?? t.id;
+            if (seenFamilies.has(familyId)) continue;
+
+            if (this.cache) {
+                const familyState = await this.cache.get<RefreshTokenFamilyState>(
+                    this.familyCacheKey(familyId),
+                );
+                if (familyState?.revoked) continue;
+            }
+
+            seenFamilies.add(familyId);
+            const parsed = parseUserAgent(t.userAgent);
+            sessions.push({
                 id: t.id,
-                userAgent: t.userAgent,
-                ipAddress: t.ipAddress,
+                familyId,
+                userAgent: t.userAgent ?? undefined,
+                browser: parsed.browser,
+                os: parsed.os,
+                deviceType: parsed.deviceType,
+                ipAddress: t.ipAddress ?? undefined,
+                lastActiveAt: t.lastUsedAt ?? t.createdAt,
                 createdAt: t.createdAt,
                 expiresAt: t.expiresAt,
                 isCurrent: currentHash ? t.tokenHash === currentHash : false,
-            }));
+            });
+        }
+
+        return sessions;
     }
 
-    async revokeSession(userId: string, sessionId: string): Promise<void> {
-        const result = await this.refreshRepo.update(
-            { id: sessionId, userId, revokedAt: IsNull() },
-            { revokedAt: new Date() },
-        );
-        if (result.affected === 0) {
+    async revokeSession(
+        userId: string,
+        sessionId: string,
+        reason = 'session_revoked',
+    ): Promise<void> {
+        const session = await this.refreshRepo.findOne({
+            where: { id: sessionId, userId, revokedAt: IsNull() },
+        });
+        if (!session) {
             throw new NotFoundException('Session not found');
         }
+
+        const familyId = session.familyId ?? session.id;
+        await this.revokeTokenFamily(
+            familyId,
+            userId,
+            reason,
+            undefined,
+            session.id,
+            Boolean(session.familyId),
+        );
+    }
+
+    async revokeOtherSessions(
+        userId: string,
+        opts: { currentRefreshToken?: string; keepSessionId?: string },
+    ): Promise<{ revokedCount: number }> {
+        const currentHash = opts.currentRefreshToken
+            ? this.hashToken(opts.currentRefreshToken)
+            : null;
+
+        let keepToken: RefreshToken | null = null;
+        if (currentHash) {
+            keepToken = await this.refreshRepo.findOne({
+                where: { userId, tokenHash: currentHash, revokedAt: IsNull() },
+            });
+        } else if (opts.keepSessionId) {
+            keepToken = await this.refreshRepo.findOne({
+                where: { id: opts.keepSessionId, userId, revokedAt: IsNull() },
+            });
+        } else {
+            throw new BadRequestException(
+                'Current refresh token or keepSessionId is required',
+            );
+        }
+
+        if (!keepToken || keepToken.expiresAt <= new Date()) {
+            throw new UnauthorizedException('Current session is invalid or expired');
+        }
+
+        const keepFamilyId = keepToken.familyId ?? keepToken.id;
+        const activeTokens =
+            (await this.refreshRepo.find({
+                where: { userId, revokedAt: IsNull() },
+            })) ?? [];
+
+        const others = activeTokens.filter((t) => {
+            const fid = t.familyId ?? t.id;
+            return fid !== keepFamilyId && t.id !== keepToken.id;
+        });
+
+        if (others.length === 0) {
+            return { revokedCount: 0 };
+        }
+
+        const now = new Date();
+        const otherIds = others.map((t) => t.id);
+        await this.refreshRepo.update(
+            { id: In(otherIds), userId, revokedAt: IsNull() },
+            { revokedAt: now, revokedReason: 'revoke_other_sessions' },
+        );
+
+        const otherFamilyIds = Array.from(
+            new Set(others.map((t) => t.familyId ?? t.id)),
+        );
+        await Promise.all(
+            otherFamilyIds.map((fid) =>
+                this.markFamilyRevokedInCache(
+                    fid,
+                    userId,
+                    'revoke_other_sessions',
+                    now,
+                ),
+            ),
+        );
+
+        void this.audit.log({
+            actorId: userId,
+            action: 'auth.sessions.revoked_others',
+            entity: 'user',
+            entityId: userId,
+            newValue: { keepFamilyId, revokedCount: otherFamilyIds.length },
+        });
+
+        return { revokedCount: otherFamilyIds.length };
     }
 
     /** Issue authentication tokens for a user ID */

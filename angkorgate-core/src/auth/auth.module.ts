@@ -15,6 +15,7 @@ import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { CustomersModule } from '../customers/customers.module';
 import { EmployeesModule } from '../employees/employees.module';
 import { AuthController } from './controllers/auth.controller';
+import { UserSessionsController } from './controllers/user-sessions.controller';
 import { MfaController } from './controllers/mfa.controller';
 import { MfaBackupCode } from './entities/mfa-backup-code.entity';
 import { UserMfa } from './entities/user-mfa.entity';
@@ -65,7 +66,7 @@ import { PasswordlessController } from './controllers/passwordless.controller';
         EmployeesModule,
         ApiKeysModule,
     ],
-    controllers: [AuthController, MfaController, EmailChangeController, PasskeyController, PasswordlessController],
+    controllers: [AuthController, UserSessionsController, MfaController, EmailChangeController, PasskeyController, PasswordlessController],
     providers: [
         AuthService,
         EmailChangeService,

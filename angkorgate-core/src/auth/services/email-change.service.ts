@@ -215,7 +215,7 @@ export class EmailChangeService {
         // 🔒 Revoke all sessions directly — no circular dependency
         await this.refreshRepo.update(
             { userId: record.userId, revokedAt: IsNull() },
-            { revokedAt: new Date() },
+            { revokedAt: new Date(), revokedReason: 'email_changed' },
         );
 
         void this.audit.log({

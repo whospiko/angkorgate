@@ -10,8 +10,14 @@ export class RefreshToken {
     @Column({ name: 'user_id', type: 'uuid' })
     userId: string;
 
+    @Column({ name: 'family_id', type: 'uuid', nullable: true })
+    familyId: string | null;
+
     @Column({ name: 'token_hash', type: 'text', unique: true })
     tokenHash: string;
+
+    @Column({ name: 'replaced_by_id', type: 'uuid', nullable: true })
+    replacedById: string | null;
 
     @Column({ name: 'user_agent', type: 'text', nullable: true })
     userAgent: string | null;
@@ -19,11 +25,17 @@ export class RefreshToken {
     @Column({ name: 'ip_address', type: colInet(), nullable: true })
     ipAddress: string | null;
 
+    @Column({ name: 'last_used_at', type: colTimestamptz(), nullable: true })
+    lastUsedAt: Date | null;
+
     @Column({ name: 'expires_at', type: colTimestamptz() })
     expiresAt: Date;
 
     @Column({ name: 'revoked_at', type: colTimestamptz(), nullable: true })
     revokedAt: Date | null;
+
+    @Column({ name: 'revoked_reason', type: 'varchar', length: 64, nullable: true })
+    revokedReason: string | null;
 
     @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;

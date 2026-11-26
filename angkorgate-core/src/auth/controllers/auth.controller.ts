@@ -39,7 +39,11 @@ import { ForgotPasswordDto } from '../dto/forgot-password.dto';
 import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { MfaPendingGuard } from '../guards/mfa-pending.guard';
 import { LoginMfaDto } from '../dto/login-mfa.dto';
-import { SessionResponseDto } from '../dto/session-response.dto';
+import {
+    SessionResponseDto,
+    RevokeOtherSessionsDto,
+    RevokeSessionsResultDto,
+} from '../dto/session-response.dto';
 import { UserProfileDto } from '../dto/user-profile.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { extractClientContext } from '../utils/client-context.util';
@@ -115,8 +119,8 @@ export class AuthController {
     @ApiOperation({ summary: 'Log out from all active devices and sessions' })
     @ApiResponse({ status: 204, description: 'Logged out from all sessions successfully' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
-    logoutAll(@CurrentUser('id') userId: string): Promise<void> {
-        return this.auth.logoutAll(userId);
+    async logoutAll(@CurrentUser('id') userId: string): Promise<void> {
+        await this.auth.logoutAll(userId);
     }
 
     @ApiBearerAuth('bearerAuth')
@@ -223,6 +227,21 @@ export class AuthController {
         @Body() body?: { currentRefreshToken?: string },
     ) {
         return this.auth.listSessions(userId, queryToken || body?.currentRefreshToken);
+    }
+
+    @ApiBearerAuth('bearerAuth')
+    @UseGuards(JwtAuthGuard)
+    @Post('sessions/revoke-others')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Revoke all active sessions except the current session' })
+    @ApiResponse({ status: 200, description: 'Other sessions revoked successfully', type: RevokeSessionsResultDto })
+    @ApiResponse({ status: 400, description: 'Missing currentRefreshToken or keepSessionId' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    revokeOtherSessions(
+        @CurrentUser('id') userId: string,
+        @Body() dto: RevokeOtherSessionsDto,
+    ): Promise<RevokeSessionsResultDto> {
+        return this.auth.revokeOtherSessions(userId, dto);
     }
 
     @ApiBearerAuth('bearerAuth')
