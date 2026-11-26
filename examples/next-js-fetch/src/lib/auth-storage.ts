@@ -51,6 +51,7 @@ export function saveOidcTokens(tokens: {
 
   if (tokens.id_token) {
     localStorage.setItem(ID_TOKEN_KEY, tokens.id_token);
+    setCookie(ID_TOKEN_KEY, tokens.id_token, accessMaxAge);
   }
 }
 
@@ -77,6 +78,7 @@ export function clearAuthTokens() {
   sessionStorage.removeItem(OIDC_TX_KEY);
   deleteCookie(ACCESS_TOKEN_KEY);
   deleteCookie(REFRESH_TOKEN_KEY);
+  deleteCookie(ID_TOKEN_KEY);
 }
 
 export function saveOidcTransaction(tx: OidcTransaction) {
