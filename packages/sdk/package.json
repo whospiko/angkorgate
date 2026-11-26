@@ -1,0 +1,31 @@
+{
+  "name": "@angkorgate/sdk",
+  "version": "0.1.0",
+  "description": "Framework-agnostic TypeScript/JavaScript SDK for AngkorGate IAM (OIDC/SSO, PKCE, M2M Client Credentials, Token Verification, and RBAC).",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "./node_modules/.bin/tsup",
+    "typecheck": "./node_modules/.bin/tsc --noEmit",
+    "test": "./node_modules/.bin/tsx --test \"src/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}
