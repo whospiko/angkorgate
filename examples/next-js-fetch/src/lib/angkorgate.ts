@@ -158,6 +158,7 @@ export async function exchangeCodeForTokens(
   });
 
   if (!response.ok) {
+    clearAuthTokens();
     await parseOidcError(response);
   }
 
@@ -190,6 +191,7 @@ export async function refreshOidcTokens(): Promise<OidcTokenResponse> {
   });
 
   if (!response.ok) {
+    clearAuthTokens();
     await parseOidcError(response);
   }
 

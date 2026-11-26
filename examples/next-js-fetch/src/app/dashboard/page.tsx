@@ -96,7 +96,10 @@ export default function DashboardPage() {
       setTodos(todoList);
       setIdClaims(claims);
     } catch (err) {
-      if (err instanceof AngkorGateError && err.status === 401) {
+      if (
+        err instanceof AngkorGateError &&
+        (err.status === 401 || err.status === 400)
+      ) {
         clearAuthTokens();
         router.replace("/login?redirect=/dashboard");
         return;
