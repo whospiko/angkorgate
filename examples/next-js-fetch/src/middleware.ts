@@ -8,6 +8,13 @@ import {
 
 const PROTECTED_ROUTES = ["/dashboard"];
 
+const ANGKORGATE_URL = (
+  process.env.NEXT_PUBLIC_ANGKORGATE_URL || "http://localhost:8080"
+).replace(/\/+$/, "");
+
+const OIDC_CLIENT_ID =
+  process.env.NEXT_PUBLIC_ANGKORGATE_CLIENT_ID || "next-js-fetch-demo";
+
 function hasValidSession(request: NextRequest): boolean {
   const accessToken = request.cookies.get(ACCESS_TOKEN_KEY)?.value;
   if (!accessToken) return false;
@@ -25,13 +32,56 @@ function hasValidSession(request: NextRequest): boolean {
   return true;
 }
 
-export function middleware(request: NextRequest) {
+interface RefreshedTokens {
+  access_token: string;
+  refresh_token?: string;
+  id_token?: string;
+  expires_in?: number;
+}
+
+async function tryRefreshOidcTokens(
+  refreshToken: string
+): Promise<RefreshedTokens | null> {
+  try {
+    const res = await fetch(`${ANGKORGATE_URL}/oidc/token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: OIDC_CLIENT_ID,
+        refresh_token: refreshToken,
+      }).toString(),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as RefreshedTokens;
+    return data?.access_token ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
-  const isAuthenticated = hasValidSession(request);
+  let isAuthenticated = hasValidSession(request);
+  let refreshed: RefreshedTokens | null = null;
 
   const isProtected = PROTECTED_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`)
   );
+
+  if (!isAuthenticated && (isProtected || pathname === "/login")) {
+    const refreshToken = request.cookies.get(REFRESH_TOKEN_KEY)?.value;
+    if (refreshToken) {
+      refreshed = await tryRefreshOidcTokens(refreshToken);
+      if (refreshed) {
+        isAuthenticated = true;
+      }
+    }
+  }
 
   if (isProtected && !isAuthenticated) {
     const loginUrl = new URL("/login", request.url);
@@ -45,6 +95,37 @@ export function middleware(request: NextRequest) {
 
   if (pathname === "/login" && isAuthenticated) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  if (refreshed) {
+    const isProd = process.env.NODE_ENV === "production";
+    const response = NextResponse.next();
+    response.cookies.set(ACCESS_TOKEN_KEY, refreshed.access_token, {
+      httpOnly: false,
+      secure: isProd,
+      sameSite: "lax",
+      path: "/",
+      maxAge: refreshed.expires_in || 3600,
+    });
+    if (refreshed.refresh_token) {
+      response.cookies.set(REFRESH_TOKEN_KEY, refreshed.refresh_token, {
+        httpOnly: false,
+        secure: isProd,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 604800,
+      });
+    }
+    if (refreshed.id_token) {
+      response.cookies.set(ID_TOKEN_KEY, refreshed.id_token, {
+        httpOnly: false,
+        secure: isProd,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 604800,
+      });
+    }
+    return response;
   }
 
   return NextResponse.next();
