@@ -1,22 +1,30 @@
-import type {
-  ApiEnvelope,
-  AuthTokensResponse,
-  LoginPayload,
-  LoginResponse,
-  RegisterPayload,
-  SessionInfo,
-  UserProfile,
-} from "@/types/auth";
+import type { OidcTokenResponse, OidcUserInfo } from "@/types/auth";
 import {
   clearAuthTokens,
+  consumeOidcTransaction,
   getAccessToken,
+  getIdToken,
   getRefreshToken,
-  saveAuthTokens,
+  saveOidcTokens,
+  saveOidcTransaction,
 } from "./auth-storage";
 
 export const ANGKORGATE_URL = (
   process.env.NEXT_PUBLIC_ANGKORGATE_URL || "http://localhost:8080"
 ).replace(/\/+$/, "");
+
+export const OIDC_CLIENT_ID =
+  process.env.NEXT_PUBLIC_OIDC_CLIENT_ID || "demo-app";
+
+export const OIDC_REDIRECT_URI =
+  process.env.NEXT_PUBLIC_OIDC_REDIRECT_URI || "http://localhost:3000/callback";
+
+export const OIDC_POST_LOGOUT_REDIRECT_URI =
+  process.env.NEXT_PUBLIC_OIDC_POST_LOGOUT_REDIRECT_URI || "http://localhost:3000";
+
+export const OIDC_SCOPES =
+  process.env.NEXT_PUBLIC_OIDC_SCOPES ||
+  "openid profile email roles offline_access";
 
 export class AngkorGateError extends Error {
   constructor(
@@ -29,172 +37,199 @@ export class AngkorGateError extends Error {
   }
 }
 
-function unwrapEnvelope<T>(payload: unknown): T {
-  if (
-    payload &&
-    typeof payload === "object" &&
-    "data" in payload &&
-    (payload as ApiEnvelope<T>).data !== undefined
-  ) {
-    return (payload as ApiEnvelope<T>).data as T;
+function toBase64Url(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
   }
-  return payload as T;
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-async function rawFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers = new Headers(init.headers);
-  if (!headers.has("Content-Type") && init.body !== undefined) {
-    headers.set("Content-Type", "application/json");
-  }
-  headers.set("Accept", "application/json");
+function randomBase64Url(byteLength = 32): string {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  return toBase64Url(bytes);
+}
 
-  const response = await fetch(`${ANGKORGATE_URL}${path}`, {
-    ...init,
-    headers,
-    cache: "no-store",
+async function createPkceChallenge(verifier: string): Promise<string> {
+  const data = new TextEncoder().encode(verifier);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return toBase64Url(new Uint8Array(digest));
+}
+
+export async function buildAuthorizationUrl(redirectTo = "/dashboard"): Promise<string> {
+  const state = randomBase64Url(24);
+  const nonce = randomBase64Url(24);
+  const codeVerifier = randomBase64Url(48);
+  const codeChallenge = await createPkceChallenge(codeVerifier);
+
+  saveOidcTransaction({ state, nonce, codeVerifier, redirectTo });
+
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: OIDC_CLIENT_ID,
+    redirect_uri: OIDC_REDIRECT_URI,
+    scope: OIDC_SCOPES,
+    state,
+    nonce,
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
   });
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
+  return `${ANGKORGATE_URL}/oidc/auth?${params.toString()}`;
+}
 
-  let json: unknown = null;
+async function parseOidcError(response: Response): Promise<never> {
+  let payload: unknown = null;
   const text = await response.text();
   if (text) {
     try {
-      json = JSON.parse(text);
+      payload = JSON.parse(text);
     } catch {
-      json = null;
+      payload = text;
+    }
+  }
+
+  const obj = payload as {
+    error_description?: string;
+    error?: string;
+    message?: string;
+  } | null;
+
+  const message =
+    obj?.error_description ||
+    obj?.message ||
+    obj?.error ||
+    `OIDC request failed with status ${response.status}`;
+
+  throw new AngkorGateError(message, response.status, payload);
+}
+
+export async function exchangeCodeForTokens(
+  code: string,
+  returnedState: string | null
+): Promise<{ tokens: OidcTokenResponse; redirectTo: string }> {
+  const tx = consumeOidcTransaction();
+  if (!tx) {
+    throw new AngkorGateError(
+      "Missing OIDC login session. Please start sign-in again.",
+      400
+    );
+  }
+
+  if (!returnedState || returnedState !== tx.state) {
+    throw new AngkorGateError("Invalid OIDC state parameter.", 400);
+  }
+
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    client_id: OIDC_CLIENT_ID,
+    code,
+    redirect_uri: OIDC_REDIRECT_URI,
+    code_verifier: tx.codeVerifier,
+  });
+
+  const response = await fetch(`${ANGKORGATE_URL}/oidc/token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    body: body.toString(),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    await parseOidcError(response);
+  }
+
+  const tokens = (await response.json()) as OidcTokenResponse;
+  saveOidcTokens(tokens);
+
+  return { tokens, redirectTo: tx.redirectTo || "/dashboard" };
+}
+
+export async function refreshOidcTokens(): Promise<OidcTokenResponse> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    throw new AngkorGateError("No refresh token available.", 401);
+  }
+
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    client_id: OIDC_CLIENT_ID,
+    refresh_token: refreshToken,
+  });
+
+  const response = await fetch(`${ANGKORGATE_URL}/oidc/token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    body: body.toString(),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    await parseOidcError(response);
+  }
+
+  const tokens = (await response.json()) as OidcTokenResponse;
+  saveOidcTokens(tokens);
+  return tokens;
+}
+
+export async function fetchUserInfo(): Promise<OidcUserInfo> {
+  let token = getAccessToken();
+
+  if (!token) {
+    const refreshed = await refreshOidcTokens();
+    token = refreshed.access_token;
+  }
+
+  const callMe = (accessToken: string) =>
+    fetch(`${ANGKORGATE_URL}/oidc/me`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+
+  let response = await callMe(token);
+
+  if (response.status === 401 && getRefreshToken()) {
+    try {
+      const refreshed = await refreshOidcTokens();
+      response = await callMe(refreshed.access_token);
+    } catch (err) {
+      clearAuthTokens();
+      throw err;
     }
   }
 
   if (!response.ok) {
-    const errObj = json as { message?: string | string[]; error?: string } | null;
-    const rawMsg = errObj?.message;
-    const message =
-      (Array.isArray(rawMsg) ? rawMsg.join(", ") : rawMsg) ||
-      errObj?.error ||
-      `Request failed with status ${response.status}`;
-    throw new AngkorGateError(message, response.status, json);
-  }
-
-  return unwrapEnvelope<T>(json);
-}
-
-export async function loginWithEmail(payload: LoginPayload): Promise<LoginResponse> {
-  const result = await rawFetch<LoginResponse>("/auth/login", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-
-  if (!("mfaRequired" in result)) {
-    saveAuthTokens(result);
-  }
-
-  return result;
-}
-
-export async function completeMfaLogin(
-  mfaToken: string,
-  code: string
-): Promise<AuthTokensResponse> {
-  const result = await rawFetch<AuthTokensResponse>("/auth/login/mfa", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${mfaToken}`,
-    },
-    body: JSON.stringify({ code }),
-  });
-
-  saveAuthTokens(result);
-  return result;
-}
-
-export async function registerCustomer(payload: RegisterPayload): Promise<unknown> {
-  return rawFetch("/auth/register", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function refreshSession(): Promise<AuthTokensResponse> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) {
-    throw new AngkorGateError("No refresh token available", 401);
-  }
-
-  const result = await rawFetch<AuthTokensResponse>("/auth/refresh", {
-    method: "POST",
-    body: JSON.stringify({ refreshToken }),
-  });
-
-  saveAuthTokens(result);
-  return result;
-}
-
-async function fetchWithAutoRefresh<T>(
-  path: string,
-  init: RequestInit = {}
-): Promise<T> {
-  let token = getAccessToken();
-
-  if (!token) {
-    const refreshed = await refreshSession();
-    token = refreshed.accessToken;
-  }
-
-  try {
-    return await rawFetch<T>(path, {
-      ...init,
-      headers: {
-        ...init.headers,
-        Authorization: `Bearer ${token}`,
-      },
-    });
-  } catch (err) {
-    if (err instanceof AngkorGateError && err.status === 401 && getRefreshToken()) {
-      try {
-        const refreshed = await refreshSession();
-        return await rawFetch<T>(path, {
-          ...init,
-          headers: {
-            ...init.headers,
-            Authorization: `Bearer ${refreshed.accessToken}`,
-          },
-        });
-      } catch (refreshErr) {
-        clearAuthTokens();
-        throw refreshErr;
-      }
+    if (response.status === 401) {
+      clearAuthTokens();
     }
-    throw err;
+    await parseOidcError(response);
   }
+
+  return (await response.json()) as OidcUserInfo;
 }
 
-export async function fetchMe(): Promise<UserProfile> {
-  return fetchWithAutoRefresh<UserProfile>("/auth/me", { method: "GET" });
-}
+export function buildEndSessionUrl(): string {
+  const idToken = getIdToken();
+  clearAuthTokens();
 
-export async function fetchSessions(): Promise<SessionInfo[]> {
-  const refreshToken = getRefreshToken();
-  const query = refreshToken
-    ? `?currentRefreshToken=${encodeURIComponent(refreshToken)}`
-    : "";
-  return fetchWithAutoRefresh<SessionInfo[]>(`/auth/sessions${query}`, {
-    method: "GET",
+  const params = new URLSearchParams({
+    post_logout_redirect_uri: OIDC_POST_LOGOUT_REDIRECT_URI,
   });
-}
-
-export async function logoutSession(): Promise<void> {
-  const refreshToken = getRefreshToken();
-  try {
-    if (refreshToken) {
-      await rawFetch<void>("/auth/logout", {
-        method: "POST",
-        body: JSON.stringify({ refreshToken }),
-      });
-    }
-  } finally {
-    clearAuthTokens();
+  if (idToken) {
+    params.set("id_token_hint", idToken);
   }
+
+  return `${ANGKORGATE_URL}/oidc/session/end?${params.toString()}`;
 }

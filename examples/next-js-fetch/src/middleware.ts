@@ -6,7 +6,6 @@ import {
 } from "./lib/auth-storage";
 
 const PROTECTED_ROUTES = ["/dashboard"];
-const AUTH_ROUTES = ["/login", "/register"];
 
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
@@ -26,11 +25,7 @@ export function middleware(request: NextRequest) {
     return response;
   }
 
-  const isAuthRoute = AUTH_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
-  );
-
-  if (isAuthRoute && isAuthenticated) {
+  if (pathname === "/login" && isAuthenticated) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

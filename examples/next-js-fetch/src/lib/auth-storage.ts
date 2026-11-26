@@ -1,5 +1,14 @@
 export const ACCESS_TOKEN_KEY = "angkorgate_token";
 export const REFRESH_TOKEN_KEY = "angkorgate_refresh_token";
+export const ID_TOKEN_KEY = "angkorgate_id_token";
+export const OIDC_TX_KEY = "angkorgate_oidc_tx";
+
+export interface OidcTransaction {
+  state: string;
+  nonce: string;
+  codeVerifier: string;
+  redirectTo: string;
+}
 
 function setCookie(name: string, value: string, maxAgeSeconds: number) {
   if (typeof document === "undefined") return;
@@ -22,23 +31,27 @@ function deleteCookie(name: string) {
   document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
 }
 
-export function saveAuthTokens(params: {
-  accessToken: string;
-  refreshToken: string;
-  accessTokenExpiresIn?: number;
-  refreshTokenExpiresIn?: number;
+export function saveOidcTokens(tokens: {
+  access_token: string;
+  refresh_token?: string;
+  id_token?: string;
+  expires_in?: number;
 }) {
   if (typeof window === "undefined") return;
 
-  const accessMaxAge = params.accessTokenExpiresIn ?? 900;
-  const refreshMaxAge = params.refreshTokenExpiresIn ?? 604800;
+  const accessMaxAge = tokens.expires_in ?? 3600;
 
-  localStorage.setItem(ACCESS_TOKEN_KEY, params.accessToken);
-  localStorage.setItem(REFRESH_TOKEN_KEY, params.refreshToken);
+  localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
+  setCookie(ACCESS_TOKEN_KEY, tokens.access_token, accessMaxAge);
 
-  // Also persist in cookies so Next.js middleware.ts can protect /dashboard
-  setCookie(ACCESS_TOKEN_KEY, params.accessToken, accessMaxAge);
-  setCookie(REFRESH_TOKEN_KEY, params.refreshToken, refreshMaxAge);
+  if (tokens.refresh_token) {
+    localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
+    setCookie(REFRESH_TOKEN_KEY, tokens.refresh_token, 60 * 60 * 24 * 30);
+  }
+
+  if (tokens.id_token) {
+    localStorage.setItem(ID_TOKEN_KEY, tokens.id_token);
+  }
 }
 
 export function getAccessToken(): string | null {
@@ -51,17 +64,41 @@ export function getRefreshToken(): string | null {
   return localStorage.getItem(REFRESH_TOKEN_KEY) || getCookie(REFRESH_TOKEN_KEY);
 }
 
+export function getIdToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(ID_TOKEN_KEY);
+}
+
 export function clearAuthTokens() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem(ID_TOKEN_KEY);
+  sessionStorage.removeItem(OIDC_TX_KEY);
   deleteCookie(ACCESS_TOKEN_KEY);
   deleteCookie(REFRESH_TOKEN_KEY);
 }
 
-export function isJwtValidStructureAndUnexpired(token: string): boolean {
+export function saveOidcTransaction(tx: OidcTransaction) {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(OIDC_TX_KEY, JSON.stringify(tx));
+}
+
+export function consumeOidcTransaction(): OidcTransaction | null {
+  if (typeof window === "undefined") return null;
+  const raw = sessionStorage.getItem(OIDC_TX_KEY);
+  sessionStorage.removeItem(OIDC_TX_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as OidcTransaction;
+  } catch {
+    return null;
+  }
+}
+
+export function decodeJwtPayload<T = Record<string, unknown>>(token: string): T | null {
   const parts = token.split(".");
-  if (parts.length !== 3) return false;
+  if (parts.length !== 3) return null;
 
   try {
     const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
@@ -70,10 +107,15 @@ export function isJwtValidStructureAndUnexpired(token: string): boolean {
       typeof atob === "function"
         ? atob(padded)
         : Buffer.from(padded, "base64").toString("utf-8");
-    const payload = JSON.parse(json) as { exp?: number };
-    const now = Math.floor(Date.now() / 1000);
-    return !payload.exp || payload.exp > now;
+    return JSON.parse(json) as T;
   } catch {
-    return false;
+    return null;
   }
+}
+
+export function isJwtValidStructureAndUnexpired(token: string): boolean {
+  const payload = decodeJwtPayload<{ exp?: number }>(token);
+  if (!payload) return false;
+  const now = Math.floor(Date.now() / 1000);
+  return !payload.exp || payload.exp > now;
 }
