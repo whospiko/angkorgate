@@ -35,6 +35,7 @@ AngkorGate gives developers and organizations a clean, self-hosted alternative t
 | **RBAC & Governance** | Granular `resource:action` permissions, role assignment, per-user permission overrides, and configurable console access roles. |
 | **User, Staff & CRM Directory** | Manage auth accounts, sign-in method visibility, Employee profiles, and Customer CRM records in one place. |
 | **API Keys & Audit Logs** | Developer API Keys gateway and tamper-evident audit logging for authentication and administrative events. |
+| **Global Command Palette (`Cmd + K`)** | Unified keyboard launcher across the Console to search users by email or ID, jump directly to client apps, audit logs, or settings, and run quick actions (**Create API Key**, **Toggle Maintenance Mode**, **Purge Redis Cache**). |
 | **White-Label CMS & Legal Pages** | Built-in Content Management (`/settings/content`) for app name, custom logo, support email, and CMS-aware `/terms` and `/privacy` pages. |
 
 ### Non-Features
