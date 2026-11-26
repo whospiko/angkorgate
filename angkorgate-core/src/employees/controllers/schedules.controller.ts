@@ -18,16 +18,17 @@ import {
     ApiResponse,
     ApiTags,
 } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { Permissions } from '../../rbac/decorators/permissions.decorator';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { UnifiedAuthGuard } from '../../auth/guards/unified-auth.guard';
 import { SchedulesService } from '../services/schedules.service';
 import { CreateEmployeeScheduleDto } from '../dto/create-schedule.dto';
 import { UpdateScheduleDto } from '../dto/update-schedule.dto';
 
 @ApiTags('Employees')
 @ApiBearerAuth('bearerAuth')
-@UseGuards(AuthGuard('jwt'), PermissionsGuard)
+@UseGuards(UnifiedAuthGuard, PermissionsGuard)
 @Controller('employees/:employeeId/schedules')
 export class SchedulesController {
     constructor(private readonly schedules: SchedulesService) { }
@@ -44,8 +45,9 @@ export class SchedulesController {
     create(
         @Param('employeeId', ParseUUIDPipe) employeeId: string,
         @Body() dto: CreateEmployeeScheduleDto,
+        @CurrentUser('id') actorId: string,
     ) {
-        return this.schedules.create({ ...dto, employeeId });
+        return this.schedules.create({ ...dto, employeeId }, actorId);
     }
 
     @Get()
@@ -87,11 +89,12 @@ export class SchedulesController {
     @ApiResponse({ status: 403, description: 'Forbidden' })
     @ApiResponse({ status: 404, description: 'Schedule not found' })
     update(
-        @Param('employeeId', ParseUUIDPipe) _employeeId: string,
+        @Param('employeeId', ParseUUIDPipe) employeeId: string,
         @Param('id', ParseUUIDPipe) id: string,
         @Body() dto: UpdateScheduleDto,
+        @CurrentUser('id') actorId: string,
     ) {
-        return this.schedules.update(id, dto);
+        return this.schedules.update(employeeId, id, dto, actorId);
     }
 
     @Delete(':id')
@@ -104,7 +107,11 @@ export class SchedulesController {
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden' })
     @ApiResponse({ status: 404, description: 'Schedule not found' })
-    remove(@Param('id', ParseUUIDPipe) id: string) {
-        return this.schedules.remove(id);
+    remove(
+        @Param('employeeId', ParseUUIDPipe) employeeId: string,
+        @Param('id', ParseUUIDPipe) id: string,
+        @CurrentUser('id') actorId: string,
+    ) {
+        return this.schedules.remove(employeeId, id, actorId);
     }
 }

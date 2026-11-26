@@ -30,6 +30,7 @@ import { EmployeesService } from '../services/employees.service';
 import { CreateEmployeeDto } from '../dto/create-employee.dto';
 import { UpdateEmployeeDto } from '../dto/update-employee.dto';
 import { EmployeeResponseDto } from '../dto/employee-response.dto';
+import { LinkEmployeeUserDto } from '../dto/link-employee-user.dto';
 
 @ApiTags('Employees')
 @ApiBearerAuth('bearerAuth')
@@ -57,9 +58,10 @@ export class EmployeesController {
     @Get()
     @Permissions('employee:read')
     @ApiOperation({ summary: 'List employees with optional filtering and pagination' })
-    @ApiQuery({ name: 'status', required: false, description: 'Filter by employment status' })
+    @ApiQuery({ name: 'status', required: false, enum: ['ACTIVE', 'ON_LEAVE', 'RESIGNED', 'TERMINATED'], description: 'Filter by employment status' })
     @ApiQuery({ name: 'departmentCode', required: false, description: 'Filter by department code' })
     @ApiQuery({ name: 'jobTitleCode', required: false, description: 'Filter by job title code' })
+    @ApiQuery({ name: 'search', required: false, description: 'Search by full name, employeeCode, or phone' })
     @ApiQuery({ name: 'page', required: false, example: '1', description: 'Page number' })
     @ApiQuery({ name: 'limit', required: false, example: '20', description: 'Items per page' })
     @ApiResponse({ status: 200, description: 'Paginated employee list' })
@@ -69,6 +71,7 @@ export class EmployeesController {
         @Query('status') status?: string,
         @Query('departmentCode') departmentCode?: string,
         @Query('jobTitleCode') jobTitleCode?: string,
+        @Query('search') search?: string,
         @Query('page') page?: string,
         @Query('limit') limit?: string,
     ) {
@@ -76,6 +79,7 @@ export class EmployeesController {
             status,
             departmentCode,
             jobTitleCode,
+            search,
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
         });
@@ -119,6 +123,19 @@ export class EmployeesController {
         return this.employees.update(id, dto, actorId);
     }
 
+    @Patch(':id/user')
+    @Permissions('employee:write')
+    @ApiOperation({ summary: 'Link or unlink a user account to an employee profile' })
+    @ApiParam({ name: 'id', description: 'Employee UUID' })
+    @ApiResponse({ status: 200, description: 'Employee user link updated', type: EmployeeResponseDto })
+    linkUser(
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() dto: LinkEmployeeUserDto,
+        @CurrentUser('id') actorId: string,
+    ) {
+        return this.employees.linkUser(id, dto.userId ?? null, actorId);
+    }
+
     @Patch(':id/status/:status')
     @HttpCode(HttpStatus.NO_CONTENT)
     @Permissions('employee:write')
@@ -126,6 +143,7 @@ export class EmployeesController {
     @ApiParam({ name: 'id', description: 'Employee UUID' })
     @ApiParam({ name: 'status', enum: ['ACTIVE', 'ON_LEAVE', 'RESIGNED', 'TERMINATED'], description: 'New employment status' })
     @ApiResponse({ status: 204, description: 'Employee status updated successfully' })
+    @ApiResponse({ status: 400, description: 'Invalid employment status' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden (lacks employee:write permission)' })
     @ApiResponse({ status: 404, description: 'Employee not found' })
@@ -134,17 +152,13 @@ export class EmployeesController {
         @Param('status') status: string,
         @CurrentUser('id') actorId: string,
     ) {
-        return this.employees.setStatus(
-            id,
-            status.toUpperCase() as 'ACTIVE' | 'ON_LEAVE' | 'RESIGNED' | 'TERMINATED',
-            actorId,
-        );
+        return this.employees.setStatus(id, status, actorId);
     }
 
     @Delete(':id')
     @HttpCode(HttpStatus.NO_CONTENT)
     @Permissions('employee:write')
-    @ApiOperation({ summary: 'Delete employee profile' })
+    @ApiOperation({ summary: 'Soft delete employee profile' })
     @ApiParam({ name: 'id', description: 'Employee UUID' })
     @ApiResponse({ status: 204, description: 'Employee deleted successfully' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })

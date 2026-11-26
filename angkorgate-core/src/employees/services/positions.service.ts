@@ -1,12 +1,19 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    ConflictException,
+    Injectable,
+    NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { EmployeePosition } from '../entities/employee-position.entity';
 import { EmployeeAttribute } from '../entities/employee-attribute.entity';
 import { JobTitlesService } from './job-titles.service';
 import { AssignPositionDto } from '../dto/assign-position.dto';
+import { UpdatePositionDto } from '../dto/update-position.dto';
 import { EmployeesService } from './employees.service';
 import { DepartmentsService } from './departments.service';
+import { AuditService } from '../../audit/services/audit.service';
 
 @Injectable()
 export class PositionsService {
@@ -18,9 +25,14 @@ export class PositionsService {
         private readonly employees: EmployeesService,
         private readonly departments: DepartmentsService,
         private readonly jobTitles: JobTitlesService,
+        private readonly audit: AuditService,
     ) { }
 
-    async assign(dto: AssignPositionDto): Promise<EmployeePosition> {
+    async assign(dto: AssignPositionDto, actorId?: string): Promise<EmployeePosition> {
+        if (dto.startDate && dto.endDate && dto.startDate > dto.endDate) {
+            throw new BadRequestException('Position startDate cannot be after endDate');
+        }
+
         const employee = await this.employees.findByIdOrFail(dto.employeeId);
         const jobTitle = await this.jobTitles.findByCodeOrFail(dto.jobTitleCode);
 
@@ -30,7 +42,17 @@ export class PositionsService {
             departmentId = dept.id;
         }
 
-        // If isPrimary, demote any existing primary position
+        const existing = await this.posRepo.findOne({
+            where: {
+                employeeId: employee.id,
+                jobTitleId: jobTitle.id,
+                departmentId: departmentId === null ? IsNull() : departmentId,
+            },
+        });
+        if (existing) {
+            throw new ConflictException('Position already assigned');
+        }
+
         if (dto.isPrimary) {
             await this.posRepo.update(
                 { employeeId: employee.id, isPrimary: true },
@@ -38,18 +60,7 @@ export class PositionsService {
             );
         }
 
-        const existing = await this.posRepo.findOne({
-            where: {
-                employeeId: employee.id,
-                jobTitleId: jobTitle.id,
-                departmentId: departmentId ?? undefined,
-            },
-        });
-        if (existing) {
-            throw new ConflictException('Position already assigned');
-        }
-
-        return this.posRepo.save(
+        const saved = await this.posRepo.save(
             this.posRepo.create({
                 employeeId: employee.id,
                 jobTitleId: jobTitle.id,
@@ -59,9 +70,25 @@ export class PositionsService {
                 endDate: dto.endDate ?? null,
             }),
         );
+
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'employee.position.assign',
+            entity: 'employee_position',
+            entityId: saved.id,
+            newValue: {
+                employeeId: employee.id,
+                jobTitleCode: dto.jobTitleCode,
+                departmentCode: dto.departmentCode ?? null,
+                isPrimary: saved.isPrimary,
+            },
+        });
+
+        return this.findById(employee.id, saved.id);
     }
 
     async findByEmployee(employeeId: string) {
+        await this.employees.findByIdOrFail(employeeId);
         return this.posRepo.find({
             where: { employeeId },
             relations: { jobTitle: true, department: true },
@@ -78,39 +105,173 @@ export class PositionsService {
         return p;
     }
 
-    async remove(positionId: string): Promise<void> {
-        const result = await this.posRepo.delete(positionId);
+    async update(
+        employeeId: string,
+        positionId: string,
+        dto: UpdatePositionDto,
+        actorId?: string,
+    ): Promise<EmployeePosition> {
+        const p = await this.findById(employeeId, positionId);
+
+        const nextStart = dto.startDate !== undefined ? dto.startDate : p.startDate;
+        const nextEnd = dto.endDate !== undefined ? dto.endDate : p.endDate;
+        if (nextStart && nextEnd && nextStart > nextEnd) {
+            throw new BadRequestException('Position startDate cannot be after endDate');
+        }
+
+        let nextDepartmentId = p.departmentId;
+        if (dto.departmentCode !== undefined) {
+            if (dto.departmentCode === null || dto.departmentCode === '') {
+                nextDepartmentId = null;
+            } else {
+                const dept = await this.departments.findByCodeOrFail(dto.departmentCode);
+                nextDepartmentId = dept.id;
+            }
+        }
+
+        if (nextDepartmentId !== p.departmentId) {
+            const dup = await this.posRepo.findOne({
+                where: {
+                    employeeId,
+                    jobTitleId: p.jobTitleId,
+                    departmentId: nextDepartmentId === null ? IsNull() : nextDepartmentId,
+                },
+            });
+            if (dup && dup.id !== positionId) {
+                throw new ConflictException('Position already assigned for this department');
+            }
+        }
+
+        if (dto.isPrimary === true && !p.isPrimary) {
+            await this.posRepo.update(
+                { employeeId, isPrimary: true },
+                { isPrimary: false },
+            );
+        }
+
+        const oldValue = {
+            departmentId: p.departmentId,
+            isPrimary: p.isPrimary,
+            startDate: p.startDate,
+            endDate: p.endDate,
+        };
+
+        p.departmentId = nextDepartmentId;
+        if (dto.isPrimary !== undefined) p.isPrimary = dto.isPrimary;
+        if (dto.startDate !== undefined) p.startDate = dto.startDate;
+        if (dto.endDate !== undefined) p.endDate = dto.endDate;
+
+        await this.posRepo.save(p);
+
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'employee.position.update',
+            entity: 'employee_position',
+            entityId: positionId,
+            oldValue,
+            newValue: {
+                departmentId: p.departmentId,
+                isPrimary: p.isPrimary,
+                startDate: p.startDate,
+                endDate: p.endDate,
+            },
+        });
+
+        return this.findById(employeeId, positionId);
+    }
+
+    async remove(
+        employeeId: string,
+        positionId: string,
+        actorId?: string,
+    ): Promise<void> {
+        const existing = await this.findById(employeeId, positionId);
+        const result = await this.posRepo.delete({ id: positionId, employeeId });
         if (result.affected === 0) {
             throw new NotFoundException(`Position ${positionId} not found`);
         }
+
+        if (existing.isPrimary) {
+            const nextPrimary = await this.posRepo.findOne({
+                where: { employeeId },
+                order: { createdAt: 'ASC' },
+            });
+            if (nextPrimary) {
+                await this.posRepo.update(nextPrimary.id, { isPrimary: true });
+            }
+        }
+
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'employee.position.remove',
+            entity: 'employee_position',
+            entityId: positionId,
+            oldValue: {
+                employeeId,
+                jobTitleId: existing.jobTitleId,
+                departmentId: existing.departmentId,
+            },
+        });
     }
 
     /** Dynamic attributes (JSONB key/value) */
     async setAttribute(
+        employeeId: string,
         positionId: string,
         key: string,
         value: unknown,
+        actorId?: string,
     ): Promise<EmployeeAttribute> {
-        const position = await this.posRepo.findOne({ where: { id: positionId } });
-        if (!position) throw new NotFoundException(`Position ${positionId} not found`);
+        await this.findById(employeeId, positionId);
 
         let attr = await this.attrRepo.findOne({ where: { positionId, key } });
+        const oldValue = attr ? attr.value : undefined;
         if (attr) {
             attr.value = value;
         } else {
             attr = this.attrRepo.create({ positionId, key, value });
         }
-        return this.attrRepo.save(attr);
+        const saved = await this.attrRepo.save(attr);
+
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'employee.position.attribute.set',
+            entity: 'employee_position',
+            entityId: positionId,
+            oldValue: oldValue !== undefined ? { [key]: oldValue } : undefined,
+            newValue: { [key]: value },
+        });
+
+        return saved;
     }
 
-    async getAttributes(positionId: string): Promise<Record<string, unknown>> {
+    async getAttributes(
+        employeeId: string,
+        positionId: string,
+    ): Promise<Record<string, unknown>> {
+        await this.findById(employeeId, positionId);
         const attrs = await this.attrRepo.find({ where: { positionId } });
         const out: Record<string, unknown> = {};
         for (const a of attrs) out[a.key] = a.value;
         return out;
     }
 
-    async deleteAttribute(positionId: string, key: string): Promise<void> {
-        await this.attrRepo.delete({ positionId, key });
+    async deleteAttribute(
+        employeeId: string,
+        positionId: string,
+        key: string,
+        actorId?: string,
+    ): Promise<void> {
+        await this.findById(employeeId, positionId);
+        const result = await this.attrRepo.delete({ positionId, key });
+        if (result.affected && result.affected > 0) {
+            void this.audit.log({
+                actorId: actorId ?? null,
+                action: 'employee.position.attribute.delete',
+                entity: 'employee_position',
+                entityId: positionId,
+                oldValue: { key },
+            });
+        }
     }
 }

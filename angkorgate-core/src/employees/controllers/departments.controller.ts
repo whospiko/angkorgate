@@ -6,16 +6,17 @@ import {
     ApiResponse,
     ApiTags,
 } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { Permissions } from '../../rbac/decorators/permissions.decorator';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { UnifiedAuthGuard } from '../../auth/guards/unified-auth.guard';
 import { DepartmentsService } from '../services/departments.service';
 import { CreateDepartmentDto } from '../dto/create-department.dto';
 import { UpdateDepartmentDto } from '../dto/update-department.dto';
 
 @ApiTags('Employees')
 @ApiBearerAuth('bearerAuth')
-@UseGuards(AuthGuard('jwt'), PermissionsGuard)
+@UseGuards(UnifiedAuthGuard, PermissionsGuard)
 @Controller('departments')
 export class DepartmentsController {
     constructor(private readonly departments: DepartmentsService) { }
@@ -27,8 +28,11 @@ export class DepartmentsController {
     @ApiResponse({ status: 400, description: 'Validation error' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden' })
-    create(@Body() dto: CreateDepartmentDto) {
-        return this.departments.create(dto);
+    create(
+        @Body() dto: CreateDepartmentDto,
+        @CurrentUser('id') actorId: string,
+    ) {
+        return this.departments.create(dto, actorId);
     }
 
     @Get()
@@ -65,8 +69,9 @@ export class DepartmentsController {
     update(
         @Param('code') code: string,
         @Body() dto: UpdateDepartmentDto,
+        @CurrentUser('id') actorId: string,
     ) {
-        return this.departments.update(code, dto);
+        return this.departments.update(code, dto, actorId);
     }
 
     @Delete(':code')
@@ -78,8 +83,11 @@ export class DepartmentsController {
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden' })
     @ApiResponse({ status: 404, description: 'Department not found' })
-    remove(@Param('code') code: string) {
-        return this.departments.remove(code);
+    remove(
+        @Param('code') code: string,
+        @CurrentUser('id') actorId: string,
+    ) {
+        return this.departments.remove(code, actorId);
     }
 
     @Post('seed/:template')
@@ -89,7 +97,10 @@ export class DepartmentsController {
     @ApiResponse({ status: 201, description: 'Departments seeded successfully' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden' })
-    async seed(@Param('template') template: string) {
-        return this.departments.seedFromTemplate(template);
+    async seed(
+        @Param('template') template: string,
+        @CurrentUser('id') actorId: string,
+    ) {
+        return this.departments.seedFromTemplate(template, actorId);
     }
 }

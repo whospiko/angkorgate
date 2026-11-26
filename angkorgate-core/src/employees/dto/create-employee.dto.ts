@@ -17,14 +17,15 @@ export class CreateEmployeeDto {
     @IsUUID()
     userId?: string;
 
-    @ApiProperty({
-        description: 'Unique employee ID code',
+    @ApiPropertyOptional({
+        description: 'Unique employee ID code (auto-generated as EMP-0001 if omitted)',
         example: 'EMP-001',
         maxLength: 30,
     })
+    @IsOptional()
     @IsString()
     @MaxLength(30)
-    employeeCode: string;
+    employeeCode?: string;
 
     @ApiProperty({
         description: 'Employee full legal or display name',

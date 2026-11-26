@@ -2,6 +2,7 @@ import { colTimestamptz } from '../../common/utils/db-types.util';
 import {
     Column,
     CreateDateColumn,
+    DeleteDateColumn,
     Entity,
     Index,
     JoinColumn,
@@ -70,6 +71,9 @@ export class Employee {
 
     @UpdateDateColumn({ name: 'updated_at', type: colTimestamptz() })
     updatedAt: Date;
+
+    @DeleteDateColumn({ name: 'deleted_at', type: colTimestamptz(), nullable: true })
+    deletedAt: Date | null;
 
     @OneToMany(() => EmployeePosition, (p) => p.employee)
     positions: EmployeePosition[];

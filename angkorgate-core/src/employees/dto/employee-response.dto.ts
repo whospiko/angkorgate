@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Employee } from '../entities/employee.entity';
+import { EmployeePosition } from '../entities/employee-position.entity';
+import { WorkSchedule } from '../entities/work-schedule.entity';
 
 export class EmployeeResponseDto {
     @ApiProperty({ description: 'Employee UUID', example: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' })
@@ -44,6 +46,12 @@ export class EmployeeResponseDto {
     @ApiProperty({ description: 'Record last update timestamp', example: '2026-11-21T11:00:00.000Z' })
     updatedAt: Date;
 
+    @ApiPropertyOptional({ description: 'Assigned positions when loaded' })
+    positions?: EmployeePosition[];
+
+    @ApiPropertyOptional({ description: 'Assigned work schedules when loaded' })
+    schedules?: WorkSchedule[];
+
     static fromEntity(e: Employee): EmployeeResponseDto {
         const dto = new EmployeeResponseDto();
         dto.id = e.id;
@@ -60,6 +68,12 @@ export class EmployeeResponseDto {
         dto.employmentStatus = e.employmentStatus;
         dto.createdAt = e.createdAt;
         dto.updatedAt = e.updatedAt;
+        if (Array.isArray(e.positions)) {
+            dto.positions = e.positions;
+        }
+        if (Array.isArray(e.schedules)) {
+            dto.schedules = e.schedules;
+        }
         return dto;
     }
 }

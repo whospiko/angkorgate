@@ -4,18 +4,30 @@ import { Repository } from 'typeorm';
 import { JobTitle } from '../entities/job-title.entity';
 import { CreateJobTitleDto } from '../dto/create-job-title.dto';
 import { UpdateJobTitleDto } from '../dto/update-job-title.dto';
+import { AuditService } from '../../audit/services/audit.service';
 
 @Injectable()
 export class JobTitlesService {
     constructor(
         @InjectRepository(JobTitle)
         private readonly repo: Repository<JobTitle>,
+        private readonly audit: AuditService,
     ) { }
 
-    async create(dto: CreateJobTitleDto): Promise<JobTitle> {
+    async create(dto: CreateJobTitleDto, actorId?: string): Promise<JobTitle> {
         const exists = await this.repo.findOne({ where: { code: dto.code } });
         if (exists) throw new ConflictException(`Job title ${dto.code} exists`);
-        return this.repo.save(this.repo.create(dto));
+        const saved = await this.repo.save(this.repo.create(dto));
+
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'job_title.create',
+            entity: 'job_title',
+            entityId: saved.id,
+            newValue: { code: saved.code, name: saved.name, category: saved.category },
+        });
+
+        return saved;
     }
 
     findAll(category?: string): Promise<JobTitle[]> {
@@ -31,14 +43,34 @@ export class JobTitlesService {
         return j;
     }
 
-    async update(code: string, dto: UpdateJobTitleDto): Promise<JobTitle> {
+    async update(code: string, dto: UpdateJobTitleDto, actorId?: string): Promise<JobTitle> {
         const j = await this.findByCodeOrFail(code);
+        const oldValue = { name: j.name, category: j.category, isActive: j.isActive };
         Object.assign(j, dto);
-        return this.repo.save(j);
+        const saved = await this.repo.save(j);
+
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'job_title.update',
+            entity: 'job_title',
+            entityId: j.id,
+            oldValue,
+            newValue: dto as Record<string, unknown>,
+        });
+
+        return saved;
     }
 
-    async remove(code: string): Promise<void> {
+    async remove(code: string, actorId?: string): Promise<void> {
         const j = await this.findByCodeOrFail(code);
         await this.repo.delete(j.id);
+
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'job_title.delete',
+            entity: 'job_title',
+            entityId: j.id,
+            oldValue: { code: j.code, name: j.name },
+        });
     }
 }

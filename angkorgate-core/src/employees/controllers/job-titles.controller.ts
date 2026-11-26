@@ -7,16 +7,17 @@ import {
     ApiResponse,
     ApiTags,
 } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { Permissions } from '../../rbac/decorators/permissions.decorator';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { UnifiedAuthGuard } from '../../auth/guards/unified-auth.guard';
 import { JobTitlesService } from '../services/job-titles.service';
 import { CreateJobTitleDto } from '../dto/create-job-title.dto';
 import { UpdateJobTitleDto } from '../dto/update-job-title.dto';
 
 @ApiTags('Employees')
 @ApiBearerAuth('bearerAuth')
-@UseGuards(AuthGuard('jwt'), PermissionsGuard)
+@UseGuards(UnifiedAuthGuard, PermissionsGuard)
 @Controller('job-titles')
 export class JobTitlesController {
     constructor(private readonly jobTitles: JobTitlesService) { }
@@ -28,8 +29,11 @@ export class JobTitlesController {
     @ApiResponse({ status: 400, description: 'Validation error' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden' })
-    create(@Body() dto: CreateJobTitleDto) {
-        return this.jobTitles.create(dto);
+    create(
+        @Body() dto: CreateJobTitleDto,
+        @CurrentUser('id') actorId: string,
+    ) {
+        return this.jobTitles.create(dto, actorId);
     }
 
     @Get()
@@ -67,8 +71,9 @@ export class JobTitlesController {
     update(
         @Param('code') code: string,
         @Body() dto: UpdateJobTitleDto,
+        @CurrentUser('id') actorId: string,
     ) {
-        return this.jobTitles.update(code, dto);
+        return this.jobTitles.update(code, dto, actorId);
     }
 
     @Delete(':code')
@@ -80,7 +85,10 @@ export class JobTitlesController {
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @ApiResponse({ status: 403, description: 'Forbidden' })
     @ApiResponse({ status: 404, description: 'Job title not found' })
-    remove(@Param('code') code: string) {
-        return this.jobTitles.remove(code);
+    remove(
+        @Param('code') code: string,
+        @CurrentUser('id') actorId: string,
+    ) {
+        return this.jobTitles.remove(code, actorId);
     }
 }
