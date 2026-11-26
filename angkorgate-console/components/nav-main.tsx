@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import {
   Collapsible,
   CollapsibleContent,
@@ -44,7 +45,13 @@ export function NavMain({
           >
             <SidebarMenuButton
               tooltip={item.title}
-              render={<a href={item.url} />}
+              render={
+                item.url.startsWith("/") ? (
+                  <Link href={item.url} />
+                ) : (
+                  <a href={item.url} target="_blank" rel="noreferrer" />
+                )
+              }
             >
               {item.icon}
               <span>{item.title}</span>
@@ -63,7 +70,19 @@ export function NavMain({
                   <SidebarMenuSub>
                     {item.items?.map((subItem) => (
                       <SidebarMenuSubItem key={subItem.title}>
-                        <SidebarMenuSubButton render={<a href={subItem.url} />}>
+                        <SidebarMenuSubButton
+                          render={
+                            subItem.url.startsWith("/") ? (
+                              <Link href={subItem.url} />
+                            ) : (
+                              <a
+                                href={subItem.url}
+                                target="_blank"
+                                rel="noreferrer"
+                              />
+                            )
+                          }
+                        >
                           <span>{subItem.title}</span>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>

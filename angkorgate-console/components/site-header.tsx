@@ -32,7 +32,9 @@ const routeTitles: Record<string, string> = {
   "/settings/dev-inbox": "Dev Outbox",
   "/system/health": "Core API Health",
   "/system/cache": "Cache Metrics",
+  "/api-explorer": "Swagger API Explorer",
   "/oidc": "OpenID Connect Discovery",
+  "/oidc/discovery": "OpenID Discovery",
 }
 
 export function SiteHeader() {

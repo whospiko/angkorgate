@@ -117,11 +117,11 @@ const defaultNavData = {
         },
         {
           title: "Swagger API Explorer",
-          url: `${publicCoreUrl}/api#`,
+          url: "/api-explorer",
         },
         {
-          title: "OpenID Discovery JSON",
-          url: `${publicCoreUrl}/oidc/.well-known/openid-configuration`,
+          title: "OpenID Discovery",
+          url: "/oidc/discovery",
         },
       ],
     },

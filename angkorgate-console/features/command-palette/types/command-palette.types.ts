@@ -172,6 +172,22 @@ export const STATIC_COMMAND_ENTRIES: StaticCommandEntry[] = [
     keywords: ["cache", "redis", "metrics", "keys", "prefix"],
     href: "/system/cache",
   },
+  {
+    id: "nav:api-explorer",
+    group: "navigation",
+    title: "Swagger API Explorer",
+    subtitle: "Browse OpenAPI endpoints, schemas, and copy cURL commands",
+    keywords: ["swagger", "openapi", "api", "explorer", "docs", "endpoints"],
+    href: "/api-explorer",
+  },
+  {
+    id: "nav:oidc-discovery",
+    group: "navigation",
+    title: "OpenID Discovery",
+    subtitle: "Inspect OIDC metadata endpoints, scopes, and JWKS keys",
+    keywords: ["oidc", "openid", "discovery", "well-known", "jwks"],
+    href: "/oidc/discovery",
+  },
 ]
 
 export function filterStaticCommands(

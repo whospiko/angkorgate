@@ -4,7 +4,7 @@ import "server-only"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { apiClient, ApiError } from "@/lib/api-client"
-import type { SystemHealth, CacheStatus } from "../types/system.types"
+import type { SystemHealth, CacheStatus, OpenApiSpec } from "../types/system.types"
 import type {
   SetupStatus,
   BrandingConfig,
@@ -46,6 +46,15 @@ export async function getCacheStatus(): Promise<CacheStatus> {
       prefix: "angkorgate:",
       itemCount: 0,
     }
+  }
+}
+
+export async function getOpenApiSpec(): Promise<OpenApiSpec | null> {
+  try {
+    return await apiClient.get<OpenApiSpec>("/api-json")
+  } catch (error) {
+    console.error("Failed to fetch OpenAPI spec:", error)
+    return null
   }
 }
 
