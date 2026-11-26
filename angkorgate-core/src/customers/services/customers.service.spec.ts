@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { CustomersService } from './customers.service';
 import { Customer } from '../entities/customer.entity';
 import { CustomerAttribute } from '../entities/customer-attribute.entity';
@@ -40,6 +40,7 @@ describe('CustomersService', () => {
                 cb({
                     createQueryBuilder: jest.fn().mockReturnValue({
                         where: jest.fn().mockReturnThis(),
+                        withDeleted: jest.fn().mockReturnThis(),
                         orderBy: jest.fn().mockReturnThis(),
                         setLock: jest.fn().mockReturnThis(),
                         getOne: jest.fn().mockResolvedValue(null),
@@ -68,6 +69,7 @@ describe('CustomersService', () => {
                 cb({
                     createQueryBuilder: jest.fn().mockReturnValue({
                         where: jest.fn().mockReturnThis(),
+                        withDeleted: jest.fn().mockReturnThis(),
                         orderBy: jest.fn().mockReturnThis(),
                         setLock: jest.fn().mockReturnThis(),
                         getOne: jest.fn().mockResolvedValue({ customerCode: 'PAT-0001' }),
@@ -96,6 +98,7 @@ describe('CustomersService', () => {
                 cb({
                     createQueryBuilder: jest.fn().mockReturnValue({
                         where: jest.fn().mockReturnThis(),
+                        withDeleted: jest.fn().mockReturnThis(),
                         orderBy: jest.fn().mockReturnThis(),
                         setLock: jest.fn().mockReturnThis(),
                         getOne: jest.fn().mockResolvedValue(null),
@@ -142,7 +145,71 @@ describe('CustomersService', () => {
         });
     });
 
-    describe('setAttribute', () => {
+    describe('findAll', () => {
+        it('uses cross-DB LOWER LIKE instead of ILIKE for search', async () => {
+            const qb = {
+                andWhere: jest.fn().mockReturnThis(),
+                orderBy: jest.fn().mockReturnThis(),
+                skip: jest.fn().mockReturnThis(),
+                take: jest.fn().mockReturnThis(),
+                getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+            };
+            repo.createQueryBuilder.mockReturnValue(qb as never);
+
+            await service.findAll({ search: 'PAT-0001', status: 'active' });
+
+            expect(qb.andWhere).toHaveBeenCalledWith('c.status = :status', { status: 'ACTIVE' });
+            const searchCall = qb.andWhere.mock.calls.find((c) =>
+                String(c[0]).includes('LOWER(c.fullName)'),
+            );
+            expect(searchCall).toBeDefined();
+            expect(String(searchCall![0])).not.toContain('ILIKE');
+        });
+    });
+
+    describe('setStatus & remove & linkUser', () => {
+        it('rejects invalid customer status', async () => {
+            await expect(service.setStatus('c1', 'LEAD')).rejects.toThrow(BadRequestException);
+        });
+
+        it('updates status to ARCHIVED and logs audit', async () => {
+            repo.findOne.mockResolvedValue({ id: 'c1', status: 'ACTIVE' } as never);
+            repo.update.mockResolvedValue({ affected: 1 } as never);
+
+            await service.setStatus('c1', 'archived', 'admin1');
+            expect(repo.update).toHaveBeenCalledWith('c1', { status: 'ARCHIVED' });
+            expect(audit.log).toHaveBeenCalledWith(
+                expect.objectContaining({ action: 'customer.status.archived', entityId: 'c1' }),
+            );
+        });
+
+        it('clears userId and soft-deletes customer on remove', async () => {
+            repo.findOne.mockResolvedValue({
+                id: 'c1',
+                userId: 'u1',
+                customerCode: 'CUS-0001',
+                fullName: 'John',
+            } as never);
+            repo.update.mockResolvedValue({ affected: 1 } as never);
+            repo.softDelete.mockResolvedValue({ affected: 1 } as never);
+
+            await service.remove('c1', 'admin1');
+            expect(repo.update).toHaveBeenCalledWith('c1', { userId: null });
+            expect(repo.softDelete).toHaveBeenCalledWith('c1');
+        });
+
+        it('links and unlinks userId cleanly', async () => {
+            repo.findOne
+                .mockResolvedValueOnce({ id: 'c1', userId: null } as never)
+                .mockResolvedValueOnce(null);
+            repo.save.mockImplementation(async (d) => d);
+
+            const linked = await service.linkUser('c1', 'u1', 'admin1');
+            expect(linked.userId).toBe('u1');
+        });
+    });
+
+    describe('setAttribute & getAttributes & deleteAttribute', () => {
         it('creates a new attribute', async () => {
             repo.findOne.mockResolvedValue({ id: 'c1' } as never);
             attrRepo.findOne.mockResolvedValue(null);
@@ -166,9 +233,7 @@ describe('CustomersService', () => {
             const result = await service.setAttribute('c1', 'blood_type', 'O+');
             expect(result.value).toBe('O+');
         });
-    });
 
-    describe('getAttributes', () => {
         it('returns all attributes as a flat object', async () => {
             repo.findOne.mockResolvedValue({ id: 'c1' } as never);
             attrRepo.find.mockResolvedValue([
@@ -181,6 +246,14 @@ describe('CustomersService', () => {
                 blood_type: 'O+',
                 allergies: ['peanuts'],
             });
+        });
+
+        it('deletes attribute after checking customer exists', async () => {
+            repo.findOne.mockResolvedValue({ id: 'c1' } as never);
+            attrRepo.delete.mockResolvedValue({ affected: 1 } as never);
+
+            await service.deleteAttribute('c1', 'blood_type', 'admin1');
+            expect(attrRepo.delete).toHaveBeenCalledWith({ customerId: 'c1', key: 'blood_type' });
         });
     });
 });

@@ -173,6 +173,22 @@ async function runSmokeTest() {
             .send({ fullName: 'Smoke Guardian', relationship: 'Mother', phone: '+123456789' });
         assert('Customer guardian added', contactRes.status === 201);
 
+        // Test cross-DB customer search & status validation
+        const searchCustRes = await request(http)
+            .get('/customers?search=Smoke')
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert('Customer search works in SQLite', searchCustRes.status === 200 && (searchCustRes.body?.data?.data?.length ?? 0) >= 1);
+
+        const badCustStatusRes = await request(http)
+            .patch(`/customers/${patientId}/status/LEAD`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert('Invalid customer status rejected with 400', badCustStatusRes.status === 400);
+
+        const archiveCustRes = await request(http)
+            .patch(`/customers/${patientId}/status/ARCHIVED`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert('Valid customer status ARCHIVED accepted', archiveCustRes.status === 204);
+
         // ══════════════════════════════════════════════════════════════════
         logSection('5. Employees Module (Clinic / Hotel / POS)');
         // ══════════════════════════════════════════════════════════════════
@@ -220,6 +236,35 @@ async function runSmokeTest() {
             .get(`/employees/${empId}/positions/${posId}/attributes`)
             .set('Authorization', `Bearer ${adminToken}`);
         assert('Employee attributes (JSONB) saved & retrieved', empAttrs.body?.data?.license_number === 'LIC-12345');
+
+        // 5. Schedules & status validation + POS template seeding
+        const schedRes = await request(http)
+            .post(`/employees/${empId}/schedules`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ dayOfWeek: 1, startTime: '08:00', endTime: '17:00', isActive: true });
+        assert('Create Employee schedule works', schedRes.status === 201);
+        const schedId = schedRes.body?.data?.id;
+
+        const schedUpdateRes = await request(http)
+            .patch(`/employees/${empId}/schedules/${schedId}`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ endTime: '16:00' });
+        assert('Update Employee schedule works', schedUpdateRes.status === 200);
+
+        const badEmpStatusRes = await request(http)
+            .patch(`/employees/${empId}/status/PROBATION`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert('Invalid employee status rejected with 400', badEmpStatusRes.status === 400);
+
+        const leaveEmpStatusRes = await request(http)
+            .patch(`/employees/${empId}/status/ON_LEAVE`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert('Valid employee status ON_LEAVE accepted', leaveEmpStatusRes.status === 204);
+
+        const seedPosRes = await request(http)
+            .post('/departments/seed/pos')
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert('Seed POS departments & job titles works', seedPosRes.status === 201);
 
         // ══════════════════════════════════════════════════════════════════
         logSection('6. MFA (TOTP) Setup & Login Flow');
