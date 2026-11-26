@@ -40,7 +40,12 @@ export class ApiError extends Error {
 async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   let token = getAccessToken();
   if (!token) {
-    throw new ApiError("Not authenticated", 401);
+    if (getRefreshToken()) {
+      const refreshed = await refreshOidcTokens();
+      token = refreshed.access_token;
+    } else {
+      throw new ApiError("Not authenticated", 401);
+    }
   }
 
   const doRequest = (accessToken: string) =>
