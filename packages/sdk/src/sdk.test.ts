@@ -174,4 +174,89 @@ describe("@angkorgate/sdk", () => {
     assert.equal(isJwtUnexpired(valid), true);
     assert.equal(isJwtUnexpired("not-a-jwt"), false);
   });
+
+  it("refreshes tokens and manages enriched active sessions", async () => {
+    const calls: Array<{ url: string; method: string; body?: string }> = [];
+    const mockFetch: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const method = init?.method || "GET";
+      calls.push({ url, method, body: init?.body ? String(init.body) : undefined });
+
+      if (url.endsWith("/auth/refresh") && method === "POST") {
+        return new Response(
+          JSON.stringify({
+            data: {
+              accessToken: "new-at",
+              refreshToken: "new-rt",
+              accessTokenExpiresIn: 900,
+              refreshTokenExpiresIn: 604800,
+              user: {
+                id: "u1",
+                email: "piko@angkorgate.com",
+                phone: null,
+                roles: ["ADMIN"],
+                mustChangePassword: false,
+              },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      if (url.includes("/auth/sessions?") && method === "GET") {
+        return new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: "s1",
+                familyId: "fam-1",
+                browser: "Chrome 131",
+                os: "macOS 10.15",
+                deviceType: "desktop",
+                ipAddress: "203.0.113.10",
+                lastActiveAt: "2026-11-26T12:00:00.000Z",
+                createdAt: "2026-11-26T11:00:00.000Z",
+                expiresAt: "2026-12-03T11:00:00.000Z",
+                isCurrent: true,
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      if (url.endsWith("/auth/sessions/revoke-others") && method === "POST") {
+        return new Response(
+          JSON.stringify({ data: { revokedCount: 2 } }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      if (url.endsWith("/auth/sessions/s2") && method === "DELETE") {
+        return new Response(null, { status: 204 });
+      }
+
+      return new Response("Not Found", { status: 404 });
+    };
+
+    const client = new AngkorGateClient({
+      baseUrl: "http://localhost:8080",
+      fetchImpl: mockFetch,
+    });
+
+    const refreshed = await client.refresh("old-rt");
+    assert.equal(refreshed.refreshToken, "new-rt");
+
+    const sessions = await client.listSessions("new-at", "new-rt");
+    assert.equal(sessions.length, 1);
+    assert.equal(sessions[0].browser, "Chrome 131");
+    assert.equal(sessions[0].os, "macOS 10.15");
+    assert.equal(sessions[0].isCurrent, true);
+
+    const revoked = await client.revokeOtherSessions("new-at", "new-rt");
+    assert.equal(revoked.revokedCount, 2);
+
+    await client.revokeSession("new-at", "s2");
+    assert.equal(calls.length, 4);
+  });
 });

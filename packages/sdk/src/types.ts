@@ -63,6 +63,32 @@ export interface CoreAuthResponse {
   };
 }
 
+export type SessionDeviceType =
+  | "desktop"
+  | "mobile"
+  | "tablet"
+  | "cli"
+  | "bot"
+  | "unknown";
+
+export interface AngkorGateSession {
+  id: string;
+  familyId: string;
+  userAgent?: string;
+  browser: string;
+  os: string;
+  deviceType: SessionDeviceType;
+  ipAddress?: string;
+  lastActiveAt: string;
+  createdAt: string;
+  expiresAt: string;
+  isCurrent: boolean;
+}
+
+export interface RevokeSessionsResult {
+  revokedCount: number;
+}
+
 export interface AngkorGateClientConfig {
   baseUrl: string;
   clientId?: string;

@@ -2,11 +2,13 @@ import { decodeJwtPayload } from "./oidc";
 import { normalizeStringArray } from "./rbac";
 import type {
   AngkorGateClientConfig,
+  AngkorGateSession,
   AngkorGateUser,
   CoreAuthResponse,
   IntrospectionResult,
   OidcDiscoveryDocument,
   OidcTokenSet,
+  RevokeSessionsResult,
 } from "./types";
 
 export class AngkorGateError extends Error {
@@ -518,5 +520,120 @@ export class AngkorGateClient {
     }
 
     return this.unwrapEnvelope<CoreAuthResponse>(json);
+  }
+
+  /**
+   * Rotates a core refresh token (POST /auth/refresh).
+   * Throws AngkorGateError (401) if the token is expired or its family was revoked due to reuse.
+   */
+  async refresh(refreshToken: string): Promise<CoreAuthResponse> {
+    const res = await this.fetchFn(`${this.baseUrl}/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new AngkorGateError(
+        (json as { message?: string } | null)?.message ||
+          `Refresh failed (${res.status})`,
+        res.status,
+        json
+      );
+    }
+
+    return this.unwrapEnvelope<CoreAuthResponse>(json);
+  }
+
+  /**
+   * Lists enriched active sessions (parsed OS/Browser, IP, lastActiveAt) for the authenticated user.
+   */
+  async listSessions(
+    accessToken: string,
+    currentRefreshToken?: string
+  ): Promise<AngkorGateSession[]> {
+    const query = currentRefreshToken
+      ? `?currentRefreshToken=${encodeURIComponent(currentRefreshToken)}`
+      : "";
+    const res = await this.fetchFn(`${this.baseUrl}/auth/sessions${query}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+      },
+    });
+
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new AngkorGateError(
+        (json as { message?: string } | null)?.message ||
+          `Failed to list sessions (${res.status})`,
+        res.status,
+        json
+      );
+    }
+
+    const sessions = this.unwrapEnvelope<AngkorGateSession[]>(json);
+    return Array.isArray(sessions) ? sessions : [];
+  }
+
+  /**
+   * Revokes a specific active session by ID (DELETE /auth/sessions/:id).
+   */
+  async revokeSession(accessToken: string, sessionId: string): Promise<void> {
+    const res = await this.fetchFn(
+      `${this.baseUrl}/auth/sessions/${encodeURIComponent(sessionId)}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: "application/json",
+        },
+      }
+    );
+
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      throw new AngkorGateError(
+        (json as { message?: string } | null)?.message ||
+          `Failed to revoke session (${res.status})`,
+        res.status,
+        json
+      );
+    }
+  }
+
+  /**
+   * Revokes all other active sessions while preserving the current refresh token family.
+   */
+  async revokeOtherSessions(
+    accessToken: string,
+    currentRefreshToken: string
+  ): Promise<RevokeSessionsResult> {
+    const res = await this.fetchFn(`${this.baseUrl}/auth/sessions/revoke-others`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ currentRefreshToken }),
+    });
+
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new AngkorGateError(
+        (json as { message?: string } | null)?.message ||
+          `Failed to revoke other sessions (${res.status})`,
+        res.status,
+        json
+      );
+    }
+
+    return this.unwrapEnvelope<RevokeSessionsResult>(json);
   }
 }
