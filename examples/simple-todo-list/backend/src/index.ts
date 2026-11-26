@@ -15,7 +15,7 @@ async function bootstrap() {
   await AppDataSource.initialize();
 
   const app = express();
-  const port = Number(process.env.PORT || 3001);
+  const port = Number(process.env.PORT || 4001);
   const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:3001";
 
   app.use(
