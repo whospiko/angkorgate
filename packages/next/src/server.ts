@@ -1,13 +1,79 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  DEFAULT_ACCESS_COOKIE,
-  DEFAULT_ID_COOKIE,
-  DEFAULT_REFRESH_COOKIE,
-  fetchOidcUser,
-  isJwtUnexpired,
-  normalizeStringArray,
-  type AngkorGateUser,
-} from "@angkorgate/react";
+import type { AngkorGateUser } from "@angkorgate/react";
+
+const DEFAULT_ACCESS_COOKIE = "angkorgate_token";
+const DEFAULT_REFRESH_COOKIE = "angkorgate_refresh_token";
+const DEFAULT_ID_COOKIE = "angkorgate_id_token";
+
+function normalizeStringArray(val: unknown): string[] {
+  if (!Array.isArray(val)) return [];
+  return val.filter((v): v is string => typeof v === "string");
+}
+
+function isJwtUnexpired(token: string): boolean {
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  try {
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(
+      base64.length + ((4 - (base64.length % 4)) % 4),
+      "="
+    );
+    const json = Buffer.from(padded, "base64").toString("utf-8");
+    const payload = JSON.parse(json) as { exp?: number };
+    const now = Math.floor(Date.now() / 1000);
+    return !payload.exp || payload.exp > now;
+  } catch {
+    return false;
+  }
+}
+
+async function fetchOidcUserServer(
+  baseUrl: string,
+  accessToken: string
+): Promise<AngkorGateUser | null> {
+  const cleanBase = baseUrl.replace(/\/+$/, "");
+  const res = await fetch(`${cleanBase}/oidc/me`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  if (!res.ok) return null;
+
+  const claims = (await res.json()) as Record<string, unknown>;
+  if (typeof claims.sub !== "string" || !claims.sub) return null;
+
+  return {
+    id: claims.sub,
+    sub: claims.sub,
+    email: typeof claims.email === "string" ? claims.email : null,
+    name:
+      typeof claims.name === "string"
+        ? claims.name
+        : typeof claims.preferred_username === "string"
+          ? claims.preferred_username
+          : null,
+    preferredUsername:
+      typeof claims.preferred_username === "string"
+        ? claims.preferred_username
+        : null,
+    emailVerified:
+      typeof claims.email_verified === "boolean"
+        ? claims.email_verified
+        : undefined,
+    roles: normalizeStringArray(
+      claims.roles ?? claims["https://angkorgate.com/roles"]
+    ),
+    permissions: normalizeStringArray(
+      claims.permissions ?? claims["https://angkorgate.com/permissions"]
+    ),
+    claims,
+  };
+}
 
 export function createRouteMatcher(patterns: Array<string | RegExp>) {
   const compiled = patterns.map((p) =>
@@ -80,7 +146,7 @@ export async function verifyAngkorGateToken(
 ): Promise<AngkorGateUser | null> {
   const cleanBase = baseUrl.replace(/\/+$/, "");
 
-  const oidcUser = await fetchOidcUser(cleanBase, token);
+  const oidcUser = await fetchOidcUserServer(cleanBase, token);
   if (oidcUser) return oidcUser;
 
   try {
