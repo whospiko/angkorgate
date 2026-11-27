@@ -67,6 +67,35 @@ export interface EmployeeSchedule {
   createdAt?: string
 }
 
+export interface ScheduleOverride {
+  id: string
+  employeeId: string
+  date: string
+  isAvailable: boolean
+  startTime?: string | null
+  endTime?: string | null
+  reason?: string | null
+  createdAt?: string
+}
+
+export type LeaveType = "ANNUAL" | "SICK" | "UNPAID" | "MATERNITY" | "OTHER"
+export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED"
+
+export interface LeaveRequest {
+  id: string
+  employeeId: string
+  employee?: Employee
+  leaveType: LeaveType
+  startDate: string
+  endDate: string
+  reason?: string | null
+  status: LeaveStatus
+  reviewedById?: string | null
+  reviewedAt?: string | null
+  reviewNote?: string | null
+  createdAt?: string
+}
+
 export interface Employee {
   id: string
   userId?: string | null

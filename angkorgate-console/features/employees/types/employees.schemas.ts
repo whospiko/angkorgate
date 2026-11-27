@@ -137,3 +137,30 @@ export const UpdateScheduleSchema = z.object({
   departmentId: z.string().uuid().optional(),
   isActive: z.boolean().optional(),
 })
+
+export const LeaveTypeSchema = z.enum([
+  "ANNUAL",
+  "SICK",
+  "UNPAID",
+  "MATERNITY",
+  "OTHER",
+])
+
+export const CreateLeaveRequestSchema = z
+  .object({
+    leaveType: LeaveTypeSchema,
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Start date must be YYYY-MM-DD"),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "End date must be YYYY-MM-DD"),
+    reason: z.string().trim().optional().or(z.literal("")),
+  })
+  .refine((d) => d.startDate <= d.endDate, {
+    message: "Leave start date cannot be after end date",
+  })
+
+export const CreateScheduleOverrideSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
+  isAvailable: z.boolean(),
+  startTime: z.string().regex(TIME_REGEX).optional().or(z.literal("")),
+  endTime: z.string().regex(TIME_REGEX).optional().or(z.literal("")),
+  reason: z.string().trim().max(200).optional().or(z.literal("")),
+})

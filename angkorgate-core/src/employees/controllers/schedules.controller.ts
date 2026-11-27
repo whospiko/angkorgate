@@ -9,6 +9,7 @@ import {
     ParseUUIDPipe,
     Patch,
     Post,
+    Query,
     UseGuards,
 } from '@nestjs/common';
 import {
@@ -25,6 +26,7 @@ import { UnifiedAuthGuard } from '../../auth/guards/unified-auth.guard';
 import { SchedulesService } from '../services/schedules.service';
 import { CreateEmployeeScheduleDto } from '../dto/create-schedule.dto';
 import { UpdateScheduleDto } from '../dto/update-schedule.dto';
+import { CreateScheduleOverrideDto } from '../dto/create-schedule-override.dto';
 
 @ApiTags('Employees')
 @ApiBearerAuth('bearerAuth')
@@ -60,6 +62,52 @@ export class SchedulesController {
     @ApiResponse({ status: 404, description: 'Employee not found' })
     list(@Param('employeeId', ParseUUIDPipe) employeeId: string) {
         return this.schedules.findByEmployee(employeeId);
+    }
+
+    @Get('availability')
+    @Permissions('employee:read')
+    @ApiOperation({ summary: 'Check employee availability on a specific date and time' })
+    @ApiParam({ name: 'employeeId', description: 'Employee UUID' })
+    checkAvailability(
+        @Param('employeeId', ParseUUIDPipe) employeeId: string,
+        @Query('date') date: string,
+        @Query('time') time: string,
+    ) {
+        return this.schedules.isEmployeeAvailableOnDate(employeeId, date, time);
+    }
+
+    @Get('overrides')
+    @Permissions('employee:read')
+    @ApiOperation({ summary: 'List date-specific schedule overrides for employee' })
+    @ApiParam({ name: 'employeeId', description: 'Employee UUID' })
+    listOverrides(@Param('employeeId', ParseUUIDPipe) employeeId: string) {
+        return this.schedules.listOverrides(employeeId);
+    }
+
+    @Post('overrides')
+    @Permissions('employee:write')
+    @ApiOperation({ summary: 'Create or update a date-specific schedule override' })
+    @ApiParam({ name: 'employeeId', description: 'Employee UUID' })
+    setOverride(
+        @Param('employeeId', ParseUUIDPipe) employeeId: string,
+        @Body() dto: CreateScheduleOverrideDto,
+        @CurrentUser('id') actorId: string,
+    ) {
+        return this.schedules.setOverride(employeeId, dto, actorId);
+    }
+
+    @Delete('overrides/:overrideId')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    @Permissions('employee:write')
+    @ApiOperation({ summary: 'Remove a schedule override' })
+    @ApiParam({ name: 'employeeId', description: 'Employee UUID' })
+    @ApiParam({ name: 'overrideId', description: 'Override UUID' })
+    removeOverride(
+        @Param('employeeId', ParseUUIDPipe) employeeId: string,
+        @Param('overrideId', ParseUUIDPipe) overrideId: string,
+        @CurrentUser('id') actorId: string,
+    ) {
+        return this.schedules.removeOverride(employeeId, overrideId, actorId);
     }
 
     @Get(':id')

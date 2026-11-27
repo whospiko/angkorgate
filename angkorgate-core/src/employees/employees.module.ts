@@ -6,6 +6,8 @@ import { Employee } from "./entities/employee.entity";
 import { EmployeePosition } from "./entities/employee-position.entity";
 import { EmployeeAttribute } from "./entities/employee-attribute.entity";
 import { WorkSchedule } from "./entities/work-schedule.entity";
+import { ScheduleOverride } from "./entities/schedule-override.entity";
+import { LeaveRequest } from "./entities/leave-request.entity";
 import { User } from "../users/entities/user.entity";
 import { UsersModule } from "../users/users.module";
 import { RbacModule } from "../rbac/rbac.module";
@@ -15,11 +17,13 @@ import { JobTitlesController } from "./controllers/job-titles.controller";
 import { EmployeesController } from "./controllers/employees.controller";
 import { PositionsController } from "./controllers/positions.controller";
 import { SchedulesController } from "./controllers/schedules.controller";
+import { LeaveRequestsController } from "./controllers/leave-requests.controller";
 import { DepartmentsService } from "./services/departments.service";
 import { JobTitlesService } from "./services/job-titles.service";
 import { EmployeesService } from "./services/employees.service";
 import { PositionsService } from "./services/positions.service";
 import { SchedulesService } from "./services/schedules.service";
+import { LeaveRequestsService } from "./services/leave-requests.service";
 
 @Module({
     imports: [
@@ -30,6 +34,8 @@ import { SchedulesService } from "./services/schedules.service";
             EmployeePosition,
             EmployeeAttribute,
             WorkSchedule,
+            ScheduleOverride,
+            LeaveRequest,
             User, // ← for FK on employee.userId
         ]),
         UsersModule, // ✅ for UsersService.exists() / getEmail() in employees.service
@@ -42,6 +48,7 @@ import { SchedulesService } from "./services/schedules.service";
         EmployeesController,
         PositionsController,
         SchedulesController,
+        LeaveRequestsController,
     ],
     providers: [
         DepartmentsService,
@@ -49,10 +56,12 @@ import { SchedulesService } from "./services/schedules.service";
         EmployeesService,
         PositionsService,
         SchedulesService,
+        LeaveRequestsService,
     ],
     exports: [
         EmployeesService,
         SchedulesService,
+        LeaveRequestsService,
         DepartmentsService,
         JobTitlesService,
     ],

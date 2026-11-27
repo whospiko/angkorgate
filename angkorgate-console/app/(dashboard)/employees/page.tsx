@@ -2,6 +2,7 @@ import {
   getDepartments,
   getDepartmentTree,
   getOrgChart,
+  getLeaveRequests,
   getJobTitles,
   getEmployees,
   EmployeesOverview,
@@ -25,10 +26,11 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
   const params = (await searchParams) || {}
   const page = params.page ? Math.max(1, parseInt(params.page, 10) || 1) : 1
 
-  const [departments, departmentTree, orgChart, jobTitles, employeesData] = await Promise.all([
+  const [departments, departmentTree, orgChart, leaveRequests, jobTitles, employeesData] = await Promise.all([
     getDepartments(),
     getDepartmentTree(),
     getOrgChart(),
+    getLeaveRequests(),
     getJobTitles(),
     getEmployees({
       search: params.search,
@@ -57,6 +59,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
         departments={departments}
         departmentTree={departmentTree}
         orgChart={orgChart}
+        leaveRequests={leaveRequests}
         jobTitles={jobTitles}
         employees={employeesData.items}
         total={employeesData.total}

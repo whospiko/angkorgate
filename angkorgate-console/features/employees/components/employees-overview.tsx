@@ -43,6 +43,7 @@ import type {
   OrgChartNode,
   JobTitle,
   Employee,
+  LeaveRequest,
 } from "../types/employees.types"
 import { deleteEmployeeAction } from "../server/employees-actions"
 import { CreateEmployeeDialog } from "./create-employee-dialog"
@@ -51,11 +52,13 @@ import { EmployeeDetailsDialog } from "./employee-details-dialog"
 import { DepartmentsManager } from "./departments-manager"
 import { JobTitlesManager } from "./job-titles-manager"
 import { OrgChartView } from "./org-chart-view"
+import { LeaveQueueManager } from "./leave-queue-manager"
 
 interface EmployeesOverviewProps {
   departments: Department[]
   departmentTree?: DepartmentTreeNode[]
   orgChart?: OrgChartNode[]
+  leaveRequests?: LeaveRequest[]
   jobTitles: JobTitle[]
   employees: Employee[]
   total?: number
@@ -71,6 +74,7 @@ export function EmployeesOverview({
   departments,
   departmentTree = [],
   orgChart = [],
+  leaveRequests = [],
   jobTitles,
   employees,
   total = employees.length,
@@ -211,6 +215,7 @@ export function EmployeesOverview({
         <TabsList className="font-mono text-xs">
           <TabsTrigger value="staff">Staff Directory ({total})</TabsTrigger>
           <TabsTrigger value="org-chart">Org Chart</TabsTrigger>
+          <TabsTrigger value="leaves">Leave Queue ({leaveRequests.filter((l) => l.status === "PENDING").length})</TabsTrigger>
           <TabsTrigger value="departments">Departments ({departments.length})</TabsTrigger>
           <TabsTrigger value="job-titles">Job Titles ({jobTitles.length})</TabsTrigger>
         </TabsList>
@@ -476,7 +481,12 @@ export function EmployeesOverview({
           <OrgChartView orgChart={orgChart} departmentTree={departmentTree} />
         </TabsContent>
 
-        {/* Tab 3: Departments */}
+        {/* Tab 3: Leave Queue */}
+        <TabsContent value="leaves">
+          <LeaveQueueManager leaveRequests={leaveRequests} />
+        </TabsContent>
+
+        {/* Tab 4: Departments */}
         <TabsContent value="departments">
           <DepartmentsManager departments={departments} />
         </TabsContent>

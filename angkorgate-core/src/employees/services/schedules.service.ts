@@ -1,9 +1,12 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WorkSchedule } from '../entities/work-schedule.entity';
+import { ScheduleOverride } from '../entities/schedule-override.entity';
+import { LeaveRequest } from '../entities/leave-request.entity';
 import { CreateScheduleDto } from '../dto/create-schedule.dto';
 import { UpdateScheduleDto } from '../dto/update-schedule.dto';
+import { CreateScheduleOverrideDto } from '../dto/create-schedule-override.dto';
 import { EmployeesService } from './employees.service';
 import { AuditService } from '../../audit/services/audit.service';
 
@@ -14,6 +17,12 @@ export class SchedulesService {
         private readonly repo: Repository<WorkSchedule>,
         private readonly employees: EmployeesService,
         private readonly audit: AuditService,
+        @Optional()
+        @InjectRepository(ScheduleOverride)
+        private readonly overrideRepo?: Repository<ScheduleOverride>,
+        @Optional()
+        @InjectRepository(LeaveRequest)
+        private readonly leaveRepo?: Repository<LeaveRequest>,
     ) { }
 
     async create(dto: CreateScheduleDto, actorId?: string): Promise<WorkSchedule> {
@@ -121,7 +130,97 @@ export class SchedulesService {
         });
     }
 
-    /** Narrow API — used later by Appointments module. */
+    // --- Schedule Overrides ---
+
+    async setOverride(
+        employeeId: string,
+        dto: CreateScheduleOverrideDto,
+        actorId?: string,
+    ): Promise<ScheduleOverride> {
+        await this.employees.findByIdOrFail(employeeId);
+
+        if (dto.isAvailable) {
+            if (!dto.startTime || !dto.endTime) {
+                throw new BadRequestException(
+                    'startTime and endTime are required when override isAvailable is true',
+                );
+            }
+            this.assertValidTimeRange(dto.startTime, dto.endTime);
+        }
+
+        if (!this.overrideRepo) {
+            throw new BadRequestException('Schedule overrides repository unavailable');
+        }
+
+        let existing = await this.overrideRepo.findOne({
+            where: { employeeId, date: dto.date },
+        });
+        if (existing) {
+            existing.isAvailable = dto.isAvailable;
+            existing.startTime = dto.isAvailable ? (dto.startTime ?? null) : null;
+            existing.endTime = dto.isAvailable ? (dto.endTime ?? null) : null;
+            existing.reason = dto.reason ?? null;
+        } else {
+            existing = this.overrideRepo.create({
+                employeeId,
+                date: dto.date,
+                isAvailable: dto.isAvailable,
+                startTime: dto.isAvailable ? (dto.startTime ?? null) : null,
+                endTime: dto.isAvailable ? (dto.endTime ?? null) : null,
+                reason: dto.reason ?? null,
+            });
+        }
+
+        const saved = await this.overrideRepo.save(existing);
+
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'employee.schedule.override.set',
+            entity: 'schedule_override',
+            entityId: saved.id,
+            newValue: {
+                employeeId,
+                date: saved.date,
+                isAvailable: saved.isAvailable,
+                reason: saved.reason,
+            },
+        });
+
+        return saved;
+    }
+
+    async listOverrides(employeeId: string): Promise<ScheduleOverride[]> {
+        await this.employees.findByIdOrFail(employeeId);
+        if (!this.overrideRepo) return [];
+        return this.overrideRepo.find({
+            where: { employeeId },
+            order: { date: 'ASC' },
+        });
+    }
+
+    async removeOverride(
+        employeeId: string,
+        overrideId: string,
+        actorId?: string,
+    ): Promise<void> {
+        if (!this.overrideRepo) return;
+        const existing = await this.overrideRepo.findOne({
+            where: { id: overrideId, employeeId },
+        });
+        if (!existing) throw new NotFoundException(`Schedule override ${overrideId} not found`);
+
+        await this.overrideRepo.delete({ id: overrideId, employeeId });
+
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'employee.schedule.override.delete',
+            entity: 'schedule_override',
+            entityId: overrideId,
+            oldValue: { employeeId, date: existing.date },
+        });
+    }
+
+    /** Narrow API — used by Appointments & scheduling modules. */
     async isEmployeeAvailable(
         employeeId: string,
         dayOfWeek: number,
@@ -135,6 +234,65 @@ export class SchedulesService {
             .andWhere('s.startTime <= :time', { time })
             .andWhere('s.endTime > :time', { time })
             .getExists();
+    }
+
+    /**
+     * Date-aware availability check:
+     * 1. Date-specific ScheduleOverride (takes precedence)
+     * 2. Approved LeaveRequest covering the date
+     * 3. Recurring weekly WorkSchedule
+     */
+    async isEmployeeAvailableOnDate(
+        employeeId: string,
+        date: string,
+        time: string,
+    ): Promise<{ available: boolean; reason?: string }> {
+        const normTime = this.normalizeTime(time);
+
+        if (this.overrideRepo) {
+            const override = await this.overrideRepo.findOne({
+                where: { employeeId, date },
+            });
+            if (override) {
+                if (!override.isAvailable) {
+                    return {
+                        available: false,
+                        reason: override.reason || 'Schedule override (day off)',
+                    };
+                }
+                const start = override.startTime ? this.normalizeTime(override.startTime) : '00:00:00';
+                const end = override.endTime ? this.normalizeTime(override.endTime) : '23:59:59';
+                const within = start <= normTime && end > normTime;
+                return {
+                    available: within,
+                    reason: within ? undefined : 'Outside override shift hours',
+                };
+            }
+        }
+
+        if (this.leaveRepo) {
+            const onLeave = await this.leaveRepo
+                .createQueryBuilder('l')
+                .where('l.employeeId = :eid', { eid: employeeId })
+                .andWhere('l.status = :status', { status: 'APPROVED' })
+                .andWhere('l.startDate <= :date', { date })
+                .andWhere('l.endDate >= :date', { date })
+                .getOne();
+
+            if (onLeave) {
+                return {
+                    available: false,
+                    reason: `On approved ${onLeave.leaveType} leave`,
+                };
+            }
+        }
+
+        const dayOfWeek = new Date(`${date}T00:00:00Z`).getUTCDay();
+        const regular = await this.isEmployeeAvailable(employeeId, dayOfWeek, time);
+        return {
+            available: regular,
+            reason: regular ? undefined : 'Outside recurring work schedule',
+        };
     }
 
     private assertValidTimeRange(startTime: string, endTime: string): void {

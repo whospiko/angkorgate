@@ -45,11 +45,19 @@ import {
   createScheduleAction,
   updateScheduleAction,
   deleteScheduleAction,
+  getScheduleOverrides,
+  setScheduleOverrideAction,
+  deleteScheduleOverrideAction,
+  getEmployeeLeaveRequests,
+  createLeaveRequestAction,
 } from "../server/employees-actions"
 import type {
   Employee,
   EmployeePosition,
   EmployeeSchedule,
+  ScheduleOverride,
+  LeaveRequest,
+  LeaveType,
   EmploymentStatus,
   Department,
   JobTitle,
@@ -126,16 +134,34 @@ export function EmployeeDetailsDialog({
   const [editEnd, setEditEnd] = useState("17:00")
   const [editActive, setEditActive] = useState(true)
 
+  // Schedule Overrides & Leave Requests
+  const [overrides, setOverrides] = useState<ScheduleOverride[]>([])
+  const [ovDate, setOvDate] = useState("")
+  const [ovAvailable, setOvAvailable] = useState(false)
+  const [ovReason, setOvReason] = useState("")
+  const [ovLoading, setOvLoading] = useState(false)
+
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([])
+  const [leaveType, setLeaveType] = useState<LeaveType>("ANNUAL")
+  const [leaveStart, setLeaveStart] = useState("")
+  const [leaveEnd, setLeaveEnd] = useState("")
+  const [leaveReason, setLeaveReason] = useState("")
+  const [leaveLoading, setLeaveLoading] = useState(false)
+
   useEffect(() => {
     if (!open) return
     let cancelled = false
     Promise.all([
       getEmployeePositions(employee.id),
       getEmployeeSchedules(employee.id),
-    ]).then(([pos, sched]) => {
+      getScheduleOverrides(employee.id),
+      getEmployeeLeaveRequests(employee.id),
+    ]).then(([pos, sched, ovs, lvs]) => {
       if (cancelled) return
       setPositions(pos)
       setSchedules(sched)
+      setOverrides(ovs)
+      setLeaves(lvs)
     })
     return () => {
       cancelled = true
@@ -321,6 +347,60 @@ export function EmployeeDetailsDialog({
       setSchedules((prev) => prev.filter((s) => s.id !== scheduleId))
     } else {
       setFeedbackError(res.message || "Failed to delete schedule")
+    }
+  }
+
+  const handleAddOverride = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!ovDate) return
+    setFeedbackError(null)
+    setOvLoading(true)
+    const res = await setScheduleOverrideAction(employee.id, {
+      date: ovDate,
+      isAvailable: ovAvailable,
+      reason: ovReason.trim() || undefined,
+    })
+    setOvLoading(false)
+    if (res.success) {
+      const refreshed = await getScheduleOverrides(employee.id)
+      setOverrides(refreshed)
+      setOvDate("")
+      setOvReason("")
+    } else {
+      setFeedbackError(res.message || "Failed to save schedule override")
+    }
+  }
+
+  const handleDeleteOverride = async (overrideId: string) => {
+    setFeedbackError(null)
+    const res = await deleteScheduleOverrideAction(employee.id, overrideId)
+    if (res.success) {
+      setOverrides((prev) => prev.filter((o) => o.id !== overrideId))
+    } else {
+      setFeedbackError(res.message || "Failed to delete schedule override")
+    }
+  }
+
+  const handleRequestLeave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!leaveStart || !leaveEnd) return
+    setFeedbackError(null)
+    setLeaveLoading(true)
+    const res = await createLeaveRequestAction(employee.id, {
+      leaveType,
+      startDate: leaveStart,
+      endDate: leaveEnd,
+      reason: leaveReason.trim() || undefined,
+    })
+    setLeaveLoading(false)
+    if (res.success) {
+      const refreshed = await getEmployeeLeaveRequests(employee.id)
+      setLeaves(refreshed)
+      setLeaveStart("")
+      setLeaveEnd("")
+      setLeaveReason("")
+    } else {
+      setFeedbackError(res.message || "Failed to submit leave request")
     }
   }
 
@@ -726,6 +806,131 @@ export function EmployeeDetailsDialog({
               />
               <Button type="submit" size="sm" disabled={schedLoading} className="h-8 font-mono text-xs">
                 {schedLoading ? <RiLoader4Line className="size-3 animate-spin" /> : <RiAddLine className="size-3.5" />}
+              </Button>
+            </form>
+          </div>
+
+          {/* Schedule Overrides */}
+          <div className="space-y-2">
+            <h4 className="font-heading font-semibold text-sm">
+              Date Overrides & Holidays ({overrides.length})
+            </h4>
+            {overrides.length > 0 && (
+              <div className="space-y-1">
+                {overrides.map((ov) => (
+                  <div
+                    key={ov.id}
+                    className="flex items-center justify-between p-2 rounded-md border border-border/40 bg-muted/10 text-xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{ov.date}</span>
+                      <Badge variant="outline" className="text-[10px]">
+                        {ov.isAvailable ? "Special Shift" : "Day Off"}
+                      </Badge>
+                      {ov.reason && <span className="text-muted-foreground">{ov.reason}</span>}
+                    </div>
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
+                      onClick={() => handleDeleteOverride(ov.id)}
+                      className="text-destructive hover:bg-destructive/10"
+                    >
+                      <RiDeleteBinLine className="size-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <form onSubmit={handleAddOverride} className="flex flex-wrap gap-2 pt-1 items-center">
+              <Input
+                type="date"
+                value={ovDate}
+                onChange={(e) => setOvDate(e.target.value)}
+                className="h-8 text-xs font-mono w-36"
+                required
+              />
+              <select
+                value={ovAvailable ? "true" : "false"}
+                onChange={(e) => setOvAvailable(e.target.value === "true")}
+                className="h-8 rounded-md border border-input bg-background/90 dark:bg-black/25 px-2 text-xs font-mono"
+              >
+                <option value="false">Day Off / Holiday</option>
+                <option value="true">Available</option>
+              </select>
+              <Input
+                placeholder="Reason (e.g. Holiday)"
+                value={ovReason}
+                onChange={(e) => setOvReason(e.target.value)}
+                className="h-8 text-xs font-mono flex-1 min-w-[140px]"
+              />
+              <Button type="submit" size="sm" disabled={ovLoading} className="h-8 font-mono text-xs">
+                {ovLoading ? <RiLoader4Line className="size-3 animate-spin" /> : <RiAddLine className="size-3.5" />}
+              </Button>
+            </form>
+          </div>
+
+          {/* Leave Requests */}
+          <div className="space-y-2">
+            <h4 className="font-heading font-semibold text-sm">
+              Leave Requests ({leaves.length})
+            </h4>
+            {leaves.length > 0 && (
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {leaves.map((lv) => (
+                  <div
+                    key={lv.id}
+                    className="flex items-center justify-between p-2 rounded-md border border-border/40 bg-muted/10 text-xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="text-[10px]">
+                        {lv.leaveType}
+                      </Badge>
+                      <span>
+                        {lv.startDate} &rarr; {lv.endDate}
+                      </span>
+                      {lv.reason && <span className="text-muted-foreground truncate max-w-[160px]">{lv.reason}</span>}
+                    </div>
+                    <Badge variant="outline" className="text-[10px]">
+                      {lv.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+            <form onSubmit={handleRequestLeave} className="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-1">
+              <select
+                value={leaveType}
+                onChange={(e) => setLeaveType(e.target.value as LeaveType)}
+                className="h-8 rounded-md border border-input bg-background/90 dark:bg-black/25 px-2 text-xs font-mono sm:col-span-3"
+              >
+                <option value="ANNUAL">ANNUAL</option>
+                <option value="SICK">SICK</option>
+                <option value="UNPAID">UNPAID</option>
+                <option value="MATERNITY">MATERNITY</option>
+                <option value="OTHER">OTHER</option>
+              </select>
+              <Input
+                type="date"
+                value={leaveStart}
+                onChange={(e) => setLeaveStart(e.target.value)}
+                className="h-8 text-xs font-mono sm:col-span-3"
+                required
+              />
+              <Input
+                type="date"
+                value={leaveEnd}
+                onChange={(e) => setLeaveEnd(e.target.value)}
+                className="h-8 text-xs font-mono sm:col-span-3"
+                required
+              />
+              <Input
+                placeholder="Reason"
+                value={leaveReason}
+                onChange={(e) => setLeaveReason(e.target.value)}
+                className="h-8 text-xs font-mono sm:col-span-2"
+              />
+              <Button type="submit" size="sm" disabled={leaveLoading} className="h-8 font-mono text-xs sm:col-span-1">
+                {leaveLoading ? <RiLoader4Line className="size-3 animate-spin" /> : <RiAddLine className="size-3.5" />}
               </Button>
             </form>
           </div>

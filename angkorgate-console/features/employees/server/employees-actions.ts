@@ -13,6 +13,9 @@ import type {
   PaginatedEmployees,
   EmployeePosition,
   EmployeeSchedule,
+  ScheduleOverride,
+  LeaveRequest,
+  LeaveType,
   CreateDepartmentInput,
   UpdateDepartmentInput,
   CreateJobTitleInput,
@@ -35,6 +38,8 @@ import {
   AssignPositionSchema,
   CreateScheduleSchema,
   UpdateScheduleSchema,
+  CreateLeaveRequestSchema,
+  CreateScheduleOverrideSchema,
 } from "../types/employees.schemas"
 
 function cleanOptionalStrings<T extends Record<string, unknown>>(obj: T): T {
@@ -552,5 +557,139 @@ export async function deleteScheduleAction(
     return { success: true }
   } catch (error: unknown) {
     return { success: false, message: getErrorMessage(error, "Failed to delete schedule") }
+  }
+}
+
+// --- Schedule Overrides ---
+
+export async function getScheduleOverrides(
+  employeeId: string
+): Promise<ScheduleOverride[]> {
+  try {
+    const res = await apiClient.get<ScheduleOverride[]>(
+      `/employees/${encodeURIComponent(employeeId)}/schedules/overrides`
+    )
+    return Array.isArray(res) ? res : []
+  } catch {
+    return []
+  }
+}
+
+export async function setScheduleOverrideAction(
+  employeeId: string,
+  data: {
+    date: string
+    isAvailable: boolean
+    startTime?: string
+    endTime?: string
+    reason?: string
+  }
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    const parsed = CreateScheduleOverrideSchema.parse(data)
+    await apiClient.post(
+      `/employees/${encodeURIComponent(employeeId)}/schedules/overrides`,
+      cleanOptionalStrings(parsed)
+    )
+    revalidatePath("/employees")
+    return { success: true }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to save schedule override") }
+  }
+}
+
+export async function deleteScheduleOverrideAction(
+  employeeId: string,
+  overrideId: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    await apiClient.delete(
+      `/employees/${encodeURIComponent(employeeId)}/schedules/overrides/${encodeURIComponent(overrideId)}`
+    )
+    revalidatePath("/employees")
+    return { success: true }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to delete schedule override") }
+  }
+}
+
+// --- Leave Requests ---
+
+export async function getLeaveRequests(query?: {
+  status?: string
+  employeeId?: string
+}): Promise<LeaveRequest[]> {
+  try {
+    const params = new URLSearchParams()
+    if (query?.status) params.set("status", query.status)
+    if (query?.employeeId) params.set("employeeId", query.employeeId)
+    const qs = params.toString() ? `?${params.toString()}` : ""
+    const res = await apiClient.get<LeaveRequest[] | { data?: LeaveRequest[] }>(
+      `/leave-requests${qs}`
+    )
+    if (Array.isArray(res)) return res
+    if (res && Array.isArray(res.data)) return res.data
+    return []
+  } catch {
+    return []
+  }
+}
+
+export async function getEmployeeLeaveRequests(
+  employeeId: string
+): Promise<LeaveRequest[]> {
+  try {
+    const res = await apiClient.get<LeaveRequest[]>(
+      `/employees/${encodeURIComponent(employeeId)}/leave-requests`
+    )
+    return Array.isArray(res) ? res : []
+  } catch {
+    return []
+  }
+}
+
+export async function createLeaveRequestAction(
+  employeeId: string,
+  data: { leaveType: LeaveType; startDate: string; endDate: string; reason?: string }
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    const parsed = CreateLeaveRequestSchema.parse(data)
+    await apiClient.post(
+      `/employees/${encodeURIComponent(employeeId)}/leave-requests`,
+      cleanOptionalStrings(parsed)
+    )
+    revalidatePath("/employees")
+    return { success: true }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to submit leave request") }
+  }
+}
+
+export async function reviewLeaveRequestAction(
+  id: string,
+  decision: "APPROVED" | "REJECTED",
+  reviewNote?: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    await apiClient.patch(`/leave-requests/${encodeURIComponent(id)}/review`, {
+      decision,
+      reviewNote: reviewNote || undefined,
+    })
+    revalidatePath("/employees")
+    return { success: true }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to review leave request") }
+  }
+}
+
+export async function cancelLeaveRequestAction(
+  id: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    await apiClient.patch(`/leave-requests/${encodeURIComponent(id)}/cancel`, {})
+    revalidatePath("/employees")
+    return { success: true }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to cancel leave request") }
   }
 }
