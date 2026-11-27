@@ -12,9 +12,10 @@ An open-source, self-hostable Identity & Access Management (IAM) platform inspir
 [![NestJS](https://img.shields.io/badge/Core-NestJS%2012-E0234E?style=flat-square&logo=nestjs)](angkorgate-core/package.json)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%20%2F%20SQLite-4169E1?style=flat-square&logo=postgresql&logoColor=white)](angkorgate-core/package.json)
 [![Redis](https://img.shields.io/badge/Cache-Redis-DC382D?style=flat-square&logo=redis&logoColor=white)](angkorgate-core/package.json)
+[![Contributions](https://img.shields.io/badge/Contributions-Closed-DC2626?style=flat-square)](#-contributing)
 [![License](https://img.shields.io/badge/License-MIT%20(planned)-blue?style=flat-square)](#-license)
 
-[Features](#-features) • [Architecture](#️-architecture) • [Quick Start](#-quick-start) • [Configuration](#️-environment-configuration) • [Origin](#-origin)
+[Features](#-features) • [Architecture](#️-architecture) • [Quick Start](#-quick-start) • [Configuration](#️-environment-configuration) • [Contributing](#-contributing) • [Origin](#-origin)
 
 </div>
 
@@ -139,6 +140,12 @@ npm run build
 ```
 
 ---
+
+## 🤝 Contributing
+
+> [!IMPORTANT]
+> **Contributions are currently closed.**
+> This repository is not accepting external pull requests or community code contributions at this time. You are welcome to explore, self-host, or fork the project for your own use.
 
 ## 🔭 Vision
 
