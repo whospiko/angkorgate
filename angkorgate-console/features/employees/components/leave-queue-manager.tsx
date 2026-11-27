@@ -13,11 +13,11 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  RiAttachmentLine,
   RiCalendarCheckLine,
   RiCheckLine,
   RiCloseLine,
 } from "@remixicon/react"
+import { LeaveAttachmentPreview } from "./leave-attachment-preview"
 import type { LeaveRequest } from "../types/employees.types"
 import {
   reviewLeaveRequestAction,
@@ -137,16 +137,13 @@ export function LeaveQueueManager({ leaveRequests }: LeaveQueueManagerProps) {
                   <TableCell className="text-muted-foreground max-w-[220px]">
                     <div className="truncate">{lr.reason || "—"}</div>
                     {lr.attachmentDataUrl && (
-                      <a
-                        href={lr.attachmentDataUrl}
-                        download={lr.attachmentName || "leave-attachment"}
-                        className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
-                      >
-                        <RiAttachmentLine className="size-3 shrink-0" />
-                        <span className="truncate max-w-[160px]">
-                          {lr.attachmentName || "Attachment"}
-                        </span>
-                      </a>
+                      <div className="mt-1">
+                        <LeaveAttachmentPreview
+                          name={lr.attachmentName}
+                          mimeType={lr.attachmentMimeType}
+                          dataUrl={lr.attachmentDataUrl}
+                        />
+                      </div>
                     )}
                   </TableCell>
                   <TableCell>

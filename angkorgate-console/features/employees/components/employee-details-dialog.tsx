@@ -28,10 +28,10 @@ import {
   RiCheckLine,
   RiCloseLine,
   RiLink,
-  RiAttachmentLine,
   RiLinkUnlink,
   RiSettings3Line,
 } from "@remixicon/react"
+import { LeaveAttachmentPreview } from "./leave-attachment-preview"
 import {
   updateEmployeeStatusAction,
   linkEmployeeUserAction,
@@ -939,14 +939,11 @@ export function EmployeeDetailsDialog({
                       </span>
                       {lv.reason && <span className="text-muted-foreground truncate max-w-[160px]">{lv.reason}</span>}
                       {lv.attachmentDataUrl && (
-                        <a
-                          href={lv.attachmentDataUrl}
-                          download={lv.attachmentName || "leave-attachment"}
-                          className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
-                        >
-                          <RiAttachmentLine className="size-3" />
-                          {lv.attachmentName || "Attachment"}
-                        </a>
+                        <LeaveAttachmentPreview
+                          name={lv.attachmentName}
+                          mimeType={lv.attachmentMimeType}
+                          dataUrl={lv.attachmentDataUrl}
+                        />
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
