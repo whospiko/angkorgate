@@ -59,6 +59,15 @@ export class LeaveRequest {
     @Column({ name: 'review_note', type: 'text', nullable: true })
     reviewNote: string | null;
 
+    @Column({ name: 'attachment_name', type: 'varchar', length: 255, nullable: true })
+    attachmentName: string | null;
+
+    @Column({ name: 'attachment_mime_type', type: 'varchar', length: 100, nullable: true })
+    attachmentMimeType: string | null;
+
+    @Column({ name: 'attachment_data_url', type: 'text', nullable: true })
+    attachmentDataUrl: string | null;
+
     @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;
 

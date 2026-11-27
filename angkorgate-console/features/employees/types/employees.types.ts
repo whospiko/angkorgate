@@ -91,8 +91,16 @@ export interface LeaveRequest {
   reason?: string | null
   status: LeaveStatus
   reviewedById?: string | null
+  reviewedBy?: {
+    id: string
+    email?: string | null
+    fullName?: string | null
+  } | null
   reviewedAt?: string | null
   reviewNote?: string | null
+  attachmentName?: string | null
+  attachmentMimeType?: string | null
+  attachmentDataUrl?: string | null
   createdAt?: string
 }
 

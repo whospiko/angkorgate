@@ -28,6 +28,7 @@ import {
   RiCheckLine,
   RiCloseLine,
   RiLink,
+  RiAttachmentLine,
   RiLinkUnlink,
   RiSettings3Line,
 } from "@remixicon/react"
@@ -146,6 +147,11 @@ export function EmployeeDetailsDialog({
   const [leaveStart, setLeaveStart] = useState("")
   const [leaveEnd, setLeaveEnd] = useState("")
   const [leaveReason, setLeaveReason] = useState("")
+  const [leaveAttachment, setLeaveAttachment] = useState<{
+    name: string
+    mimeType: "application/pdf" | "image/png" | "image/jpeg"
+    dataUrl: string
+  } | null>(null)
   const [leaveLoading, setLeaveLoading] = useState(false)
 
   useEffect(() => {
@@ -381,6 +387,41 @@ export function EmployeeDetailsDialog({
     }
   }
 
+  const handleLeaveFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) {
+      setLeaveAttachment(null)
+      return
+    }
+    const allowed: ("application/pdf" | "image/png" | "image/jpeg")[] = [
+      "application/pdf",
+      "image/png",
+      "image/jpeg",
+    ]
+    if (!allowed.includes(file.type as "application/pdf" | "image/png" | "image/jpeg")) {
+      setFeedbackError("Only PDF, PNG, or JPG files are allowed.")
+      e.target.value = ""
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setFeedbackError("Attachment must be smaller than 2 MB.")
+      e.target.value = ""
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setFeedbackError(null)
+        setLeaveAttachment({
+          name: file.name,
+          mimeType: file.type as "application/pdf" | "image/png" | "image/jpeg",
+          dataUrl: reader.result,
+        })
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
   const handleRequestLeave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!leaveStart || !leaveEnd) return
@@ -391,6 +432,9 @@ export function EmployeeDetailsDialog({
       startDate: leaveStart,
       endDate: leaveEnd,
       reason: leaveReason.trim() || undefined,
+      attachmentName: leaveAttachment?.name,
+      attachmentMimeType: leaveAttachment?.mimeType,
+      attachmentDataUrl: leaveAttachment?.dataUrl,
     })
     setLeaveLoading(false)
     if (res.success) {
@@ -399,6 +443,7 @@ export function EmployeeDetailsDialog({
       setLeaveStart("")
       setLeaveEnd("")
       setLeaveReason("")
+      setLeaveAttachment(null)
     } else {
       setFeedbackError(res.message || "Failed to submit leave request")
     }
@@ -881,7 +926,7 @@ export function EmployeeDetailsDialog({
                     key={lv.id}
                     className="flex items-center justify-between p-2 rounded-md border border-border/40 bg-muted/10 text-xs"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="secondary" className="text-[10px]">
                         {lv.leaveType}
                       </Badge>
@@ -889,10 +934,27 @@ export function EmployeeDetailsDialog({
                         {lv.startDate} &rarr; {lv.endDate}
                       </span>
                       {lv.reason && <span className="text-muted-foreground truncate max-w-[160px]">{lv.reason}</span>}
+                      {lv.attachmentDataUrl && (
+                        <a
+                          href={lv.attachmentDataUrl}
+                          download={lv.attachmentName || "leave-attachment"}
+                          className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+                        >
+                          <RiAttachmentLine className="size-3" />
+                          {lv.attachmentName || "Attachment"}
+                        </a>
+                      )}
                     </div>
-                    <Badge variant="outline" className="text-[10px]">
-                      {lv.status}
-                    </Badge>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {lv.reviewedBy && (
+                        <span className="text-[10px] text-muted-foreground">
+                          by {lv.reviewedBy.fullName || lv.reviewedBy.email}
+                        </span>
+                      )}
+                      <Badge variant="outline" className="text-[10px]">
+                        {lv.status}
+                      </Badge>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -932,6 +994,19 @@ export function EmployeeDetailsDialog({
               <Button type="submit" size="sm" disabled={leaveLoading} className="h-8 font-mono text-xs sm:col-span-1">
                 {leaveLoading ? <RiLoader4Line className="size-3 animate-spin" /> : <RiAddLine className="size-3.5" />}
               </Button>
+              <div className="sm:col-span-12 flex items-center gap-2 pt-0.5">
+                <input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                  onChange={handleLeaveFileChange}
+                  className="text-[11px] font-mono text-muted-foreground file:mr-2 file:rounded file:border file:border-border file:bg-muted file:px-2 file:py-1 file:text-[11px] file:font-mono file:text-foreground"
+                />
+                {leaveAttachment && (
+                  <span className="text-[11px] font-mono text-primary truncate">
+                    Attached: {leaveAttachment.name}
+                  </span>
+                )}
+              </div>
             </form>
           </div>
         </div>

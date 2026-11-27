@@ -11,7 +11,12 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { RiCalendarCheckLine, RiCheckLine, RiCloseLine } from "@remixicon/react"
+import {
+  RiAttachmentLine,
+  RiCalendarCheckLine,
+  RiCheckLine,
+  RiCloseLine,
+} from "@remixicon/react"
 import type { LeaveRequest } from "../types/employees.types"
 import {
   reviewLeaveRequestAction,
@@ -96,8 +101,9 @@ export function LeaveQueueManager({ leaveRequests }: LeaveQueueManagerProps) {
                 <TableHead className="font-mono text-xs">Employee</TableHead>
                 <TableHead className="font-mono text-xs">Type</TableHead>
                 <TableHead className="font-mono text-xs">Dates</TableHead>
-                <TableHead className="font-mono text-xs">Reason</TableHead>
+                <TableHead className="font-mono text-xs">Reason & File</TableHead>
                 <TableHead className="font-mono text-xs">Status</TableHead>
+                <TableHead className="font-mono text-xs">Reviewed By</TableHead>
                 <TableHead className="font-mono text-xs text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -122,8 +128,20 @@ export function LeaveQueueManager({ leaveRequests }: LeaveQueueManagerProps) {
                   <TableCell className="text-[11px]">
                     {lr.startDate} &rarr; {lr.endDate}
                   </TableCell>
-                  <TableCell className="text-muted-foreground max-w-[200px] truncate">
-                    {lr.reason || "—"}
+                  <TableCell className="text-muted-foreground max-w-[220px]">
+                    <div className="truncate">{lr.reason || "—"}</div>
+                    {lr.attachmentDataUrl && (
+                      <a
+                        href={lr.attachmentDataUrl}
+                        download={lr.attachmentName || "leave-attachment"}
+                        className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+                      >
+                        <RiAttachmentLine className="size-3 shrink-0" />
+                        <span className="truncate max-w-[160px]">
+                          {lr.attachmentName || "Attachment"}
+                        </span>
+                      </a>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -138,6 +156,24 @@ export function LeaveQueueManager({ leaveRequests }: LeaveQueueManagerProps) {
                     >
                       {lr.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-[11px]">
+                    {lr.reviewedBy ? (
+                      <div>
+                        <div className="font-medium text-foreground">
+                          {lr.reviewedBy.fullName || lr.reviewedBy.email || lr.reviewedBy.id}
+                        </div>
+                        {lr.reviewedAt && (
+                          <div className="text-[10px] text-muted-foreground">
+                            {new Date(lr.reviewedAt).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    ) : lr.reviewedById ? (
+                      <span className="text-muted-foreground">{lr.reviewedById.slice(0, 8)}</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">

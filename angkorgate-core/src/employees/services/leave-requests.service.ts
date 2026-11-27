@@ -55,6 +55,9 @@ export class LeaveRequestsService {
                 startDate: dto.startDate,
                 endDate: dto.endDate,
                 reason: dto.reason ?? null,
+                attachmentName: dto.attachmentName ?? null,
+                attachmentMimeType: dto.attachmentMimeType ?? null,
+                attachmentDataUrl: dto.attachmentDataUrl ?? null,
                 status: 'PENDING',
             }),
         );
@@ -77,10 +80,14 @@ export class LeaveRequestsService {
 
     async findByEmployee(employeeId: string): Promise<LeaveRequest[]> {
         await this.employees.findByIdOrFail(employeeId);
-        return this.repo.find({
-            where: { employeeId },
-            order: { startDate: 'DESC', createdAt: 'DESC' },
-        });
+        return this.repo
+            .createQueryBuilder('l')
+            .leftJoin('l.reviewedBy', 'rev')
+            .addSelect(['rev.id', 'rev.email', 'rev.fullName'])
+            .where('l.employeeId = :eid', { eid: employeeId })
+            .orderBy('l.startDate', 'DESC')
+            .addOrderBy('l.createdAt', 'DESC')
+            .getMany();
     }
 
     async findAll(params: {
@@ -92,7 +99,9 @@ export class LeaveRequestsService {
         const { page, limit, skip } = normalizePagination(params.page, params.limit);
         const qb = this.repo
             .createQueryBuilder('l')
-            .leftJoinAndSelect('l.employee', 'emp');
+            .leftJoinAndSelect('l.employee', 'emp')
+            .leftJoin('l.reviewedBy', 'rev')
+            .addSelect(['rev.id', 'rev.email', 'rev.fullName']);
 
         if (params.status) {
             qb.andWhere('l.status = :status', { status: params.status.toUpperCase() });

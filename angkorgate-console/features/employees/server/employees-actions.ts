@@ -679,7 +679,15 @@ export async function getEmployeeLeaveRequests(
 
 export async function createLeaveRequestAction(
   employeeId: string,
-  data: { leaveType: LeaveType; startDate: string; endDate: string; reason?: string }
+  data: {
+    leaveType: LeaveType
+    startDate: string
+    endDate: string
+    reason?: string
+    attachmentName?: string
+    attachmentMimeType?: "application/pdf" | "image/png" | "image/jpeg"
+    attachmentDataUrl?: string
+  }
 ): Promise<{ success: boolean; message?: string }> {
   try {
     const parsed = CreateLeaveRequestSchema.parse(data)

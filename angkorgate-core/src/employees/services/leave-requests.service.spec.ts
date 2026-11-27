@@ -85,4 +85,27 @@ describe('LeaveRequestsService', () => {
         repo.findOne.mockResolvedValue(null);
         await expect(service.cancel('missing')).rejects.toThrow(NotFoundException);
     });
+
+    it('persists PDF/PNG/JPG attachment metadata when creating leave request', async () => {
+        const qb = {
+            where: jest.fn().mockReturnThis(),
+            andWhere: jest.fn().mockReturnThis(),
+            getExists: jest.fn().mockResolvedValue(false),
+        };
+        repo.createQueryBuilder.mockReturnValue(qb as never);
+        repo.create.mockImplementation((d) => d);
+        repo.save.mockImplementation(async (d) => ({ id: 'lr2', ...d }));
+
+        const res = await service.create('e1', {
+            leaveType: 'SICK',
+            startDate: '2026-12-05',
+            endDate: '2026-12-06',
+            attachmentName: 'medical-note.pdf',
+            attachmentMimeType: 'application/pdf',
+            attachmentDataUrl: 'data:application/pdf;base64,JVBERi0xLjQK',
+        });
+
+        expect(res.attachmentName).toBe('medical-note.pdf');
+        expect(res.attachmentMimeType).toBe('application/pdf');
+    });
 });

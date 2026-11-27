@@ -152,6 +152,12 @@ export const CreateLeaveRequestSchema = z
     startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Start date must be YYYY-MM-DD"),
     endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "End date must be YYYY-MM-DD"),
     reason: z.string().trim().optional().or(z.literal("")),
+    attachmentName: z.string().max(255).optional(),
+    attachmentMimeType: z.enum(["application/pdf", "image/png", "image/jpeg"]).optional(),
+    attachmentDataUrl: z
+      .string()
+      .max(3_000_000, "Attachment must be smaller than 2 MB")
+      .optional(),
   })
   .refine((d) => d.startDate <= d.endDate, {
     message: "Leave start date cannot be after end date",
