@@ -22,6 +22,7 @@ import {
 } from '../utils/customer-code.util';
 import { normalizePagination } from '../../common/utils/pagination.util';
 import { isSqlite } from '../../common/utils/db-types.util';
+import { buildCsv } from '../../common/utils/csv.util';
 
 const ALLOWED_CUSTOMER_STATUSES: ReadonlyArray<CustomerStatus> = [
     'ACTIVE',
@@ -316,6 +317,155 @@ export class CustomersService {
         if (linked && linked.id !== excludeCustomerId) {
             throw new ConflictException(`User ${userId} already has a customer record`);
         }
+    }
+
+    /** Finds potential duplicate customers matching phone, email, or nationalId. */
+    async findPotentialDuplicates(params: {
+        phone?: string;
+        email?: string;
+        nationalId?: string;
+    }): Promise<Customer[]> {
+        const phone = params.phone?.trim();
+        const email = params.email?.trim();
+        const nationalId = params.nationalId?.trim();
+
+        const clauses: string[] = [];
+        const bindings: Record<string, string> = {};
+
+        if (phone) {
+            clauses.push('c.phone = :phone');
+            bindings.phone = phone;
+        }
+        if (email) {
+            clauses.push('LOWER(c.email) = LOWER(:email)');
+            bindings.email = email;
+        }
+        if (nationalId) {
+            clauses.push('c.nationalId = :nationalId');
+            bindings.nationalId = nationalId;
+        }
+
+        if (clauses.length === 0) {
+            return [];
+        }
+
+        return this.repo
+            .createQueryBuilder('c')
+            .where(`(${clauses.join(' OR ')})`, bindings)
+            .orderBy('c.createdAt', 'DESC')
+            .take(10)
+            .getMany();
+    }
+
+    /** Exports filtered customers (up to 1000 rows) as a CSV payload. */
+    async exportCsv(params: {
+        search?: string;
+        status?: string;
+        type?: string;
+    }): Promise<{ filename: string; contentType: string; total: number; csv: string }> {
+        const { data } = await this.findAll({
+            search: params.search,
+            status: params.status,
+            type: params.type as CustomerType | undefined,
+            page: 1,
+            limit: 1000,
+        });
+        const headers = [
+            'customerCode',
+            'type',
+            'fullName',
+            'gender',
+            'dateOfBirth',
+            'phone',
+            'email',
+            'nationalId',
+            'address',
+            'status',
+            'createdAt',
+        ];
+        const rows = data.map((c) => [
+            c.customerCode,
+            c.type,
+            c.fullName,
+            c.gender ?? '',
+            c.dateOfBirth,
+            c.phone ?? '',
+            c.email ?? '',
+            c.nationalId ?? '',
+            c.address ?? '',
+            c.status,
+            c.createdAt,
+        ]);
+
+        return {
+            filename: 'customers-export.csv',
+            contentType: 'text/csv',
+            total: data.length,
+            csv: buildCsv(headers, rows),
+        };
+    }
+
+    /** Bulk-imports customer rows with optional duplicate detection. */
+    async importBulk(
+        rows: CreateCustomerDto[],
+        skipDuplicates = true,
+        actorId?: string,
+    ): Promise<{
+        createdCount: number;
+        skippedCount: number;
+        errorCount: number;
+        createdCodes: string[];
+        skipped: { rowIndex: number; fullName: string; reason: string; existingCode: string }[];
+        errors: { rowIndex: number; fullName: string; message: string }[];
+    }> {
+        const createdCodes: string[] = [];
+        const skipped: {
+            rowIndex: number;
+            fullName: string;
+            reason: string;
+            existingCode: string;
+        }[] = [];
+        const errors: { rowIndex: number; fullName: string; message: string }[] = [];
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            if (skipDuplicates) {
+                const duplicates = await this.findPotentialDuplicates({
+                    phone: row.phone,
+                    email: row.email,
+                    nationalId: row.nationalId,
+                });
+                if (duplicates.length > 0) {
+                    skipped.push({
+                        rowIndex: i,
+                        fullName: row.fullName,
+                        reason: 'Duplicate phone, email, or nationalId',
+                        existingCode: duplicates[0].customerCode,
+                    });
+                    continue;
+                }
+            }
+
+            try {
+                const created = await this.create(row, actorId);
+                createdCodes.push(created.customerCode);
+            } catch (err) {
+                errors.push({
+                    rowIndex: i,
+                    fullName: row.fullName,
+                    message: err instanceof Error ? err.message : 'Failed to import row',
+                });
+            }
+        }
+
+        return {
+            createdCount: createdCodes.length,
+            skippedCount: skipped.length,
+            errorCount: errors.length,
+            createdCodes,
+            skipped,
+            errors,
+        };
     }
 
     /** Generates PAT-0001 / GST-0001 / CUS-0001 atomically using a transaction. */

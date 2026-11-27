@@ -2,9 +2,13 @@
 
 import { getUsers, getUserById } from "@/features/users"
 import { getApps } from "@/features/apps"
+import { getCustomers } from "@/features/customers"
+import { getEmployees } from "@/features/employees"
 import {
   CommandSearchQuerySchema,
   type CommandAppMatch,
+  type CommandCustomerMatch,
+  type CommandEmployeeMatch,
   type CommandPaletteSearchResult,
   type CommandUserMatch,
 } from "../types/command-palette.types"
@@ -18,11 +22,17 @@ export async function searchCommandPaletteAction(
   const parsed = CommandSearchQuerySchema.safeParse({ query: rawQuery })
   const query = parsed.success ? parsed.data.query : ""
 
-  const [usersResult, allApps] = await Promise.all([
+  const [usersResult, allApps, customersResult, employeesResult] = await Promise.all([
     query.length > 0
       ? getUsers({ search: query, page: 1, limit: 6 })
       : Promise.resolve({ items: [], total: 0, page: 1, limit: 6 }),
     getApps(),
+    query.length > 0
+      ? getCustomers({ search: query, page: 1, limit: 5 })
+      : Promise.resolve({ items: [], total: 0, page: 1, limit: 5 }),
+    query.length > 0
+      ? getEmployees({ search: query, page: 1, limit: 5 })
+      : Promise.resolve({ items: [], total: 0, page: 1, limit: 5 }),
   ])
 
   let users: CommandUserMatch[] = (usersResult.items || []).map((u) => ({
@@ -66,5 +76,22 @@ export async function searchCommandPaletteAction(
       rootUrl: app.rootUrl ?? null,
     }))
 
-  return { users, apps }
+  const customers: CommandCustomerMatch[] = (customersResult.items || []).map((c) => ({
+    id: c.id,
+    customerCode: c.customerCode,
+    fullName: c.fullName,
+    type: c.type,
+    status: c.status,
+    phone: c.phone ?? null,
+  }))
+
+  const employees: CommandEmployeeMatch[] = (employeesResult.items || []).map((e) => ({
+    id: e.id,
+    employeeCode: e.employeeCode,
+    fullName: e.fullName,
+    employmentStatus: e.employmentStatus,
+    employmentType: e.employmentType ?? null,
+  }))
+
+  return { users, apps, customers, employees }
 }

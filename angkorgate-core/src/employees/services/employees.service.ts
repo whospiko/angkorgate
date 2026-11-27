@@ -14,6 +14,7 @@ import { UsersService } from '../../users/services/users.service';
 import { AuditService } from '../../audit/services/audit.service';
 import { normalizePagination } from '../../common/utils/pagination.util';
 import { isSqlite } from '../../common/utils/db-types.util';
+import { buildCsv } from '../../common/utils/csv.util';
 
 const ALLOWED_EMPLOYMENT_STATUSES: ReadonlyArray<EmploymentStatus> = [
     'ACTIVE',
@@ -383,6 +384,49 @@ export class EmployeesService {
         if (userLinked && userLinked.id !== excludeEmployeeId) {
             throw new ConflictException(`User ${userId} already has an employee record`);
         }
+    }
+
+    /** Exports filtered employees (up to 1000 rows) as a CSV payload. */
+    async exportCsv(params: {
+        search?: string;
+        status?: string;
+        departmentId?: string;
+        employmentType?: string;
+    }): Promise<{ filename: string; contentType: string; total: number; csv: string }> {
+        const { data } = await this.findAll({ ...params, page: 1, limit: 1000 });
+        const headers = [
+            'employeeCode',
+            'fullName',
+            'employmentStatus',
+            'employmentType',
+            'managerId',
+            'hireDate',
+            'primaryDepartment',
+            'primaryJobTitle',
+            'createdAt',
+        ];
+        const rows = data.map((emp) => {
+            const primaryPos =
+                emp.positions?.find((p) => p.isPrimary) ?? emp.positions?.[0];
+            return [
+                emp.employeeCode,
+                emp.fullName,
+                emp.employmentStatus,
+                emp.employmentType,
+                emp.managerId ?? '',
+                emp.hireDate ?? '',
+                primaryPos?.department?.name ?? '',
+                primaryPos?.jobTitle?.name ?? '',
+                emp.createdAt,
+            ];
+        });
+
+        return {
+            filename: 'employees-export.csv',
+            contentType: 'text/csv',
+            total: data.length,
+            csv: buildCsv(headers, rows),
+        };
     }
 
     /** Generates EMP-0001, EMP-0002, ... when caller omits employeeCode. */

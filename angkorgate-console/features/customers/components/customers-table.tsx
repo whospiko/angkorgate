@@ -34,7 +34,13 @@ import {
   RiCloseLine,
 } from "@remixicon/react"
 import type { Customer } from "../types/customers.types"
-import { deleteCustomerAction } from "../server/customers-actions"
+import {
+  deleteCustomerAction,
+  exportCustomersCsvAction,
+} from "../server/customers-actions"
+import { downloadCsvFile } from "@/lib/csv-download"
+import { RiDownload2Line } from "@remixicon/react"
+import { BulkImportCustomersDialog } from "./bulk-import-customers-dialog"
 import { CustomerDetailsDialog } from "./customer-details-dialog"
 import { EditCustomerDialog } from "./edit-customer-dialog"
 
@@ -195,6 +201,27 @@ export function CustomersTable({
           Total: <span className="font-semibold text-foreground">{total}</span>
         </div>
       </form>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="font-mono text-xs"
+          onClick={async () => {
+            const res = await exportCustomersCsvAction({
+              search: searchText || undefined,
+              status: statusFilter || undefined,
+              type: typeFilter || undefined,
+            })
+            if (res.success && res.data) {
+              downloadCsvFile(res.data.filename, res.data.csv)
+            }
+          }}
+        >
+          <RiDownload2Line className="mr-1.5 size-4" /> Export CSV
+        </Button>
+        <BulkImportCustomersDialog />
+      </div>
 
       {actionError && (
         <div className="font-mono text-xs text-destructive bg-destructive/10 p-2.5 rounded-md border border-destructive/20">

@@ -93,6 +93,18 @@ export class EmployeesController {
         return this.employees.getOrgChart();
     }
 
+    @Get('export')
+    @Permissions('employee:read')
+    @ApiOperation({ summary: 'Export employees as CSV payload' })
+    exportCsv(
+        @Query('search') search?: string,
+        @Query('status') status?: string,
+        @Query('departmentId') departmentId?: string,
+        @Query('employmentType') employmentType?: string,
+    ) {
+        return this.employees.exportCsv({ search, status, departmentId, employmentType });
+    }
+
     @Get('by-user/:userId')
     @Permissions('employee:read')
     @ApiOperation({ summary: 'Get employee profile linked to a user account UUID' })

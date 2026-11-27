@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -13,10 +13,13 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { RiUserAddLine, RiLoader4Line } from "@remixicon/react"
-import { createCustomerAction } from "../server/customers-actions"
+import { RiUserAddLine, RiLoader4Line, RiAlertLine } from "@remixicon/react"
+import {
+  checkCustomerDuplicatesAction,
+  createCustomerAction,
+} from "../server/customers-actions"
 import { CreateCustomerSchema } from "../types/customers.schemas"
-import type { CustomerType, CustomerGender } from "../types/customers.types"
+import type { Customer, CustomerType, CustomerGender } from "../types/customers.types"
 
 export function CreateCustomerDialog() {
   const [open, setOpen] = useState(false)
@@ -31,6 +34,33 @@ export function CreateCustomerDialog() {
   const [email, setEmail] = useState("")
   const [address, setAddress] = useState("")
   const [nationalId, setNationalId] = useState("")
+  const [duplicates, setDuplicates] = useState<Customer[]>([])
+
+  useEffect(() => {
+    if (!open) return
+    const hasCriteria =
+      phone.trim().length >= 5 ||
+      email.trim().length >= 5 ||
+      nationalId.trim().length >= 4
+    if (!hasCriteria) {
+      return
+    }
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      const matches = await checkCustomerDuplicatesAction({
+        phone: phone.trim() || undefined,
+        email: email.trim() || undefined,
+        nationalId: nationalId.trim() || undefined,
+      })
+      if (!cancelled) {
+        setDuplicates(matches)
+      }
+    }, 350)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [open, phone, email, nationalId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -98,6 +128,23 @@ export function CreateCustomerDialog() {
           {error && (
             <div className="font-mono text-xs text-destructive bg-destructive/10 p-2.5 rounded-md my-2 border border-destructive/20">
               {error}
+            </div>
+          )}
+
+          {duplicates.length > 0 && (
+            <div className="font-mono text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 p-2.5 rounded-md my-2 border border-amber-500/30 space-y-1">
+              <div className="flex items-center gap-1.5 font-semibold">
+                <RiAlertLine className="size-4 shrink-0" />
+                Potential Duplicate Profile{duplicates.length > 1 ? "s" : ""} Found
+              </div>
+              <ul className="list-disc pl-4 space-y-0.5">
+                {duplicates.slice(0, 3).map((d) => (
+                  <li key={d.id}>
+                    {d.customerCode} · {d.fullName}
+                    {d.phone ? ` (${d.phone})` : ""}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

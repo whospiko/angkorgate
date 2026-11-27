@@ -33,6 +33,7 @@ import { UpdateCustomerDto } from '../dto/update-customer.dto';
 import { SetAttributeDto } from '../dto/set-attribute.dto';
 import { CustomerResponseDto } from '../dto/customer-response.dto';
 import { LinkCustomerUserDto } from '../dto/link-customer-user.dto';
+import { BulkImportCustomersDto } from '../dto/bulk-import-customers.dto';
 import { ATTRIBUTE_SCHEMAS } from '../seed/attribute-schemas';
 
 @ApiTags('Customers')
@@ -82,6 +83,38 @@ export class CustomersController {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
         });
+    }
+
+    @Get('duplicates')
+    @Permissions('customer:read')
+    @ApiOperation({ summary: 'Find potential duplicate customers by phone, email, or nationalId' })
+    findDuplicates(
+        @Query('phone') phone?: string,
+        @Query('email') email?: string,
+        @Query('nationalId') nationalId?: string,
+    ) {
+        return this.customers.findPotentialDuplicates({ phone, email, nationalId });
+    }
+
+    @Get('export')
+    @Permissions('customer:read')
+    @ApiOperation({ summary: 'Export customers as CSV payload' })
+    exportCsv(
+        @Query('search') search?: string,
+        @Query('status') status?: string,
+        @Query('type') type?: string,
+    ) {
+        return this.customers.exportCsv({ search, status, type });
+    }
+
+    @Post('import')
+    @Permissions('customer:write')
+    @ApiOperation({ summary: 'Bulk import customers with optional duplicate skipping' })
+    importBulk(
+        @Body() dto: BulkImportCustomersDto,
+        @CurrentUser('id') actorId?: string,
+    ) {
+        return this.customers.importBulk(dto.rows, dto.skipDuplicates ?? true, actorId);
     }
 
     @Get('attribute-schemas')

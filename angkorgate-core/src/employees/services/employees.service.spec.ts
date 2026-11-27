@@ -166,4 +166,44 @@ describe('EmployeesService', () => {
             'Circular reporting hierarchy is not allowed',
         );
     });
+
+    it('exports employees CSV payload', async () => {
+        const qb = {
+            leftJoinAndSelect: jest.fn().mockReturnThis(),
+            andWhere: jest.fn().mockReturnThis(),
+            orderBy: jest.fn().mockReturnThis(),
+            skip: jest.fn().mockReturnThis(),
+            take: jest.fn().mockReturnThis(),
+            getManyAndCount: jest.fn().mockResolvedValue([
+                [
+                    {
+                        id: 'e1',
+                        employeeCode: 'EMP-0001',
+                        fullName: 'Dr. Sokha',
+                        employmentStatus: 'ACTIVE',
+                        employmentType: 'FULL_TIME',
+                        managerId: null,
+                        hireDate: '2025-01-01',
+                        terminationDate: null,
+                        createdAt: new Date('2026-01-01T00:00:00Z'),
+                        positions: [
+                            {
+                                isPrimary: true,
+                                department: { name: 'Cardiology' },
+                                jobTitle: { name: 'Cardiologist' },
+                            },
+                        ],
+                    },
+                ],
+                1,
+            ]),
+        };
+        repo.createQueryBuilder.mockReturnValue(qb as never);
+
+        const exported = await service.exportCsv({});
+        expect(exported.filename).toBe('employees-export.csv');
+        expect(exported.total).toBe(1);
+        expect(exported.csv).toContain('EMP-0001');
+        expect(exported.csv).toContain('Cardiology');
+    });
 });

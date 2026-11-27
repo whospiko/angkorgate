@@ -89,3 +89,19 @@ export interface AttributeSchemaRule {
   isRequired: boolean
   description?: string | null
 }
+
+export interface CsvExportPayload {
+  filename: string
+  contentType: string
+  total: number
+  csv: string
+}
+
+export interface BulkImportResult {
+  createdCount: number
+  skippedCount: number
+  errorCount: number
+  createdCodes: string[]
+  skipped: { rowIndex: number; fullName: string; reason: string; existingCode: string }[]
+  errors: { rowIndex: number; fullName: string; message: string }[]
+}

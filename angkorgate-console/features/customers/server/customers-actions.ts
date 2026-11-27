@@ -12,6 +12,8 @@ import type {
   CreateContactInput,
   UpdateContactInput,
   AttributeSchemaRule,
+  CsvExportPayload,
+  BulkImportResult,
 } from "../types/customers.types"
 import {
   CreateCustomerSchema,
@@ -21,7 +23,7 @@ import {
   CustomerStatusSchema,
 } from "../types/customers.schemas"
 
-function cleanOptionalStrings<T extends Record<string, unknown>>(obj: T): T {
+function cleanOptionalStrings<T extends object>(obj: T): T {
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(obj)) {
     if (v !== undefined && v !== "") {
@@ -145,6 +147,61 @@ export async function createCustomerAction(
     return { success: true, data: created }
   } catch (error: unknown) {
     return { success: false, message: getErrorMessage(error, "Failed to create customer profile") }
+  }
+}
+
+export async function checkCustomerDuplicatesAction(query: {
+  phone?: string
+  email?: string
+  nationalId?: string
+}): Promise<Customer[]> {
+  try {
+    const params = new URLSearchParams()
+    if (query.phone?.trim()) params.set("phone", query.phone.trim())
+    if (query.email?.trim()) params.set("email", query.email.trim())
+    if (query.nationalId?.trim()) params.set("nationalId", query.nationalId.trim())
+    if (!params.toString()) return []
+
+    const res = await apiClient.get<Customer[]>(`/customers/duplicates?${params.toString()}`)
+    return Array.isArray(res) ? res : []
+  } catch {
+    return []
+  }
+}
+
+export async function exportCustomersCsvAction(query?: {
+  search?: string
+  status?: string
+  type?: string
+}): Promise<{ success: boolean; data?: CsvExportPayload; message?: string }> {
+  try {
+    const params = new URLSearchParams()
+    if (query?.search) params.set("search", query.search)
+    if (query?.status) params.set("status", query.status)
+    if (query?.type) params.set("type", query.type)
+    const qs = params.toString() ? `?${params.toString()}` : ""
+    const data = await apiClient.get<CsvExportPayload>(`/customers/export${qs}`)
+    return { success: true, data }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to export customers CSV") }
+  }
+}
+
+export async function importCustomersBulkAction(
+  rows: CreateCustomerInput[],
+  skipDuplicates = true
+): Promise<{ success: boolean; data?: BulkImportResult; message?: string }> {
+  try {
+    const cleanedRows = rows.map((row) => cleanOptionalStrings(row))
+    const data = await apiClient.post<BulkImportResult>("/customers/import", {
+      rows: cleanedRows,
+      skipDuplicates,
+    })
+    revalidatePath("/customers")
+    revalidatePath("/dashboard")
+    return { success: true, data }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to import customers") }
   }
 }
 

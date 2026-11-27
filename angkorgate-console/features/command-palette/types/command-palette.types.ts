@@ -18,9 +18,28 @@ export interface CommandAppMatch {
   rootUrl?: string | null
 }
 
+export interface CommandCustomerMatch {
+  id: string
+  customerCode: string
+  fullName: string
+  type: string
+  status: string
+  phone?: string | null
+}
+
+export interface CommandEmployeeMatch {
+  id: string
+  employeeCode: string
+  fullName: string
+  employmentStatus: string
+  employmentType?: string | null
+}
+
 export interface CommandPaletteSearchResult {
   users: CommandUserMatch[]
   apps: CommandAppMatch[]
+  customers: CommandCustomerMatch[]
+  employees: CommandEmployeeMatch[]
 }
 
 export interface StaticCommandEntry {

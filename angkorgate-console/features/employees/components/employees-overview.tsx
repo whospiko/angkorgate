@@ -45,7 +45,12 @@ import type {
   Employee,
   LeaveRequest,
 } from "../types/employees.types"
-import { deleteEmployeeAction } from "../server/employees-actions"
+import {
+  deleteEmployeeAction,
+  exportEmployeesCsvAction,
+} from "../server/employees-actions"
+import { downloadCsvFile } from "@/lib/csv-download"
+import { RiDownload2Line } from "@remixicon/react"
 import { CreateEmployeeDialog } from "./create-employee-dialog"
 import { EditEmployeeDialog } from "./edit-employee-dialog"
 import { EmployeeDetailsDialog } from "./employee-details-dialog"
@@ -229,6 +234,23 @@ export function EmployeesOverview({
                 Manage employee assignments, shift schedules, and status.
               </p>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="font-mono text-xs"
+              onClick={async () => {
+                const res = await exportEmployeesCsvAction({
+                  search: searchText || undefined,
+                  status: statusFilter || undefined,
+                })
+                if (res.success && res.data) {
+                  downloadCsvFile(res.data.filename, res.data.csv)
+                }
+              }}
+            >
+              <RiDownload2Line className="mr-1.5 size-4" /> Export CSV
+            </Button>
             <CreateEmployeeDialog employees={employees} />
           </div>
 

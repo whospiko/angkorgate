@@ -258,6 +258,35 @@ export async function getEmployees(query?: {
   }
 }
 
+export async function exportEmployeesCsvAction(query?: {
+  search?: string
+  status?: string
+  departmentId?: string
+  employmentType?: string
+}): Promise<{
+  success: boolean
+  data?: { filename: string; contentType: string; total: number; csv: string }
+  message?: string
+}> {
+  try {
+    const params = new URLSearchParams()
+    if (query?.search) params.set("search", query.search)
+    if (query?.status) params.set("status", query.status)
+    if (query?.departmentId) params.set("departmentId", query.departmentId)
+    if (query?.employmentType) params.set("employmentType", query.employmentType)
+    const qs = params.toString() ? `?${params.toString()}` : ""
+    const data = await apiClient.get<{
+      filename: string
+      contentType: string
+      total: number
+      csv: string
+    }>(`/employees/export${qs}`)
+    return { success: true, data }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to export employees CSV") }
+  }
+}
+
 export async function getEmployee(id: string): Promise<Employee | null> {
   try {
     return await apiClient.get<Employee>(`/employees/${encodeURIComponent(id)}`)

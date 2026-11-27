@@ -256,4 +256,91 @@ describe('CustomersService', () => {
             expect(attrRepo.delete).toHaveBeenCalledWith({ customerId: 'c1', key: 'blood_type' });
         });
     });
+
+    describe('deduplication, export & bulk import', () => {
+        it('finds potential duplicates by phone, email, or nationalId', async () => {
+            const qb = {
+                where: jest.fn().mockReturnThis(),
+                orderBy: jest.fn().mockReturnThis(),
+                take: jest.fn().mockReturnThis(),
+                getMany: jest.fn().mockResolvedValue([
+                    { id: 'c1', customerCode: 'CUS-0001', fullName: 'Sokha', phone: '+85512345678' },
+                ]),
+            };
+            repo.createQueryBuilder.mockReturnValue(qb as never);
+
+            const matches = await service.findPotentialDuplicates({ phone: '+85512345678' });
+            expect(matches).toHaveLength(1);
+            expect(matches[0].customerCode).toBe('CUS-0001');
+        });
+
+        it('returns empty array when no deduplication criteria provided', async () => {
+            const matches = await service.findPotentialDuplicates({});
+            expect(matches).toEqual([]);
+        });
+
+        it('exports CSV with escaped values', async () => {
+            const qb = {
+                leftJoinAndSelect: jest.fn().mockReturnThis(),
+                andWhere: jest.fn().mockReturnThis(),
+                orderBy: jest.fn().mockReturnThis(),
+                skip: jest.fn().mockReturnThis(),
+                take: jest.fn().mockReturnThis(),
+                getManyAndCount: jest.fn().mockResolvedValue([
+                    [
+                        {
+                            id: 'c1',
+                            customerCode: 'CUS-0001',
+                            type: 'CUSTOMER',
+                            fullName: 'Doe, "Jane"',
+                            gender: 'FEMALE',
+                            dateOfBirth: '1992-05-01',
+                            phone: '+85512345678',
+                            email: 'jane@example.com',
+                            nationalId: 'ID-99',
+                            address: 'Phnom Penh',
+                            status: 'ACTIVE',
+                            createdAt: new Date('2026-01-01T00:00:00Z'),
+                        },
+                    ],
+                    1,
+                ]),
+            };
+            repo.createQueryBuilder.mockReturnValue(qb as never);
+
+            const exported = await service.exportCsv({});
+            expect(exported.filename).toBe('customers-export.csv');
+            expect(exported.total).toBe(1);
+            expect(exported.csv).toContain('"Doe, ""Jane"""');
+            expect(exported.csv).toContain('CUS-0001');
+        });
+
+        it('skips duplicates during bulk import when skipDuplicates is true', async () => {
+            const dupQb = {
+                where: jest.fn().mockReturnThis(),
+                orderBy: jest.fn().mockReturnThis(),
+                take: jest.fn().mockReturnThis(),
+                getMany: jest.fn().mockResolvedValue([
+                    { id: 'c1', customerCode: 'CUS-0001', fullName: 'Existing', phone: '+85512345678' },
+                ]),
+            };
+            repo.createQueryBuilder.mockReturnValue(dupQb as never);
+
+            const res = await service.importBulk(
+                [
+                    {
+                        fullName: 'Existing Dup',
+                        dateOfBirth: '1990-01-01',
+                        phone: '+85512345678',
+                    },
+                ],
+                true,
+                'admin1',
+            );
+
+            expect(res.createdCount).toBe(0);
+            expect(res.skippedCount).toBe(1);
+            expect(res.skipped[0].existingCode).toBe('CUS-0001');
+        });
+    });
 });

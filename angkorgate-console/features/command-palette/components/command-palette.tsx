@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import {
   RiAlertLine,
   RiApps2Line,
+  RiBriefcase4Line,
   RiCheckLine,
   RiCornerDownLeftLine,
   RiDashboardLine,
@@ -28,6 +29,7 @@ import {
   RiSettings3Line,
   RiShieldCheckLine,
   RiShieldKeyholeLine,
+  RiTeamLine,
   RiUserLine,
 } from "@remixicon/react"
 import {
@@ -40,13 +42,15 @@ import {
   filterStaticCommands,
   STATIC_COMMAND_ENTRIES,
   type CommandAppMatch,
+  type CommandCustomerMatch,
+  type CommandEmployeeMatch,
   type CommandUserMatch,
   type StaticCommandEntry,
 } from "../types/command-palette.types"
 
 interface PaletteRow {
   id: string
-  section: "users" | "apps" | "actions" | "navigation"
+  section: "users" | "customers" | "employees" | "apps" | "actions" | "navigation"
   title: string
   subtitle: string
   badge?: string
@@ -112,6 +116,8 @@ export function CommandPalette({
     initialMaintenanceMode
   )
   const [users, setUsers] = React.useState<CommandUserMatch[]>([])
+  const [customers, setCustomers] = React.useState<CommandCustomerMatch[]>([])
+  const [employees, setEmployees] = React.useState<CommandEmployeeMatch[]>([])
   const [apps, setApps] = React.useState<CommandAppMatch[]>([])
   const [activeIndex, setActiveIndex] = React.useState(0)
 
@@ -175,12 +181,16 @@ export function CommandPalette({
         const res = await searchCommandPaletteAction(query)
         if (!cancelled) {
           setUsers(res.users)
+          setCustomers(res.customers)
+          setEmployees(res.employees)
           setApps(res.apps)
           setActiveIndex(0)
         }
       } catch {
         if (!cancelled) {
           setUsers([])
+          setCustomers([])
+          setEmployees([])
         }
       } finally {
         if (!cancelled) {
@@ -279,6 +289,40 @@ export function CommandPalette({
       })
     }
 
+    for (const c of customers) {
+      result.push({
+        id: `customer:${c.id}`,
+        section: "customers",
+        title: `${c.customerCode} · ${c.fullName}`,
+        subtitle: c.phone ? `${c.type} · ${c.phone}` : c.type,
+        badge: c.status,
+        badgeVariant: c.status === "ACTIVE" ? "outline" : "secondary",
+        icon: <RiTeamLine className="size-4 text-primary" />,
+        onSelect: () => {
+          setOpen(false)
+          setQuery("")
+          router.push(`/customers?search=${encodeURIComponent(c.customerCode)}`)
+        },
+      })
+    }
+
+    for (const emp of employees) {
+      result.push({
+        id: `employee:${emp.id}`,
+        section: "employees",
+        title: `${emp.employeeCode} · ${emp.fullName}`,
+        subtitle: emp.employmentType || "EMPLOYEE",
+        badge: emp.employmentStatus,
+        badgeVariant: emp.employmentStatus === "ACTIVE" ? "outline" : "secondary",
+        icon: <RiBriefcase4Line className="size-4 text-primary" />,
+        onSelect: () => {
+          setOpen(false)
+          setQuery("")
+          router.push(`/employees?search=${encodeURIComponent(emp.employeeCode)}`)
+        },
+      })
+    }
+
     for (const app of apps) {
       result.push({
         id: `app:${app.appCode}`,
@@ -326,7 +370,7 @@ export function CommandPalette({
     }
 
     return result
-  }, [apps, filteredStatic, maintenanceMode, router, runAction, users])
+  }, [apps, customers, employees, filteredStatic, maintenanceMode, router, runAction, users])
 
   const safeActiveIndex =
     rows.length === 0 ? 0 : Math.min(activeIndex, rows.length - 1)
@@ -368,6 +412,8 @@ export function CommandPalette({
   }[] = React.useMemo(() => {
     const sectionOrder: { key: PaletteRow["section"]; label: string }[] = [
       { key: "users", label: "Users" },
+      { key: "customers", label: "ERP Customers" },
+      { key: "employees", label: "HR Employees" },
       { key: "apps", label: "Client Applications" },
       { key: "actions", label: "Quick Actions" },
       { key: "navigation", label: "Jump To" },
@@ -400,7 +446,7 @@ export function CommandPalette({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleInputKeyDown}
-            placeholder="Search users by email or ID, client apps, or run an action..."
+            placeholder="Search users, customers, employees, apps, or run an action..."
             aria-label="Command palette search"
             className="flex-1 bg-transparent font-mono text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
           />
