@@ -83,7 +83,7 @@ export class LeaveRequestsService {
         return this.repo
             .createQueryBuilder('l')
             .leftJoin('l.reviewedBy', 'rev')
-            .addSelect(['rev.id', 'rev.email', 'rev.fullName'])
+            .addSelect(['rev.id', 'rev.email', 'rev.phone'])
             .where('l.employeeId = :eid', { eid: employeeId })
             .orderBy('l.startDate', 'DESC')
             .addOrderBy('l.createdAt', 'DESC')
@@ -101,7 +101,7 @@ export class LeaveRequestsService {
             .createQueryBuilder('l')
             .leftJoinAndSelect('l.employee', 'emp')
             .leftJoin('l.reviewedBy', 'rev')
-            .addSelect(['rev.id', 'rev.email', 'rev.fullName']);
+            .addSelect(['rev.id', 'rev.email', 'rev.phone']);
 
         if (params.status) {
             qb.andWhere('l.status = :status', { status: params.status.toUpperCase() });

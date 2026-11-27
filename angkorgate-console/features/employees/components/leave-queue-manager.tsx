@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   Table,
   TableBody,
@@ -28,6 +29,7 @@ interface LeaveQueueManagerProps {
 }
 
 export function LeaveQueueManager({ leaveRequests }: LeaveQueueManagerProps) {
+  const router = useRouter()
   const [statusFilter, setStatusFilter] = useState("")
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -43,6 +45,8 @@ export function LeaveQueueManager({ leaveRequests }: LeaveQueueManagerProps) {
     setBusyId(null)
     if (!res.success) {
       setError(res.message || "Failed to review leave request")
+    } else {
+      router.refresh()
     }
   }
 
@@ -53,6 +57,8 @@ export function LeaveQueueManager({ leaveRequests }: LeaveQueueManagerProps) {
     setBusyId(null)
     if (!res.success) {
       setError(res.message || "Failed to cancel leave request")
+    } else {
+      router.refresh()
     }
   }
 

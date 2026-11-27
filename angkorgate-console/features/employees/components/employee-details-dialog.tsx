@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import {
   Dialog,
@@ -153,6 +153,7 @@ export function EmployeeDetailsDialog({
     dataUrl: string
   } | null>(null)
   const [leaveLoading, setLeaveLoading] = useState(false)
+  const leaveFileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -444,6 +445,9 @@ export function EmployeeDetailsDialog({
       setLeaveEnd("")
       setLeaveReason("")
       setLeaveAttachment(null)
+      if (leaveFileInputRef.current) {
+        leaveFileInputRef.current.value = ""
+      }
     } else {
       setFeedbackError(res.message || "Failed to submit leave request")
     }
@@ -996,6 +1000,7 @@ export function EmployeeDetailsDialog({
               </Button>
               <div className="sm:col-span-12 flex items-center gap-2 pt-0.5">
                 <input
+                  ref={leaveFileInputRef}
                   type="file"
                   accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
                   onChange={handleLeaveFileChange}

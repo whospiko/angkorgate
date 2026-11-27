@@ -266,6 +266,35 @@ async function runSmokeTest() {
             .set('Authorization', `Bearer ${adminToken}`);
         assert('Seed POS departments & job titles works', seedPosRes.status === 201);
 
+        const leaveCreateRes = await request(http)
+            .post(`/employees/${empId}/leave-requests`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({
+                leaveType: 'ANNUAL',
+                startDate: '2026-12-10',
+                endDate: '2026-12-12',
+                reason: 'Family trip',
+                attachmentName: 'ticket.pdf',
+                attachmentMimeType: 'application/pdf',
+                attachmentDataUrl: 'data:application/pdf;base64,JVBERi0xLjQK',
+            });
+        assert('Create Leave Request with PDF attachment works', leaveCreateRes.status === 201);
+        const leaveId = leaveCreateRes.body?.data?.id || leaveCreateRes.body?.id;
+
+        const leaveReviewRes = await request(http)
+            .patch(`/leave-requests/${leaveId}/review`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ decision: 'APPROVED' });
+        assert('Approve Leave Request works', leaveReviewRes.status === 200);
+
+        const leaveListRes = await request(http)
+            .get('/leave-requests')
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert('List Leave Requests works', leaveListRes.status === 200);
+        const leaveItems = leaveListRes.body?.data?.data || leaveListRes.body?.data || [];
+        const approvedLeave = leaveItems.find((l: any) => l.id === leaveId);
+        assert('Leave queue returns attachment and reviewer email', Boolean(approvedLeave?.attachmentName === 'ticket.pdf' && approvedLeave?.reviewedBy?.email));
+
         // ══════════════════════════════════════════════════════════════════
         logSection('6. MFA (TOTP) Setup & Login Flow');
         // ══════════════════════════════════════════════════════════════════
