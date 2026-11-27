@@ -5,9 +5,16 @@ import type {
   AngkorGateSession,
   AngkorGateUser,
   CoreAuthResponse,
+  CustomerContactRecord,
+  CustomerRecord,
+  EmployeeAvailabilityResult,
+  EmployeeRecord,
   IntrospectionResult,
+  ListCustomersParams,
+  ListEmployeesParams,
   OidcDiscoveryDocument,
   OidcTokenSet,
+  PaginatedDirectoryResult,
   RevokeSessionsResult,
 } from "./types";
 
@@ -635,5 +642,134 @@ export class AngkorGateClient {
     }
 
     return this.unwrapEnvelope<RevokeSessionsResult>(json);
+  }
+
+  private async requestDirectory<T>(
+    tokenOrApiKey: string,
+    path: string,
+    init: RequestInit = {}
+  ): Promise<T> {
+    const res = await this.fetchFn(`${this.baseUrl}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${tokenOrApiKey}`,
+        Accept: "application/json",
+        ...(init.body ? { "Content-Type": "application/json" } : {}),
+        ...(init.headers || {}),
+      },
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new AngkorGateError(
+        (json as { message?: string } | null)?.message ||
+          `Request failed (${res.status})`,
+        res.status,
+        json
+      );
+    }
+    return this.unwrapEnvelope<T>(json);
+  }
+
+  /**
+   * Lists CRM customers with optional filtering, pagination, and field projection.
+   */
+  async listCustomers(
+    tokenOrApiKey: string,
+    params?: ListCustomersParams
+  ): Promise<PaginatedDirectoryResult<CustomerRecord>> {
+    const q = new URLSearchParams();
+    if (params?.type) q.set("type", params.type);
+    if (params?.status) q.set("status", params.status);
+    if (params?.search) q.set("search", params.search);
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.limit) q.set("limit", String(params.limit));
+    if (params?.fields?.length) q.set("fields", params.fields.join(","));
+    const qs = q.toString() ? `?${q.toString()}` : "";
+    return this.requestDirectory<PaginatedDirectoryResult<CustomerRecord>>(
+      tokenOrApiKey,
+      `/customers${qs}`
+    );
+  }
+
+  /**
+   * Fetches a single customer by UUID.
+   */
+  async getCustomer(
+    tokenOrApiKey: string,
+    id: string,
+    fields?: string[]
+  ): Promise<CustomerRecord> {
+    const qs = fields?.length ? `?fields=${encodeURIComponent(fields.join(","))}` : "";
+    return this.requestDirectory<CustomerRecord>(
+      tokenOrApiKey,
+      `/customers/${encodeURIComponent(id)}${qs}`
+    );
+  }
+
+  /**
+   * Lists authorized contacts/guardians for a customer.
+   */
+  async listCustomerContacts(
+    tokenOrApiKey: string,
+    customerId: string
+  ): Promise<CustomerContactRecord[]> {
+    return this.requestDirectory<CustomerContactRecord[]>(
+      tokenOrApiKey,
+      `/customers/${encodeURIComponent(customerId)}/contacts`
+    );
+  }
+
+  /**
+   * Lists HR employees with optional filtering, pagination, and field projection.
+   */
+  async listEmployees(
+    tokenOrApiKey: string,
+    params?: ListEmployeesParams
+  ): Promise<PaginatedDirectoryResult<EmployeeRecord>> {
+    const q = new URLSearchParams();
+    if (params?.status) q.set("status", params.status);
+    if (params?.departmentCode) q.set("departmentCode", params.departmentCode);
+    if (params?.jobTitleCode) q.set("jobTitleCode", params.jobTitleCode);
+    if (params?.search) q.set("search", params.search);
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.limit) q.set("limit", String(params.limit));
+    if (params?.fields?.length) q.set("fields", params.fields.join(","));
+    const qs = q.toString() ? `?${q.toString()}` : "";
+    return this.requestDirectory<PaginatedDirectoryResult<EmployeeRecord>>(
+      tokenOrApiKey,
+      `/employees${qs}`
+    );
+  }
+
+  /**
+   * Fetches a single employee by UUID.
+   */
+  async getEmployee(
+    tokenOrApiKey: string,
+    id: string,
+    fields?: string[]
+  ): Promise<EmployeeRecord> {
+    const qs = fields?.length ? `?fields=${encodeURIComponent(fields.join(","))}` : "";
+    return this.requestDirectory<EmployeeRecord>(
+      tokenOrApiKey,
+      `/employees/${encodeURIComponent(id)}${qs}`
+    );
+  }
+
+  /**
+   * Checks whether an employee is available at a given YYYY-MM-DD date and HH:mm time,
+   * accounting for schedule overrides, approved leave requests, and recurring shifts.
+   */
+  async getEmployeeAvailability(
+    tokenOrApiKey: string,
+    employeeId: string,
+    date: string,
+    time: string
+  ): Promise<EmployeeAvailabilityResult> {
+    const q = new URLSearchParams({ date, time });
+    return this.requestDirectory<EmployeeAvailabilityResult>(
+      tokenOrApiKey,
+      `/employees/${encodeURIComponent(employeeId)}/schedules/availability?${q.toString()}`
+    );
   }
 }

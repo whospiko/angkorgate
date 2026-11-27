@@ -12,6 +12,8 @@ import { UsersService } from '../../users/services/users.service';
 import { RbacService } from '../../rbac/services/rbac.service';
 import { OauthProvider } from '../../oauth/entities/oauth-provider.entity';
 import { RuntimeConfigService } from '../../system/services/runtime-config.service';
+import { Customer } from '../../customers/entities/customer.entity';
+import { Employee } from '../../employees/entities/employee.entity';
 
 const OIDC_SETTINGS_CODE = '_oidc_settings';
 
@@ -93,6 +95,7 @@ export class OidcService implements OnModuleInit {
                 if (!user) return undefined;
                 const roles = await this.rbacService.getUserRoleCodes(id);
                 const permissions = await this.rbacService.getUserPermissions(id);
+                const dataSource = this.dataSource;
 
                 return {
                     accountId: id,
@@ -129,6 +132,57 @@ export class OidcService implements OnModuleInit {
                             claimsObj['https://angkorgate.com/permissions'] = permissions;
                         }
 
+                        if ((shouldIncludeAll || scopeList.includes('erp:customer')) && dataSource) {
+                            try {
+                                const customer = await dataSource
+                                    .getRepository(Customer)
+                                    .findOne({ where: { userId: id } });
+                                if (customer) {
+                                    const customerClaim = {
+                                        id: customer.id,
+                                        customerCode: customer.customerCode,
+                                        type: customer.type,
+                                        status: customer.status,
+                                        fullName: customer.fullName,
+                                    };
+                                    claimsObj.customer = customerClaim;
+                                    claimsObj['https://angkorgate.com/customer'] = customerClaim;
+                                }
+                            } catch {
+                                // Ignore when DataSource is mocked
+                            }
+                        }
+
+                        if ((shouldIncludeAll || scopeList.includes('hr:employee')) && dataSource) {
+                            try {
+                                const employee = await dataSource
+                                    .getRepository(Employee)
+                                    .findOne({
+                                        where: { userId: id },
+                                        relations: { positions: { jobTitle: true, department: true } },
+                                    });
+                                if (employee) {
+                                    const primary =
+                                        employee.positions?.find((p) => p.isPrimary) ??
+                                        employee.positions?.[0] ??
+                                        null;
+                                    const employeeClaim = {
+                                        id: employee.id,
+                                        employeeCode: employee.employeeCode,
+                                        employmentStatus: employee.employmentStatus,
+                                        employmentType: employee.employmentType,
+                                        fullName: employee.fullName,
+                                        departmentCode: primary?.department?.code ?? null,
+                                        jobTitleCode: primary?.jobTitle?.code ?? null,
+                                    };
+                                    claimsObj.employee = employeeClaim;
+                                    claimsObj['https://angkorgate.com/employee'] = employeeClaim;
+                                }
+                            } catch {
+                                // Ignore when DataSource is mocked
+                            }
+                        }
+
                         return claimsObj;
                     },
                 };
@@ -141,6 +195,8 @@ export class OidcService implements OnModuleInit {
                 profile: ['name', 'preferred_username', 'roles', 'permissions'],
                 roles: ['roles', 'https://angkorgate.com/roles'],
                 permissions: ['permissions', 'https://angkorgate.com/permissions'],
+                'erp:customer': ['customer', 'https://angkorgate.com/customer'],
+                'hr:employee': ['employee', 'https://angkorgate.com/employee'],
             },
 
             scopes: [
@@ -150,6 +206,8 @@ export class OidcService implements OnModuleInit {
                 'phone',
                 'roles',
                 'permissions',
+                'erp:customer',
+                'hr:employee',
                 'offline_access',
             ],
 

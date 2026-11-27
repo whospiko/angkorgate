@@ -114,3 +114,93 @@ export interface AngkorGateClientConfig {
    */
   jwksCacheTtlMs?: number;
 }
+
+// --- ERP & HR Directory Types ---
+
+export type CustomerType = "PATIENT" | "GUEST" | "CUSTOMER";
+export type CustomerStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
+export type EmploymentStatus = "ACTIVE" | "ON_LEAVE" | "RESIGNED" | "TERMINATED";
+export type EmploymentType = "FULL_TIME" | "PART_TIME" | "CONTRACTOR" | "INTERN";
+
+export interface CustomerRecord {
+  id: string;
+  customerCode: string;
+  userId?: string | null;
+  type: CustomerType;
+  fullName: string;
+  gender?: string | null;
+  dateOfBirth: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  nationalId?: string | null;
+  status: CustomerStatus;
+  isMinor?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CustomerContactRecord {
+  id: string;
+  customerId: string;
+  fullName: string;
+  relationship?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  isPrimary: boolean;
+}
+
+export interface EmployeeRecord {
+  id: string;
+  userId?: string | null;
+  employeeCode: string;
+  fullName: string;
+  gender?: string | null;
+  dateOfBirth?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  hireDate?: string | null;
+  employmentStatus: EmploymentStatus;
+  employmentType: EmploymentType;
+  managerId?: string | null;
+  positions?: Array<{
+    id: string;
+    isPrimary: boolean;
+    jobTitle?: { code: string; name: string; category?: string | null };
+    department?: { code: string; name: string } | null;
+  }>;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PaginatedDirectoryResult<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface ListCustomersParams {
+  type?: CustomerType;
+  status?: CustomerStatus;
+  search?: string;
+  page?: number;
+  limit?: number;
+  fields?: string[];
+}
+
+export interface ListEmployeesParams {
+  status?: EmploymentStatus;
+  departmentCode?: string;
+  jobTitleCode?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+  fields?: string[];
+}
+
+export interface EmployeeAvailabilityResult {
+  available: boolean;
+  reason?: string;
+}

@@ -65,6 +65,8 @@ const DEFAULT_SCOPES = [
     { name: 'phone', displayName: 'Phone', description: 'User phone number and verification state', claims: ['phone', 'phone_verified'], isDefault: false },
     { name: 'roles', displayName: 'Roles', description: 'Assigned application and realm roles', claims: ['roles', 'https://angkorgate.com/roles'], isDefault: true },
     { name: 'permissions', displayName: 'Permissions', description: 'Granular RBAC permission codes', claims: ['permissions', 'https://angkorgate.com/permissions'], isDefault: false },
+    { name: 'erp:customer', displayName: 'Customer Profile', description: 'Linked CRM customer profile claims', claims: ['customer', 'https://angkorgate.com/customer'], isDefault: false },
+    { name: 'hr:employee', displayName: 'Employee Profile', description: 'Linked HR employee profile and position claims', claims: ['employee', 'https://angkorgate.com/employee'], isDefault: false },
     { name: 'offline_access', displayName: 'Offline Access', description: 'Refresh token for offline/background access', claims: [], isDefault: true },
 ];
 

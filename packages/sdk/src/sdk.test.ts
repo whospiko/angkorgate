@@ -259,4 +259,67 @@ describe("@angkorgate/sdk", () => {
     await client.revokeSession("new-at", "s2");
     assert.equal(calls.length, 4);
   });
+
+  it("queries ERP customers, HR employees, and availability with field projection", async () => {
+    const requestedUrls: string[] = [];
+    const mockFetch: typeof fetch = async (input) => {
+      const url = String(input);
+      requestedUrls.push(url);
+
+      if (url.includes("/customers?")) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              data: [
+                {
+                  id: "c1",
+                  customerCode: "PAT-0001",
+                  type: "PATIENT",
+                  fullName: "Sok Dara",
+                  dateOfBirth: "1995-01-01",
+                  status: "ACTIVE",
+                },
+              ],
+              total: 1,
+              page: 1,
+              limit: 10,
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      if (url.includes("/schedules/availability")) {
+        return new Response(
+          JSON.stringify({ data: { available: false, reason: "Public Holiday" } }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      return new Response("Not Found", { status: 404 });
+    };
+
+    const client = new AngkorGateClient({
+      baseUrl: "http://localhost:8080",
+      fetchImpl: mockFetch,
+    });
+
+    const customers = await client.listCustomers("ag_test_123", {
+      type: "PATIENT",
+      fields: ["id", "customerCode", "fullName"],
+      limit: 10,
+    });
+    assert.equal(customers.total, 1);
+    assert.equal(customers.data[0].customerCode, "PAT-0001");
+    assert.ok(requestedUrls[0].includes("fields=id%2CcustomerCode%2CfullName"));
+
+    const avail = await client.getEmployeeAvailability(
+      "ag_test_123",
+      "emp-1",
+      "2026-12-25",
+      "10:00"
+    );
+    assert.equal(avail.available, false);
+    assert.equal(avail.reason, "Public Holiday");
+  });
 });
