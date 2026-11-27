@@ -67,7 +67,7 @@ export interface UpdateCustomerInput {
   avatarUrl?: string
 }
 
-export interface CreateContactInput {
+export type CreateContactInput = {
   fullName: string
   relationship?: string
   phone?: string
@@ -77,3 +77,15 @@ export interface CreateContactInput {
 }
 
 export type UpdateContactInput = Partial<CreateContactInput>
+
+export type AttributeValueType = "string" | "number" | "boolean" | "array<string>" | "object"
+
+export interface AttributeSchemaRule {
+  id: string
+  targetType: "CUSTOMER" | "EMPLOYEE_POSITION"
+  domain: string
+  key: string
+  valueType: AttributeValueType
+  isRequired: boolean
+  description?: string | null
+}

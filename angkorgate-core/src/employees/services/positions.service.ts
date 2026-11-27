@@ -3,6 +3,7 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
@@ -14,6 +15,7 @@ import { UpdatePositionDto } from '../dto/update-position.dto';
 import { EmployeesService } from './employees.service';
 import { DepartmentsService } from './departments.service';
 import { AuditService } from '../../audit/services/audit.service';
+import { AttributeSchemasService } from '../../customers/services/attribute-schemas.service';
 
 @Injectable()
 export class PositionsService {
@@ -26,6 +28,7 @@ export class PositionsService {
         private readonly departments: DepartmentsService,
         private readonly jobTitles: JobTitlesService,
         private readonly audit: AuditService,
+        @Optional() private readonly attributeSchemas?: AttributeSchemasService,
     ) { }
 
     async assign(dto: AssignPositionDto, actorId?: string): Promise<EmployeePosition> {
@@ -222,7 +225,11 @@ export class PositionsService {
         value: unknown,
         actorId?: string,
     ): Promise<EmployeeAttribute> {
-        await this.findById(employeeId, positionId);
+        const position = await this.findById(employeeId, positionId);
+        if (this.attributeSchemas) {
+            const domain = position.jobTitle?.category || 'GENERAL';
+            await this.attributeSchemas.validateValue('EMPLOYEE_POSITION', domain, key, value);
+        }
 
         let attr = await this.attrRepo.findOne({ where: { positionId, key } });
         const oldValue = attr ? attr.value : undefined;

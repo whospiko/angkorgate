@@ -33,6 +33,8 @@ import {
   linkCustomerUserAction,
   getCustomerAttributes,
   getCustomerAttributeSchemas,
+  getRegisteredAttributeSchemas,
+  seedAttributeSchemasAction,
   setCustomerAttributeAction,
   deleteCustomerAttributeAction,
   getCustomerContacts,
@@ -40,7 +42,12 @@ import {
   updateCustomerContactAction,
   deleteCustomerContactAction,
 } from "../server/customers-actions"
-import type { Customer, CustomerContact, CustomerStatus } from "../types/customers.types"
+import type {
+  AttributeSchemaRule,
+  Customer,
+  CustomerContact,
+  CustomerStatus,
+} from "../types/customers.types"
 
 interface CustomerDetailsDialogProps {
   customer: Customer
@@ -98,6 +105,7 @@ export function CustomerDetailsDialog({
   // Attributes
   const [attributes, setAttributes] = useState<Record<string, unknown>>({})
   const [schemaMap, setSchemaMap] = useState<Record<string, Record<string, string>>>({})
+  const [registeredSchemas, setRegisteredSchemas] = useState<AttributeSchemaRule[]>([])
   const [attrKey, setAttrKey] = useState("")
   const [attrValue, setAttrValue] = useState("")
   const [attrLoading, setAttrLoading] = useState(false)
@@ -109,16 +117,18 @@ export function CustomerDetailsDialog({
       getCustomerContacts(customer.id),
       getCustomerAttributes(customer.id),
       getCustomerAttributeSchemas(),
-    ]).then(([c, a, s]) => {
+      getRegisteredAttributeSchemas("CUSTOMER", customer.type),
+    ]).then(([c, a, s, reg]) => {
       if (cancelled) return
       setContacts(c)
       setAttributes(a)
       setSchemaMap(s)
+      setRegisteredSchemas(reg)
     })
     return () => {
       cancelled = true
     }
-  }, [open, customer.id])
+  }, [open, customer.id, customer.type])
 
   const suggestedSchema = schemaMap[customer.type] || {}
 
@@ -521,11 +531,31 @@ export function CustomerDetailsDialog({
 
           {/* Dynamic Attributes */}
           <div className="space-y-2">
-            <h4 className="font-heading font-semibold text-sm">Dynamic Attributes</h4>
-            {Object.keys(suggestedSchema).length > 0 && (
+            <div className="flex items-center justify-between">
+              <h4 className="font-heading font-semibold text-sm">Dynamic Attributes</h4>
+              {registeredSchemas.length === 0 && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const res = await seedAttributeSchemasAction()
+                    if (res.success) {
+                      const reg = await getRegisteredAttributeSchemas("CUSTOMER", customer.type)
+                      setRegisteredSchemas(reg)
+                    }
+                  }}
+                  className="text-[10px] text-primary hover:underline"
+                >
+                  Enable Strict Schema Validation
+                </button>
+              )}
+            </div>
+            {(registeredSchemas.length > 0 || Object.keys(suggestedSchema).length > 0) && (
               <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
-                <span>Suggested for {customer.type}:</span>
-                {Object.entries(suggestedSchema).map(([k, typeHint]) => (
+                <span>{registeredSchemas.length > 0 ? "Enforced" : "Suggested"} for {customer.type}:</span>
+                {(registeredSchemas.length > 0
+                  ? registeredSchemas.map((r) => [r.key, r.valueType] as const)
+                  : Object.entries(suggestedSchema)
+                ).map(([k, typeHint]) => (
                   <button
                     key={k}
                     type="button"
@@ -533,7 +563,7 @@ export function CustomerDetailsDialog({
                     className="px-1.5 py-0.5 rounded border border-border/60 bg-muted/30 hover:border-primary hover:text-primary transition-colors"
                     title={`Type: ${typeHint}`}
                   >
-                    {k}
+                    {k} <span className="opacity-60">({typeHint})</span>
                   </button>
                 ))}
               </div>

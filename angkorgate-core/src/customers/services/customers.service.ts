@@ -3,6 +3,7 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
@@ -13,6 +14,7 @@ import { UpdateCustomerDto } from '../dto/update-customer.dto';
 import { CustomerResponseDto } from '../dto/customer-response.dto';
 import { UsersService } from '../../users/services/users.service';
 import { AuditService } from '../../audit/services/audit.service';
+import { AttributeSchemasService } from './attribute-schemas.service';
 import {
     CUSTOMER_TYPE_PREFIX,
     formatCustomerCode,
@@ -36,6 +38,7 @@ export class CustomersService {
         private readonly attrRepo: Repository<CustomerAttribute>,
         private readonly users: UsersService,
         private readonly audit: AuditService,
+        @Optional() private readonly attributeSchemas?: AttributeSchemasService,
     ) { }
 
     async create(
@@ -239,7 +242,10 @@ export class CustomersService {
         value: unknown,
         actorId?: string,
     ): Promise<CustomerAttribute> {
-        await this.findByIdOrFail(customerId);
+        const customer = await this.findByIdOrFail(customerId);
+        if (this.attributeSchemas) {
+            await this.attributeSchemas.validateValue('CUSTOMER', customer.type, key, value);
+        }
 
         let attr = await this.attrRepo.findOne({ where: { customerId, key } });
         const oldValue = attr ? attr.value : undefined;

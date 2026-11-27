@@ -11,6 +11,7 @@ import type {
   CustomerContact,
   CreateContactInput,
   UpdateContactInput,
+  AttributeSchemaRule,
 } from "../types/customers.types"
 import {
   CreateCustomerSchema,
@@ -97,6 +98,37 @@ export async function getCustomerAttributeSchemas(): Promise<Record<string, Reco
     return res || {}
   } catch {
     return {}
+  }
+}
+
+export async function getRegisteredAttributeSchemas(
+  targetType?: "CUSTOMER" | "EMPLOYEE_POSITION",
+  domain?: string
+): Promise<AttributeSchemaRule[]> {
+  try {
+    const params = new URLSearchParams()
+    if (targetType) params.set("targetType", targetType)
+    if (domain) params.set("domain", domain)
+    const qs = params.toString() ? `?${params.toString()}` : ""
+    const res = await apiClient.get<AttributeSchemaRule[]>(`/attribute-schemas${qs}`)
+    return Array.isArray(res) ? res : []
+  } catch {
+    return []
+  }
+}
+
+export async function seedAttributeSchemasAction(): Promise<{
+  success: boolean
+  message?: string
+  created?: number
+}> {
+  try {
+    const res = await apiClient.post<{ created: number }>("/attribute-schemas/seed", {})
+    revalidatePath("/customers")
+    revalidatePath("/employees")
+    return { success: true, created: res?.created ?? 0 }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to seed attribute schemas") }
   }
 }
 
