@@ -73,6 +73,7 @@ interface EmployeesOverviewProps {
   initialStatus?: string
   initialDepartment?: string
   initialJobTitle?: string
+  initialTab?: string
 }
 
 export function EmployeesOverview({
@@ -89,6 +90,7 @@ export function EmployeesOverview({
   initialStatus = "",
   initialDepartment = "",
   initialJobTitle = "",
+  initialTab = "staff",
 }: EmployeesOverviewProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -216,7 +218,7 @@ export function EmployeesOverview({
       </div>
 
       {/* Main Tabs Navigation */}
-      <Tabs defaultValue="staff" className="space-y-4">
+      <Tabs key={initialTab} defaultValue={initialTab} className="space-y-4">
         <TabsList className="font-mono text-xs">
           <TabsTrigger value="staff">Staff Directory ({total})</TabsTrigger>
           <TabsTrigger value="org-chart">Org Chart</TabsTrigger>

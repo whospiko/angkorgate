@@ -21,6 +21,7 @@ import {
   RiBookOpenLine,
   RiServerLine,
   RiRadarLine,
+  RiTeamLine,
   RiUserLine,
 } from "@remixicon/react"
 import { BrandLogo, useBranding } from "@/features/system"
@@ -92,13 +93,33 @@ const defaultNavData = {
           title: "Dev Outbox (Links & OTP)",
           url: "/settings/dev-inbox",
         },
+      ],
+    },
+    {
+      title: "ERP & HR",
+      url: "/customers",
+      icon: <RiTeamLine className="size-4" />,
+      isActive: true,
+      items: [
         {
           title: "Customers CRM",
           url: "/customers",
         },
         {
-          title: "Organization & Staff",
+          title: "Staff Directory",
           url: "/employees",
+        },
+        {
+          title: "Org Chart",
+          url: "/employees?tab=org-chart",
+        },
+        {
+          title: "Leave Queue",
+          url: "/employees?tab=leaves",
+        },
+        {
+          title: "Departments & Roles",
+          url: "/employees?tab=departments",
         },
       ],
     },

@@ -14,6 +14,7 @@ export const metadata = {
 
 interface EmployeesPageProps {
   searchParams?: Promise<{
+    tab?: string
     search?: string
     status?: string
     departmentCode?: string
@@ -69,6 +70,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
         initialStatus={params.status || ""}
         initialDepartment={params.departmentCode || ""}
         initialJobTitle={params.jobTitleCode || ""}
+        initialTab={params.tab || "staff"}
       />
     </div>
   )
