@@ -6,6 +6,8 @@ import { apiClient, ApiError } from "@/lib/api-client"
 import { createUserAction } from "@/features/users/server/users-actions"
 import type {
   Department,
+  DepartmentTreeNode,
+  OrgChartNode,
   JobTitle,
   Employee,
   PaginatedEmployees,
@@ -59,6 +61,24 @@ export async function getDepartments(): Promise<Department[]> {
     if (error instanceof ApiError && error.statusCode === 401) {
       redirect("/login?unauthorized=1&redirect=/employees")
     }
+    return []
+  }
+}
+
+export async function getDepartmentTree(): Promise<DepartmentTreeNode[]> {
+  try {
+    const res = await apiClient.get<DepartmentTreeNode[]>("/departments/tree")
+    return Array.isArray(res) ? res : []
+  } catch {
+    return []
+  }
+}
+
+export async function getOrgChart(): Promise<OrgChartNode[]> {
+  try {
+    const res = await apiClient.get<OrgChartNode[]>("/employees/org-chart")
+    return Array.isArray(res) ? res : []
+  } catch {
     return []
   }
 }
@@ -281,6 +301,8 @@ export async function createEmployeeAction(
       address: parsed.address,
       avatarUrl: parsed.avatarUrl,
       hireDate: parsed.hireDate,
+      employmentType: parsed.employmentType,
+      managerId: parsed.managerId ?? undefined,
       employeeCode: parsed.employeeCode ? parsed.employeeCode.toUpperCase() : undefined,
       userId: targetUserId,
     })

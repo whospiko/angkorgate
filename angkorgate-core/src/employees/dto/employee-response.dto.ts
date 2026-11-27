@@ -40,6 +40,12 @@ export class EmployeeResponseDto {
     @ApiProperty({ description: 'Current employment status', example: 'ACTIVE' })
     employmentStatus: string;
 
+    @ApiProperty({ description: 'Employment contract type', example: 'FULL_TIME' })
+    employmentType: string;
+
+    @ApiPropertyOptional({ description: 'Direct manager Employee UUID', nullable: true })
+    managerId: string | null;
+
     @ApiProperty({ description: 'Record creation timestamp', example: '2026-11-21T10:00:00.000Z' })
     createdAt: Date;
 
@@ -66,6 +72,8 @@ export class EmployeeResponseDto {
         dto.avatarUrl = e.avatarUrl;
         dto.hireDate = e.hireDate;
         dto.employmentStatus = e.employmentStatus;
+        dto.employmentType = e.employmentType ?? 'FULL_TIME';
+        dto.managerId = e.managerId ?? null;
         dto.createdAt = e.createdAt;
         dto.updatedAt = e.updatedAt;
         if (Array.isArray(e.positions)) {

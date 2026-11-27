@@ -85,6 +85,14 @@ export class EmployeesController {
         });
     }
 
+    @Get('org-chart')
+    @Permissions('employee:read')
+    @ApiOperation({ summary: 'Get hierarchical employee reporting org chart' })
+    @ApiResponse({ status: 200, description: 'Nested employee org chart' })
+    getOrgChart() {
+        return this.employees.getOrgChart();
+    }
+
     @Get('by-user/:userId')
     @Permissions('employee:read')
     @ApiOperation({ summary: 'Get employee profile linked to a user account UUID' })
@@ -104,6 +112,15 @@ export class EmployeesController {
     @ApiResponse({ status: 404, description: 'Employee not found' })
     findOne(@Param('id', ParseUUIDPipe) id: string) {
         return this.employees.findByIdOrFail(id);
+    }
+
+    @Get(':id/direct-reports')
+    @Permissions('employee:read')
+    @ApiOperation({ summary: 'List direct reports for a manager employee' })
+    @ApiParam({ name: 'id', description: 'Manager Employee UUID' })
+    @ApiResponse({ status: 200, description: 'List of direct reports', type: [EmployeeResponseDto] })
+    getDirectReports(@Param('id', ParseUUIDPipe) id: string) {
+        return this.employees.getDirectReports(id);
     }
 
     @Patch(':id')

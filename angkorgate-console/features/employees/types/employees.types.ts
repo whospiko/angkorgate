@@ -1,4 +1,5 @@
 export type EmploymentStatus = "ACTIVE" | "ON_LEAVE" | "RESIGNED" | "TERMINATED"
+export type EmploymentType = "FULL_TIME" | "PART_TIME" | "CONTRACTOR" | "INTERN"
 export type EmployeeGender = "MALE" | "FEMALE" | "OTHER"
 
 export interface Department {
@@ -6,8 +7,30 @@ export interface Department {
   code: string
   name: string
   description?: string | null
+  parentId?: string | null
   isActive?: boolean
   createdAt?: string
+}
+
+export interface DepartmentTreeNode extends Department {
+  id: string
+  children: DepartmentTreeNode[]
+}
+
+export interface OrgChartNode {
+  id: string
+  employeeCode: string
+  fullName: string
+  employmentStatus: EmploymentStatus
+  employmentType: EmploymentType
+  managerId: string | null
+  primaryPosition: {
+    jobTitleCode: string
+    jobTitleName: string
+    departmentCode: string | null
+    departmentName: string | null
+  } | null
+  children: OrgChartNode[]
 }
 
 export interface JobTitle {
@@ -57,6 +80,8 @@ export interface Employee {
   avatarUrl?: string | null
   hireDate?: string | null
   employmentStatus: EmploymentStatus
+  employmentType?: EmploymentType
+  managerId?: string | null
   positions?: EmployeePosition[]
   schedules?: EmployeeSchedule[]
   createdAt?: string
@@ -74,12 +99,14 @@ export interface CreateDepartmentInput {
   code: string
   name: string
   description?: string
+  parentId?: string | null
   isActive?: boolean
 }
 
 export interface UpdateDepartmentInput {
   name?: string
   description?: string
+  parentId?: string | null
   isActive?: boolean
 }
 
@@ -114,6 +141,8 @@ export interface CreateEmployeeInput {
   address?: string
   avatarUrl?: string
   hireDate?: string
+  employmentType?: EmploymentType
+  managerId?: string | null
 }
 
 export interface UpdateEmployeeInput {
@@ -125,6 +154,8 @@ export interface UpdateEmployeeInput {
   address?: string
   avatarUrl?: string
   hireDate?: string
+  employmentType?: EmploymentType
+  managerId?: string | null
 }
 
 export interface AssignPositionInput {

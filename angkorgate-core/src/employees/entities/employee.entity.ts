@@ -16,10 +16,12 @@ import { EmployeePosition } from './employee-position.entity';
 import { WorkSchedule } from './work-schedule.entity';
 
 export type EmploymentStatus = 'ACTIVE' | 'ON_LEAVE' | 'RESIGNED' | 'TERMINATED';
+export type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'CONTRACTOR' | 'INTERN';
 export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
 
 @Entity('employees')
 @Index('idx_employees_status', ['employmentStatus'])
+@Index('idx_employees_manager', ['managerId'])
 export class Employee {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -30,6 +32,16 @@ export class Employee {
     @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
     @JoinColumn({ name: 'user_id' })
     user: User | null;
+
+    @Column({ name: 'manager_id', type: 'uuid', nullable: true })
+    managerId: string | null;
+
+    @ManyToOne(() => Employee, (e) => e.directReports, { onDelete: 'SET NULL', nullable: true })
+    @JoinColumn({ name: 'manager_id' })
+    manager: Employee | null;
+
+    @OneToMany(() => Employee, (e) => e.manager)
+    directReports: Employee[];
 
     @Column({ name: 'employee_code', type: 'varchar', length: 30, unique: true })
     employeeCode: string;
@@ -57,6 +69,14 @@ export class Employee {
 
     @Column({ name: 'hire_date', type: 'date', nullable: true })
     hireDate: string | null;
+
+    @Column({
+        name: 'employment_type',
+        type: 'varchar',
+        length: 20,
+        default: 'FULL_TIME',
+    })
+    employmentType: EmploymentType;
 
     @Column({
         name: 'employment_status',

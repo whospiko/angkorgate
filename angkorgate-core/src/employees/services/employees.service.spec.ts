@@ -125,4 +125,45 @@ describe('EmployeesService', () => {
 
         await expect(service.linkUser('e1', 'u-missing')).rejects.toThrow(NotFoundException);
     });
+
+    it('builds nested org chart from managerId', async () => {
+        repo.find.mockResolvedValue([
+            {
+                id: 'e1',
+                employeeCode: 'EMP-0001',
+                fullName: 'Chief Doctor',
+                employmentStatus: 'ACTIVE',
+                employmentType: 'FULL_TIME',
+                managerId: null,
+                positions: [],
+            },
+            {
+                id: 'e2',
+                employeeCode: 'EMP-0002',
+                fullName: 'Junior Doctor',
+                employmentStatus: 'ACTIVE',
+                employmentType: 'FULL_TIME',
+                managerId: 'e1',
+                positions: [],
+            },
+        ] as never);
+
+        const chart = await service.getOrgChart();
+        expect(chart).toHaveLength(1);
+        expect(chart[0].employeeCode).toBe('EMP-0001');
+        expect(chart[0].children).toHaveLength(1);
+        expect(chart[0].children[0].employeeCode).toBe('EMP-0002');
+    });
+
+    it('rejects circular managerId on update', async () => {
+        repo.findOne.mockResolvedValue({ id: 'e1', managerId: null } as never);
+        repo.find.mockResolvedValue([
+            { id: 'e1', managerId: null },
+            { id: 'e2', managerId: 'e1' },
+        ] as never);
+
+        await expect(service.update('e1', { managerId: 'e2' })).rejects.toThrow(
+            'Circular reporting hierarchy is not allowed',
+        );
+    });
 });

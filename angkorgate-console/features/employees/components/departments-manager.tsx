@@ -46,12 +46,14 @@ export function DepartmentsManager({ departments }: DepartmentsManagerProps) {
   const [createCode, setCreateCode] = useState("")
   const [createName, setCreateName] = useState("")
   const [createDesc, setCreateDesc] = useState("")
+  const [createParentId, setCreateParentId] = useState("")
   const [createLoading, setCreateLoading] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
   const [editDept, setEditDept] = useState<Department | null>(null)
   const [editName, setEditName] = useState("")
   const [editDesc, setEditDesc] = useState("")
+  const [editParentId, setEditParentId] = useState("")
   const [editLoading, setEditLoading] = useState(false)
 
   const [seeding, setSeeding] = useState<string | null>(null)
@@ -69,6 +71,7 @@ export function DepartmentsManager({ departments }: DepartmentsManagerProps) {
       code: createCode.trim().toUpperCase(),
       name: createName.trim(),
       description: createDesc.trim() || undefined,
+      parentId: createParentId || null,
     })
 
     setCreateLoading(false)
@@ -77,6 +80,7 @@ export function DepartmentsManager({ departments }: DepartmentsManagerProps) {
       setCreateCode("")
       setCreateName("")
       setCreateDesc("")
+      setCreateParentId("")
     } else {
       setCreateError(res.message || "Failed to create department")
     }
@@ -90,6 +94,7 @@ export function DepartmentsManager({ departments }: DepartmentsManagerProps) {
     const res = await updateDepartmentAction(editDept.code, {
       name: editName.trim(),
       description: editDesc.trim() || undefined,
+      parentId: editParentId || null,
     })
 
     setEditLoading(false)
@@ -226,6 +231,23 @@ export function DepartmentsManager({ departments }: DepartmentsManagerProps) {
                       onChange={(e) => setCreateDesc(e.target.value)}
                     />
                   </div>
+
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="dept-parent">Parent Department</Label>
+                    <select
+                      id="dept-parent"
+                      value={createParentId}
+                      onChange={(e) => setCreateParentId(e.target.value)}
+                      className="flex h-9 w-full min-w-0 rounded-md border border-input bg-background/90 dark:bg-black/25 px-3 py-1.5 text-xs font-mono text-foreground outline-none"
+                    >
+                      <option value="">None (Top-level)</option>
+                      {departments.filter((d) => d.id).map((d) => (
+                        <option key={d.code} value={d.id}>
+                          {d.name} ({d.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <DialogFooter className="gap-2">
@@ -301,6 +323,7 @@ export function DepartmentsManager({ departments }: DepartmentsManagerProps) {
                           setEditDept(d)
                           setEditName(d.name)
                           setEditDesc(d.description || "")
+                          setEditParentId(d.parentId || "")
                         }}
                       >
                         <RiEditLine className="size-3.5" />
@@ -353,6 +376,25 @@ export function DepartmentsManager({ departments }: DepartmentsManagerProps) {
                     value={editDesc}
                     onChange={(e) => setEditDesc(e.target.value)}
                   />
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="edit-dept-parent">Parent Department</Label>
+                  <select
+                    id="edit-dept-parent"
+                    value={editParentId}
+                    onChange={(e) => setEditParentId(e.target.value)}
+                    className="flex h-9 w-full min-w-0 rounded-md border border-input bg-background/90 dark:bg-black/25 px-3 py-1.5 text-xs font-mono text-foreground outline-none"
+                  >
+                    <option value="">None (Top-level)</option>
+                    {departments
+                      .filter((d) => d.id && d.code !== editDept.code)
+                      .map((d) => (
+                        <option key={d.code} value={d.id}>
+                          {d.name} ({d.code})
+                        </option>
+                      ))}
+                  </select>
                 </div>
               </div>
 

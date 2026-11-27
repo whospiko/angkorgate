@@ -16,11 +16,11 @@ import { Label } from "@/components/ui/label"
 import { RiUserAddLine, RiLoader4Line } from "@remixicon/react"
 import { createEmployeeAction } from "../server/employees-actions"
 import { CreateEmployeeSchema } from "../types/employees.schemas"
-import type { EmployeeGender } from "../types/employees.types"
+import type { Employee, EmployeeGender, EmploymentType } from "../types/employees.types"
 
 type AccountMode = "none" | "existing" | "new"
 
-export function CreateEmployeeDialog() {
+export function CreateEmployeeDialog({ employees = [] }: { employees?: Employee[] }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -33,6 +33,8 @@ export function CreateEmployeeDialog() {
   const [nationalId, setNationalId] = useState("")
   const [address, setAddress] = useState("")
   const [hireDate, setHireDate] = useState(new Date().toISOString().split("T")[0])
+  const [employmentType, setEmploymentType] = useState<EmploymentType>("FULL_TIME")
+  const [managerId, setManagerId] = useState("")
 
   const [accountMode, setAccountMode] = useState<AccountMode>("none")
   const [existingUserId, setExistingUserId] = useState("")
@@ -53,6 +55,8 @@ export function CreateEmployeeDialog() {
       nationalId: nationalId.trim() || undefined,
       address: address.trim() || undefined,
       hireDate: hireDate || undefined,
+      employmentType,
+      managerId: managerId || null,
       userId: accountMode === "existing" ? existingUserId.trim() : undefined,
       provisionUser:
         accountMode === "new"
@@ -268,6 +272,40 @@ export function CreateEmployeeDialog() {
                   value={nationalId}
                   onChange={(e) => setNationalId(e.target.value)}
                 />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="emp-type">Contract Type</Label>
+                <select
+                  id="emp-type"
+                  value={employmentType}
+                  onChange={(e) => setEmploymentType(e.target.value as EmploymentType)}
+                  className="flex h-9 w-full min-w-0 rounded-md border border-input bg-background/90 dark:bg-black/25 px-3 py-1.5 text-xs font-mono text-foreground outline-none"
+                >
+                  <option value="FULL_TIME">FULL_TIME</option>
+                  <option value="PART_TIME">PART_TIME</option>
+                  <option value="CONTRACTOR">CONTRACTOR</option>
+                  <option value="INTERN">INTERN</option>
+                </select>
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label htmlFor="emp-manager">Reports To (Manager)</Label>
+                <select
+                  id="emp-manager"
+                  value={managerId}
+                  onChange={(e) => setManagerId(e.target.value)}
+                  className="flex h-9 w-full min-w-0 rounded-md border border-input bg-background/90 dark:bg-black/25 px-3 py-1.5 text-xs font-mono text-foreground outline-none"
+                >
+                  <option value="">None (Top-level)</option>
+                  {employees.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.fullName} ({e.employeeCode})
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 

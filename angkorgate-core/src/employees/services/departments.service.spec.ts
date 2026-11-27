@@ -48,4 +48,29 @@ describe('DepartmentsService', () => {
     it('throws NotFoundException on unknown template', async () => {
         await expect(service.seedFromTemplate('unknown')).rejects.toThrow(NotFoundException);
     });
+
+    it('builds nested department tree from parentId', async () => {
+        deptRepo.find.mockResolvedValue([
+            { id: 'd1', code: 'CLINIC', name: 'Clinic', parentId: null, isActive: true, createdAt: new Date() },
+            { id: 'd2', code: 'SURGERY', name: 'Surgery', parentId: 'd1', isActive: true, createdAt: new Date() },
+        ] as never);
+
+        const tree = await service.getTree();
+        expect(tree).toHaveLength(1);
+        expect(tree[0].code).toBe('CLINIC');
+        expect(tree[0].children).toHaveLength(1);
+        expect(tree[0].children[0].code).toBe('SURGERY');
+    });
+
+    it('rejects circular parentId on update', async () => {
+        deptRepo.findOne.mockResolvedValue({ id: 'd1', code: 'CLINIC', name: 'Clinic', parentId: null } as never);
+        deptRepo.find.mockResolvedValue([
+            { id: 'd1', parentId: null },
+            { id: 'd2', parentId: 'd1' },
+        ] as never);
+
+        await expect(service.update('CLINIC', { parentId: 'd2' })).rejects.toThrow(
+            'Circular department hierarchy is not allowed',
+        );
+    });
 });

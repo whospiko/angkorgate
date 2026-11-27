@@ -37,16 +37,25 @@ import {
   RiArrowLeftSLine,
   RiArrowRightSLine,
 } from "@remixicon/react"
-import type { Department, JobTitle, Employee } from "../types/employees.types"
+import type {
+  Department,
+  DepartmentTreeNode,
+  OrgChartNode,
+  JobTitle,
+  Employee,
+} from "../types/employees.types"
 import { deleteEmployeeAction } from "../server/employees-actions"
 import { CreateEmployeeDialog } from "./create-employee-dialog"
 import { EditEmployeeDialog } from "./edit-employee-dialog"
 import { EmployeeDetailsDialog } from "./employee-details-dialog"
 import { DepartmentsManager } from "./departments-manager"
 import { JobTitlesManager } from "./job-titles-manager"
+import { OrgChartView } from "./org-chart-view"
 
 interface EmployeesOverviewProps {
   departments: Department[]
+  departmentTree?: DepartmentTreeNode[]
+  orgChart?: OrgChartNode[]
   jobTitles: JobTitle[]
   employees: Employee[]
   total?: number
@@ -60,6 +69,8 @@ interface EmployeesOverviewProps {
 
 export function EmployeesOverview({
   departments,
+  departmentTree = [],
+  orgChart = [],
   jobTitles,
   employees,
   total = employees.length,
@@ -199,6 +210,7 @@ export function EmployeesOverview({
       <Tabs defaultValue="staff" className="space-y-4">
         <TabsList className="font-mono text-xs">
           <TabsTrigger value="staff">Staff Directory ({total})</TabsTrigger>
+          <TabsTrigger value="org-chart">Org Chart</TabsTrigger>
           <TabsTrigger value="departments">Departments ({departments.length})</TabsTrigger>
           <TabsTrigger value="job-titles">Job Titles ({jobTitles.length})</TabsTrigger>
         </TabsList>
@@ -212,7 +224,7 @@ export function EmployeesOverview({
                 Manage employee assignments, shift schedules, and status.
               </p>
             </div>
-            <CreateEmployeeDialog />
+            <CreateEmployeeDialog employees={employees} />
           </div>
 
           {/* Search & Filters Toolbar */}
@@ -459,7 +471,12 @@ export function EmployeesOverview({
           )}
         </TabsContent>
 
-        {/* Tab 2: Departments */}
+        {/* Tab 2: Org Chart */}
+        <TabsContent value="org-chart">
+          <OrgChartView orgChart={orgChart} departmentTree={departmentTree} />
+        </TabsContent>
+
+        {/* Tab 3: Departments */}
         <TabsContent value="departments">
           <DepartmentsManager departments={departments} />
         </TabsContent>
@@ -487,6 +504,7 @@ export function EmployeesOverview({
         <EditEmployeeDialog
           key={selectedEditEmployee.id}
           employee={selectedEditEmployee}
+          employees={employees}
           open={Boolean(selectedEditEmployee)}
           onOpenChange={(open) => !open && setSelectedEditEmployee(null)}
         />

@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
-import { Employee, EmploymentStatus } from '../entities/employee.entity';
+import { Employee, EmploymentStatus, EmploymentType } from '../entities/employee.entity';
 import { CreateEmployeeDto } from '../dto/create-employee.dto';
 import { UpdateEmployeeDto } from '../dto/update-employee.dto';
 import { EmployeeResponseDto } from '../dto/employee-response.dto';
@@ -22,6 +22,22 @@ const ALLOWED_EMPLOYMENT_STATUSES: ReadonlyArray<EmploymentStatus> = [
     'TERMINATED',
 ];
 
+export interface OrgChartNode {
+    id: string;
+    employeeCode: string;
+    fullName: string;
+    employmentStatus: EmploymentStatus;
+    employmentType: EmploymentType;
+    managerId: string | null;
+    primaryPosition: {
+        jobTitleCode: string;
+        jobTitleName: string;
+        departmentCode: string | null;
+        departmentName: string | null;
+    } | null;
+    children: OrgChartNode[];
+}
+
 @Injectable()
 export class EmployeesService {
     constructor(
@@ -34,6 +50,10 @@ export class EmployeesService {
     async create(dto: CreateEmployeeDto, actorId?: string): Promise<EmployeeResponseDto> {
         if (dto.userId) {
             await this.assertUserLinkAvailable(dto.userId);
+        }
+
+        if (dto.managerId) {
+            await this.assertManagerValid(null, dto.managerId);
         }
 
         const employeeCode = dto.employeeCode?.trim()
@@ -51,6 +71,8 @@ export class EmployeesService {
             ...dto,
             employeeCode,
             userId: dto.userId ?? null,
+            managerId: dto.managerId ?? null,
+            employmentType: dto.employmentType ?? 'FULL_TIME',
         });
         const saved = await this.repo.save(entity);
 
@@ -148,7 +170,16 @@ export class EmployeesService {
         const e = await this.repo.findOne({ where: { id } });
         if (!e) throw new NotFoundException(`Employee ${id} not found`);
 
-        const before = { fullName: e.fullName, phone: e.phone };
+        if (dto.managerId !== undefined && dto.managerId !== null) {
+            await this.assertManagerValid(id, dto.managerId);
+        }
+
+        const before = {
+            fullName: e.fullName,
+            phone: e.phone,
+            managerId: e.managerId,
+            employmentType: e.employmentType,
+        };
         Object.assign(e, dto);
         const saved = await this.repo.save(e);
 
@@ -162,6 +193,56 @@ export class EmployeesService {
         });
 
         return EmployeeResponseDto.fromEntity(saved);
+    }
+
+    async getDirectReports(managerId: string): Promise<EmployeeResponseDto[]> {
+        await this.findByIdOrFail(managerId);
+        const rows = await this.repo.find({
+            where: { managerId },
+            relations: { positions: { jobTitle: true, department: true } },
+            order: { fullName: 'ASC' },
+        });
+        return rows.map(EmployeeResponseDto.fromEntity);
+    }
+
+    async getOrgChart(): Promise<OrgChartNode[]> {
+        const rows = await this.repo.find({
+            relations: { positions: { jobTitle: true, department: true } },
+            order: { fullName: 'ASC' },
+        });
+
+        const nodeMap = new Map<string, OrgChartNode>();
+        for (const e of rows) {
+            const primary =
+                e.positions?.find((p) => p.isPrimary) ?? e.positions?.[0] ?? null;
+            nodeMap.set(e.id, {
+                id: e.id,
+                employeeCode: e.employeeCode,
+                fullName: e.fullName,
+                employmentStatus: e.employmentStatus,
+                employmentType: e.employmentType ?? 'FULL_TIME',
+                managerId: e.managerId ?? null,
+                primaryPosition: primary?.jobTitle
+                    ? {
+                          jobTitleCode: primary.jobTitle.code,
+                          jobTitleName: primary.jobTitle.name,
+                          departmentCode: primary.department?.code ?? null,
+                          departmentName: primary.department?.name ?? null,
+                      }
+                    : null,
+                children: [],
+            });
+        }
+
+        const roots: OrgChartNode[] = [];
+        for (const node of nodeMap.values()) {
+            if (node.managerId && nodeMap.has(node.managerId)) {
+                nodeMap.get(node.managerId)!.children.push(node);
+            } else {
+                roots.push(node);
+            }
+        }
+        return roots;
     }
 
     async linkUser(
@@ -261,6 +342,37 @@ export class EmployeesService {
     async getFullName(id: string): Promise<string | null> {
         const e = await this.repo.findOne({ where: { id }, select: { id: true, fullName: true } });
         return e?.fullName ?? null;
+    }
+
+    private async assertManagerValid(
+        employeeId: string | null,
+        candidateManagerId: string,
+    ): Promise<void> {
+        if (employeeId && employeeId === candidateManagerId) {
+            throw new BadRequestException('An employee cannot report to themselves');
+        }
+        const all = await this.repo.find({ select: { id: true, managerId: true } });
+        const managerMap = new Map<string, string | null>();
+        for (const item of all) {
+            managerMap.set(item.id, item.managerId ?? null);
+        }
+
+        if (!managerMap.has(candidateManagerId)) {
+            throw new NotFoundException(`Manager employee ${candidateManagerId} not found`);
+        }
+
+        if (!employeeId) return;
+
+        let current: string | null = candidateManagerId;
+        const visited = new Set<string>();
+        while (current) {
+            if (current === employeeId) {
+                throw new BadRequestException('Circular reporting hierarchy is not allowed');
+            }
+            if (visited.has(current)) break;
+            visited.add(current);
+            current = managerMap.get(current) ?? null;
+        }
     }
 
     private async assertUserLinkAvailable(userId: string, excludeEmployeeId?: string): Promise<void> {

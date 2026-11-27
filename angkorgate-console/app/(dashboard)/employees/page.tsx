@@ -1,5 +1,7 @@
 import {
   getDepartments,
+  getDepartmentTree,
+  getOrgChart,
   getJobTitles,
   getEmployees,
   EmployeesOverview,
@@ -23,8 +25,10 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
   const params = (await searchParams) || {}
   const page = params.page ? Math.max(1, parseInt(params.page, 10) || 1) : 1
 
-  const [departments, jobTitles, employeesData] = await Promise.all([
+  const [departments, departmentTree, orgChart, jobTitles, employeesData] = await Promise.all([
     getDepartments(),
+    getDepartmentTree(),
+    getOrgChart(),
     getJobTitles(),
     getEmployees({
       search: params.search,
@@ -44,13 +48,15 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
             Organization & Staff
           </h1>
           <p className="text-xs text-muted-foreground">
-            Internal departments, job titles, positions, and staff schedules.
+            Internal departments, job titles, reporting lines, positions, and staff schedules.
           </p>
         </div>
       </div>
 
       <EmployeesOverview
         departments={departments}
+        departmentTree={departmentTree}
+        orgChart={orgChart}
         jobTitles={jobTitles}
         employees={employeesData.items}
         total={employeesData.total}

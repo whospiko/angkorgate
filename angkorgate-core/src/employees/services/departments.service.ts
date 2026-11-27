@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    ConflictException,
+    Injectable,
+    NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Department } from '../entities/department.entity';
@@ -7,6 +12,17 @@ import { UpdateDepartmentDto } from '../dto/update-department.dto';
 import { SEED_TEMPLATES } from '../seed/default-templates';
 import { JobTitle } from '../entities/job-title.entity';
 import { AuditService } from '../../audit/services/audit.service';
+
+export interface DepartmentTreeNode {
+    id: string;
+    code: string;
+    name: string;
+    description: string | null;
+    parentId: string | null;
+    isActive: boolean;
+    createdAt: Date;
+    children: DepartmentTreeNode[];
+}
 
 @Injectable()
 export class DepartmentsService {
@@ -21,14 +37,24 @@ export class DepartmentsService {
     async create(dto: CreateDepartmentDto, actorId?: string): Promise<Department> {
         const exists = await this.repo.findOne({ where: { code: dto.code } });
         if (exists) throw new ConflictException(`Department ${dto.code} exists`);
-        const saved = await this.repo.save(this.repo.create(dto));
+
+        if (dto.parentId) {
+            await this.findByIdOrFail(dto.parentId);
+        }
+
+        const saved = await this.repo.save(
+            this.repo.create({
+                ...dto,
+                parentId: dto.parentId ?? null,
+            }),
+        );
 
         void this.audit.log({
             actorId: actorId ?? null,
             action: 'department.create',
             entity: 'department',
             entityId: saved.id,
-            newValue: { code: saved.code, name: saved.name },
+            newValue: { code: saved.code, name: saved.name, parentId: saved.parentId },
         });
 
         return saved;
@@ -36,6 +62,34 @@ export class DepartmentsService {
 
     findAll(): Promise<Department[]> {
         return this.repo.find({ order: { code: 'ASC' } });
+    }
+
+    async getTree(): Promise<DepartmentTreeNode[]> {
+        const all = await this.findAll();
+        const nodeMap = new Map<string, DepartmentTreeNode>();
+
+        for (const d of all) {
+            nodeMap.set(d.id, {
+                id: d.id,
+                code: d.code,
+                name: d.name,
+                description: d.description,
+                parentId: d.parentId ?? null,
+                isActive: d.isActive,
+                createdAt: d.createdAt,
+                children: [],
+            });
+        }
+
+        const roots: DepartmentTreeNode[] = [];
+        for (const node of nodeMap.values()) {
+            if (node.parentId && nodeMap.has(node.parentId)) {
+                nodeMap.get(node.parentId)!.children.push(node);
+            } else {
+                roots.push(node);
+            }
+        }
+        return roots;
     }
 
     async findByIdOrFail(id: string): Promise<Department> {
@@ -52,7 +106,17 @@ export class DepartmentsService {
 
     async update(code: string, dto: UpdateDepartmentDto, actorId?: string): Promise<Department> {
         const d = await this.findByCodeOrFail(code);
-        const oldValue = { name: d.name, description: d.description, isActive: d.isActive };
+
+        if (dto.parentId !== undefined && dto.parentId !== null) {
+            await this.assertNoCycle(d.id, dto.parentId);
+        }
+
+        const oldValue = {
+            name: d.name,
+            description: d.description,
+            isActive: d.isActive,
+            parentId: d.parentId,
+        };
         Object.assign(d, dto);
         const saved = await this.repo.save(d);
 
@@ -115,5 +179,31 @@ export class DepartmentsService {
         });
 
         return { departments: d, jobTitles: j };
+    }
+
+    private async assertNoCycle(departmentId: string, candidateParentId: string): Promise<void> {
+        if (departmentId === candidateParentId) {
+            throw new BadRequestException('A department cannot be its own parent');
+        }
+        const all = await this.repo.find({ select: { id: true, parentId: true } });
+        const parentMap = new Map<string, string | null>();
+        for (const item of all) {
+            parentMap.set(item.id, item.parentId ?? null);
+        }
+
+        if (!parentMap.has(candidateParentId)) {
+            throw new NotFoundException(`Parent department ${candidateParentId} not found`);
+        }
+
+        let current: string | null = candidateParentId;
+        const visited = new Set<string>();
+        while (current) {
+            if (current === departmentId) {
+                throw new BadRequestException('Circular department hierarchy is not allowed');
+            }
+            if (visited.has(current)) break;
+            visited.add(current);
+            current = parentMap.get(current) ?? null;
+        }
     }
 }

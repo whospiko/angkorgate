@@ -4,6 +4,8 @@ import {
     CreateDateColumn,
     Entity,
     Index,
+    JoinColumn,
+    ManyToOne,
     OneToMany,
     PrimaryGeneratedColumn,
 } from 'typeorm';
@@ -11,6 +13,7 @@ import { EmployeePosition } from './employee-position.entity';
 
 @Entity('departments')
 @Index('idx_departments_code', ['code'])
+@Index('idx_departments_parent', ['parentId'])
 export class Department {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -23,6 +26,16 @@ export class Department {
 
     @Column({ type: 'text', nullable: true })
     description: string | null;
+
+    @Column({ name: 'parent_id', type: 'uuid', nullable: true })
+    parentId: string | null;
+
+    @ManyToOne(() => Department, (d) => d.children, { onDelete: 'SET NULL', nullable: true })
+    @JoinColumn({ name: 'parent_id' })
+    parent: Department | null;
+
+    @OneToMany(() => Department, (d) => d.parent)
+    children: Department[];
 
     @Column({ name: 'is_active', type: 'boolean', default: true })
     isActive: boolean;

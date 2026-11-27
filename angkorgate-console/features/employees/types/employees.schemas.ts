@@ -7,6 +7,13 @@ export const EmploymentStatusSchema = z.enum([
   "TERMINATED",
 ])
 
+export const EmploymentTypeSchema = z.enum([
+  "FULL_TIME",
+  "PART_TIME",
+  "CONTRACTOR",
+  "INTERN",
+])
+
 export const EmployeeGenderSchema = z.enum(["MALE", "FEMALE", "OTHER"])
 
 const CODE_REGEX = /^[A-Z][A-Z0-9_]{1,49}$/
@@ -20,6 +27,7 @@ export const CreateDepartmentSchema = z.object({
     .regex(CODE_REGEX, "Code must be UPPER_SNAKE_CASE (2-50 chars, starting with A-Z)"),
   name: z.string().trim().min(1, "Department name is required").max(100),
   description: z.string().trim().optional().or(z.literal("")),
+  parentId: z.string().uuid().nullable().optional(),
   isActive: z.boolean().optional(),
 })
 
@@ -74,6 +82,8 @@ export const CreateEmployeeSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Hire date must be YYYY-MM-DD")
     .optional()
     .or(z.literal("")),
+  employmentType: EmploymentTypeSchema.optional().default("FULL_TIME"),
+  managerId: z.string().uuid("Manager ID must be a valid UUID").nullable().optional(),
 })
 
 export const UpdateEmployeeSchema = CreateEmployeeSchema.omit({

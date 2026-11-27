@@ -90,10 +90,27 @@ export class CreateEmployeeDto {
     avatarUrl?: string;
 
     @ApiPropertyOptional({
-        description: 'Employment hire date in YYYY-MM-DD format',
+        description: 'Employment start / hire date in YYYY-MM-DD format',
         example: '2024-01-01',
     })
     @IsOptional()
     @IsDateString()
     hireDate?: string;
+
+    @ApiPropertyOptional({
+        description: 'Employment contract type',
+        enum: ['FULL_TIME', 'PART_TIME', 'CONTRACTOR', 'INTERN'],
+        default: 'FULL_TIME',
+    })
+    @IsOptional()
+    @IsIn(['FULL_TIME', 'PART_TIME', 'CONTRACTOR', 'INTERN'])
+    employmentType?: 'FULL_TIME' | 'PART_TIME' | 'CONTRACTOR' | 'INTERN';
+
+    @ApiPropertyOptional({
+        description: 'Direct reporting manager Employee UUID',
+        nullable: true,
+    })
+    @IsOptional()
+    @IsUUID()
+    managerId?: string | null;
 }

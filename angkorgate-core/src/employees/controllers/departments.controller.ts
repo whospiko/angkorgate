@@ -45,6 +45,14 @@ export class DepartmentsController {
         return this.departments.findAll();
     }
 
+    @Get('tree')
+    @Permissions('employee:read')
+    @ApiOperation({ summary: 'Get hierarchical department tree' })
+    @ApiResponse({ status: 200, description: 'Nested department hierarchy' })
+    getTree() {
+        return this.departments.getTree();
+    }
+
     @Get(':code')
     @Permissions('employee:read')
     @ApiOperation({ summary: 'Get details of a single department by code' })
