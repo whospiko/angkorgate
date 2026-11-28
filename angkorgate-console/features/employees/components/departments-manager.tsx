@@ -26,7 +26,6 @@ import {
   RiAddLine,
   RiDeleteBinLine,
   RiEditLine,
-  RiSeedlingLine,
   RiLoader4Line,
 } from "@remixicon/react"
 import type { Department } from "../types/employees.types"
@@ -34,7 +33,6 @@ import {
   createDepartmentAction,
   updateDepartmentAction,
   deleteDepartmentAction,
-  seedDepartmentsAction,
 } from "../server/employees-actions"
 
 interface DepartmentsManagerProps {
@@ -56,7 +54,6 @@ export function DepartmentsManager({ departments }: DepartmentsManagerProps) {
   const [editParentId, setEditParentId] = useState("")
   const [editLoading, setEditLoading] = useState(false)
 
-  const [seeding, setSeeding] = useState<string | null>(null)
   const [deletingCode, setDeletingCode] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(
     null
@@ -119,33 +116,6 @@ export function DepartmentsManager({ departments }: DepartmentsManagerProps) {
     }
   }
 
-  const handleSeed = async (template: string) => {
-    if (
-      !confirm(
-        `Seed standard ${template.toUpperCase()} departments & job titles? Existing records will be preserved.`
-      )
-    )
-      return
-    setSeeding(template)
-    setFeedback(null)
-    try {
-      const res = await seedDepartmentsAction(template)
-      if (res.success) {
-        const counts = res.data
-          ? ` (+${res.data.departments} departments, +${res.data.jobTitles} job titles)`
-          : ""
-        setFeedback({
-          type: "success",
-          message: `Seeded ${template.toUpperCase()} template${counts}.`,
-        })
-      } else {
-        setFeedback({ type: "error", message: res.message || "Failed to seed template" })
-      }
-    } finally {
-      setSeeding(null)
-    }
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -157,24 +127,6 @@ export function DepartmentsManager({ departments }: DepartmentsManagerProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {(["clinic", "hotel", "pos"] as const).map((tpl) => (
-            <Button
-              key={tpl}
-              size="sm"
-              variant="outline"
-              disabled={Boolean(seeding)}
-              onClick={() => handleSeed(tpl)}
-              className="font-mono text-xs uppercase"
-            >
-              {seeding === tpl ? (
-                <RiLoader4Line className="mr-1 size-3.5 animate-spin" />
-              ) : (
-                <RiSeedlingLine className="mr-1 size-3.5 text-primary" />
-              )}
-              Seed {tpl}
-            </Button>
-          ))}
-
           {/* Create Department Dialog */}
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger

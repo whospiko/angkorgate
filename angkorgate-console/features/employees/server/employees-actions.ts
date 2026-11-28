@@ -133,20 +133,6 @@ export async function deleteDepartmentAction(
   }
 }
 
-export async function seedDepartmentsAction(
-  template: string = "clinic"
-): Promise<{ success: boolean; message?: string; data?: { departments: number; jobTitles: number } }> {
-  try {
-    const res = await apiClient.post<{ departments: number; jobTitles: number }>(
-      `/departments/seed/${encodeURIComponent(template)}`
-    )
-    revalidatePath("/employees")
-    return { success: true, data: res }
-  } catch (error: unknown) {
-    return { success: false, message: getErrorMessage(error, "Failed to seed departments template") }
-  }
-}
-
 // --- Job Titles ---
 
 export async function getJobTitles(category?: string): Promise<JobTitle[]> {
