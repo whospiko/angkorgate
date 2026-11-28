@@ -770,13 +770,50 @@ export async function getTeamRosterAction(query?: {
   }
 }
 
-export async function getAttendanceLogsAction(employeeId?: string): Promise<AttendanceLog[]> {
+export async function getAttendanceLogsAction(
+  employeeId?: string,
+  includeDeleted = false
+): Promise<AttendanceLog[]> {
   try {
-    const qs = employeeId ? `?employeeId=${encodeURIComponent(employeeId)}` : ""
+    const params = new URLSearchParams()
+    if (employeeId) params.set("employeeId", employeeId)
+    if (includeDeleted) params.set("includeDeleted", "true")
+    const qs = params.toString() ? `?${params.toString()}` : ""
     const res = await apiClient.get<AttendanceLog[]>(`/employees/attendance${qs}`)
     return Array.isArray(res) ? res : []
   } catch {
     return []
+  }
+}
+
+export async function softDeleteAttendanceLogAction(
+  logId: string,
+  reason?: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    await apiClient.delete(`/employees/attendance/${encodeURIComponent(logId)}`, {
+      body: JSON.stringify({ reason: reason?.trim() || undefined }),
+    })
+    revalidatePath("/attendance")
+    revalidatePath("/employees")
+    revalidatePath("/account")
+    return { success: true }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to delete attendance log") }
+  }
+}
+
+export async function restoreAttendanceLogAction(
+  logId: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    await apiClient.post(`/employees/attendance/${encodeURIComponent(logId)}/restore`, {})
+    revalidatePath("/attendance")
+    revalidatePath("/employees")
+    revalidatePath("/account")
+    return { success: true }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to restore attendance log") }
   }
 }
 

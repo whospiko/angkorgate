@@ -109,6 +109,14 @@ export interface AttendanceLog {
   clockInIp?: string | null
   distanceMeters?: number | null
   notes?: string | null
+  deletedAt?: string | null
+  deletedById?: string | null
+  deletedBy?: {
+    id: string
+    email?: string | null
+    fullName?: string | null
+  } | null
+  deleteReason?: string | null
 }
 
 export interface AttendanceSessionRule {

@@ -10,6 +10,7 @@ import {
   RiLoginBoxLine,
   RiLogoutBoxLine,
   RiMapPinLine,
+  RiRefreshLine,
   RiSettings3Line,
   RiShieldCheckLine,
   RiTimeLine,
@@ -42,6 +43,8 @@ import {
   getAttendanceLogsAction,
   getAttendancePoliciesAction,
   getAttendanceSummaryAction,
+  restoreAttendanceLogAction,
+  softDeleteAttendanceLogAction,
   updateAttendancePolicyAction,
 } from "../server/employees-actions"
 import type {
@@ -114,6 +117,9 @@ export function AttendanceManager({
   const [selectedEmpId, setSelectedEmpId] = React.useState(employees[0]?.id ?? "")
   const [clockNote, setClockNote] = React.useState("")
   const [filterEmpId, setFilterEmpId] = React.useState("")
+  const [showDeleted, setShowDeleted] = React.useState(false)
+  const [deletingLogId, setDeletingLogId] = React.useState<string | null>(null)
+  const [deleteReason, setDeleteReason] = React.useState("")
 
   const departmentNameById = React.useMemo(() => {
     const map = new Map<string, string>()
@@ -170,15 +176,46 @@ export function AttendanceManager({
     setShowBuilder(true)
   }
 
-  const refreshAttendanceData = async (empFilter = filterEmpId) => {
+  const refreshAttendanceData = async (
+    empFilter = filterEmpId,
+    includeDel = showDeleted
+  ) => {
     const [nextPolicies, nextLogs, nextSummary] = await Promise.all([
       getAttendancePoliciesAction(),
-      getAttendanceLogsAction(empFilter || undefined),
+      getAttendanceLogsAction(empFilter || undefined, includeDel),
       getAttendanceSummaryAction(empFilter ? { employeeId: empFilter } : undefined),
     ])
     setPolicies(nextPolicies)
     setLogs(nextLogs)
     setSummary(nextSummary)
+  }
+
+  const handleConfirmDeleteLog = (logId: string) => {
+    setBanner(null)
+    startTransition(async () => {
+      const res = await softDeleteAttendanceLogAction(logId, deleteReason)
+      if (!res.success) {
+        setBanner({ type: "err", text: res.message || "Failed to delete attendance log" })
+        return
+      }
+      setDeletingLogId(null)
+      setDeleteReason("")
+      setBanner({ type: "ok", text: "Attendance log soft-deleted (audit tracked)." })
+      await refreshAttendanceData()
+    })
+  }
+
+  const handleRestoreLog = (logId: string) => {
+    setBanner(null)
+    startTransition(async () => {
+      const res = await restoreAttendanceLogAction(logId)
+      if (!res.success) {
+        setBanner({ type: "err", text: res.message || "Failed to restore attendance log" })
+        return
+      }
+      setBanner({ type: "ok", text: "Attendance log restored." })
+      await refreshAttendanceData()
+    })
   }
 
   const handleUseCurrentLocation = () => {
@@ -916,13 +953,28 @@ export function AttendanceManager({
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5 rounded-[0.625rem] border border-border/60 bg-muted/30 px-2.5 py-1.5 text-xs font-mono cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showDeleted}
+                onChange={(e) => {
+                  const next = e.target.checked
+                  setShowDeleted(next)
+                  startTransition(async () => {
+                    await refreshAttendanceData(filterEmpId, next)
+                  })
+                }}
+                className="rounded border-input"
+              />
+              Show Deleted
+            </label>
             <select
               value={filterEmpId}
               onChange={(e) => {
                 const next = e.target.value
                 setFilterEmpId(next)
                 startTransition(async () => {
-                  await refreshAttendanceData(next)
+                  await refreshAttendanceData(next, showDeleted)
                 })
               }}
               className={selectClass}
@@ -1001,20 +1053,30 @@ export function AttendanceManager({
                   <TableHead>Worked</TableHead>
                   <TableHead>Source / IP</TableHead>
                   <TableHead>Notes</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {logs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-6 text-center text-xs font-mono text-muted-foreground">
+                    <TableCell colSpan={9} className="py-6 text-center text-xs font-mono text-muted-foreground">
                       No attendance logs recorded yet.
                     </TableCell>
                   </TableRow>
                 ) : (
                   logs.slice(0, 30).map((log) => (
-                    <TableRow key={log.id}>
+                    <TableRow
+                      key={log.id}
+                      className={log.deletedAt ? "bg-rose-500/5 opacity-80" : undefined}
+                    >
                       <TableCell className="font-medium text-xs">
-                        {log.employee?.fullName || log.employeeId.slice(0, 8)}
+                        <div>{log.employee?.fullName || log.employeeId.slice(0, 8)}</div>
+                        {log.deletedAt && (
+                          <div className="mt-0.5 text-[10px] font-mono text-rose-300">
+                            Deleted by {log.deletedBy?.fullName || log.deletedBy?.email || log.deletedById?.slice(0, 8) || "Admin"}
+                            {log.deleteReason ? ` · "${log.deleteReason}"` : ""}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
                         {log.sessionIndex !== null && log.sessionIndex !== undefined
@@ -1034,15 +1096,22 @@ export function AttendanceManager({
                         )}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
-                        {log.status === "LATE" ? (
-                          <Badge className="bg-amber-500/15 text-amber-300 border-amber-500/30 text-[10px]">
-                            LATE +{log.lateMinutes ?? 0}m
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30 text-[10px]">
-                            ON TIME
-                          </Badge>
-                        )}
+                        <div className="flex flex-wrap gap-1">
+                          {log.deletedAt && (
+                            <Badge className="bg-rose-500/15 text-rose-300 border-rose-500/30 text-[10px]">
+                              DELETED
+                            </Badge>
+                          )}
+                          {log.status === "LATE" ? (
+                            <Badge className="bg-amber-500/15 text-amber-300 border-amber-500/30 text-[10px]">
+                              LATE +{log.lateMinutes ?? 0}m
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30 text-[10px]">
+                              ON TIME
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="font-mono text-xs">
                         {log.workedMinutes !== null && log.workedMinutes !== undefined
@@ -1062,6 +1131,66 @@ export function AttendanceManager({
                       </TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">
                         {log.notes || "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {log.deletedAt ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={isPending}
+                            onClick={() => handleRestoreLog(log.id)}
+                            className="h-7 px-2 font-mono text-[11px] text-emerald-300 border-emerald-500/30"
+                          >
+                            <RiRefreshLine className="mr-1 size-3.5" />
+                            Restore
+                          </Button>
+                        ) : deletingLogId === log.id ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Input
+                              value={deleteReason}
+                              onChange={(e) => setDeleteReason(e.target.value)}
+                              placeholder="Reason (optional)"
+                              className="h-7 w-36 text-[11px] font-mono"
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              disabled={isPending}
+                              onClick={() => handleConfirmDeleteLog(log.id)}
+                              className="h-7 px-2 font-mono text-[11px]"
+                            >
+                              Confirm
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setDeletingLogId(null)
+                                setDeleteReason("")
+                              }}
+                              className="h-7 px-2 font-mono text-[11px]"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={isPending}
+                            onClick={() => {
+                              setDeletingLogId(log.id)
+                              setDeleteReason("")
+                            }}
+                            title="Soft delete attendance log"
+                          >
+                            <RiDeleteBinLine className="size-4 text-rose-400" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

@@ -2,6 +2,7 @@ import { colTimestamptz } from '../../common/utils/db-types.util';
 import {
     Column,
     CreateDateColumn,
+    DeleteDateColumn,
     Entity,
     Index,
     JoinColumn,
@@ -9,6 +10,7 @@ import {
     PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Employee } from './employee.entity';
+import { User } from '../../users/entities/user.entity';
 
 export type AttendanceSource = 'WEB' | 'KIOSK' | 'API';
 export type AttendanceStatus = 'ON_TIME' | 'LATE';
@@ -68,4 +70,17 @@ export class AttendanceLog {
 
     @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
     createdAt: Date;
+
+    @DeleteDateColumn({ name: 'deleted_at', type: colTimestamptz(), nullable: true })
+    deletedAt: Date | null;
+
+    @Column({ name: 'deleted_by_id', type: 'uuid', nullable: true })
+    deletedById: string | null;
+
+    @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'deleted_by_id' })
+    deletedBy?: User | null;
+
+    @Column({ name: 'delete_reason', type: 'varchar', length: 300, nullable: true })
+    deleteReason: string | null;
 }

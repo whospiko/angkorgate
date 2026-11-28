@@ -571,6 +571,7 @@ export class SchedulesService {
         limit = 50,
         startDate?: string,
         endDate?: string,
+        includeDeleted = false,
     ): Promise<AttendanceLog[]> {
         if (!this.attendanceRepo) return [];
         const qb = this.attendanceRepo
@@ -579,6 +580,12 @@ export class SchedulesService {
             .addSelect(['emp.id', 'emp.employeeCode', 'emp.fullName'])
             .orderBy('a.clockInAt', 'DESC')
             .take(Math.min(Math.max(limit, 1), 200));
+
+        if (includeDeleted) {
+            qb.withDeleted()
+                .leftJoin('a.deletedBy', 'delUser')
+                .addSelect(['delUser.id', 'delUser.email']);
+        }
 
         if (employeeId) {
             qb.andWhere('a.employeeId = :eid', { eid: employeeId });
@@ -590,6 +597,74 @@ export class SchedulesService {
             qb.andWhere('a.clockInAt <= :toTs', { toTs: new Date(`${endDate}T23:59:59.999Z`) });
         }
         return qb.getMany();
+    }
+
+    async softDeleteAttendanceLog(
+        id: string,
+        actorId?: string,
+        reason?: string,
+    ): Promise<{ deleted: true; id: string }> {
+        if (!this.attendanceRepo) {
+            throw new BadRequestException('Attendance repository is not configured');
+        }
+        const existing = await this.attendanceRepo.findOne({ where: { id } });
+        if (!existing) {
+            throw new NotFoundException(`Attendance log "${id}" not found`);
+        }
+
+        const cleanReason = reason?.trim() || null;
+        await this.attendanceRepo.update(id, {
+            deletedById: actorId ?? null,
+            deleteReason: cleanReason,
+        });
+        await this.attendanceRepo.softDelete(id);
+
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'employee.attendance.soft_delete',
+            entity: 'attendance_log',
+            entityId: id,
+            oldValue: {
+                employeeId: existing.employeeId,
+                clockInAt: existing.clockInAt,
+                clockOutAt: existing.clockOutAt,
+            },
+            newValue: {
+                deletedById: actorId ?? null,
+                deleteReason: cleanReason,
+            },
+        });
+
+        return { deleted: true, id };
+    }
+
+    async restoreAttendanceLog(id: string, actorId?: string): Promise<AttendanceLog> {
+        if (!this.attendanceRepo) {
+            throw new BadRequestException('Attendance repository is not configured');
+        }
+        const existing = await this.attendanceRepo.findOne({
+            where: { id },
+            withDeleted: true,
+        });
+        if (!existing) {
+            throw new NotFoundException(`Attendance log "${id}" not found`);
+        }
+
+        await this.attendanceRepo.restore(id);
+        await this.attendanceRepo.update(id, {
+            deletedById: null,
+            deleteReason: null,
+        });
+
+        const restored = await this.attendanceRepo.findOne({ where: { id } });
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'employee.attendance.restore',
+            entity: 'attendance_log',
+            entityId: id,
+            newValue: { employeeId: existing.employeeId },
+        });
+        return restored ?? { ...existing, deletedAt: null, deletedById: null, deleteReason: null };
     }
 
     async getAttendanceSummary(startDate: string, endDate: string, employeeId?: string) {

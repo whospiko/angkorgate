@@ -242,4 +242,26 @@ describe('SchedulesService', () => {
         expect(ok.clockInIp).toBe('203.189.132.45');
         expect(ok.distanceMeters).toBeLessThanOrEqual(150);
     });
+
+    it('soft-deletes an attendance log with actor & reason and restores it cleanly', async () => {
+        attendanceRepo.findOne
+            .mockResolvedValueOnce({ id: 'log-del', employeeId: 'e1' } as never)
+            .mockResolvedValueOnce({ id: 'log-del', employeeId: 'e1', deletedAt: new Date() } as never)
+            .mockResolvedValueOnce({ id: 'log-del', employeeId: 'e1', deletedAt: null } as never);
+        attendanceRepo.update = jest.fn().mockResolvedValue({ affected: 1 });
+        attendanceRepo.softDelete = jest.fn().mockResolvedValue({ affected: 1 });
+        attendanceRepo.restore = jest.fn().mockResolvedValue({ affected: 1 });
+
+        const delRes = await service.softDeleteAttendanceLog('log-del', 'admin-1', 'Test entry');
+        expect(delRes).toEqual({ deleted: true, id: 'log-del' });
+        expect(attendanceRepo.update).toHaveBeenCalledWith('log-del', {
+            deletedById: 'admin-1',
+            deleteReason: 'Test entry',
+        });
+        expect(attendanceRepo.softDelete).toHaveBeenCalledWith('log-del');
+
+        const restored = await service.restoreAttendanceLog('log-del', 'admin-1');
+        expect(attendanceRepo.restore).toHaveBeenCalledWith('log-del');
+        expect(restored.id).toBe('log-del');
+    });
 });

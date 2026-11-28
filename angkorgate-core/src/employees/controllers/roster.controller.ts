@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     Param,
     ParseUUIDPipe,
@@ -61,18 +62,42 @@ export class RosterController {
     @ApiQuery({ name: 'limit', required: false })
     @ApiQuery({ name: 'startDate', required: false })
     @ApiQuery({ name: 'endDate', required: false })
+    @ApiQuery({ name: 'includeDeleted', required: false })
     listAttendance(
         @Query('employeeId') employeeId?: string,
         @Query('limit') limit?: string,
         @Query('startDate') startDate?: string,
         @Query('endDate') endDate?: string,
+        @Query('includeDeleted') includeDeleted?: string,
     ) {
         return this.schedules.listAttendance(
             employeeId,
             limit ? parseInt(limit, 10) : 50,
             startDate,
             endDate,
+            includeDeleted === 'true',
         );
+    }
+
+    @Delete('attendance/:logId')
+    @Permissions('employee:write')
+    @ApiOperation({ summary: 'Soft delete an attendance log with actor tracking' })
+    softDeleteAttendance(
+        @Param('logId', ParseUUIDPipe) logId: string,
+        @Body() body: { reason?: string },
+        @CurrentUser('id') actorId: string,
+    ) {
+        return this.schedules.softDeleteAttendanceLog(logId, actorId, body?.reason);
+    }
+
+    @Post('attendance/:logId/restore')
+    @Permissions('employee:write')
+    @ApiOperation({ summary: 'Restore a soft-deleted attendance log' })
+    restoreAttendance(
+        @Param('logId', ParseUUIDPipe) logId: string,
+        @CurrentUser('id') actorId: string,
+    ) {
+        return this.schedules.restoreAttendanceLog(logId, actorId);
     }
 
     @Get('attendance/summary')

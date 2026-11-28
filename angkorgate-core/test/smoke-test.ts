@@ -431,6 +431,34 @@ async function runSmokeTest() {
             .delete(`/attendance-policies/${strictPolicy.id}`)
             .set('Authorization', `Bearer ${adminToken}`);
 
+        // Soft-delete attendance log, verify admin ?includeDeleted=true, then restore
+        const softDelRes = await request(http)
+            .delete(`/employees/attendance/${clockIn2.id}`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ reason: 'Duplicate test punch' });
+        assert('DELETE /employees/attendance/:logId soft-deletes log', softDelRes.status === 200);
+
+        const activeAttRes = await request(http)
+            .get('/employees/attendance')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const activeAttList = activeAttRes.body?.data || activeAttRes.body || [];
+        assert('Deleted attendance log is hidden from default list', !activeAttList.some((l: any) => l.id === clockIn2.id));
+
+        const withDelAttRes = await request(http)
+            .get('/employees/attendance?includeDeleted=true')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const withDelList = withDelAttRes.body?.data || withDelAttRes.body || [];
+        const deletedRow = withDelList.find((l: any) => l.id === clockIn2.id);
+        assert(
+            'GET /employees/attendance?includeDeleted=true shows deletedBy & reason',
+            Boolean(deletedRow && deletedRow.deletedAt && deletedRow.deletedById && deletedRow.deleteReason === 'Duplicate test punch'),
+        );
+
+        const restoreAttRes = await request(http)
+            .post(`/employees/attendance/${clockIn2.id}/restore`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert('POST /employees/attendance/:logId/restore restores log', restoreAttRes.status === 201);
+
         const attSummaryRes = await request(http)
             .get('/employees/attendance/summary')
             .set('Authorization', `Bearer ${adminToken}`);
