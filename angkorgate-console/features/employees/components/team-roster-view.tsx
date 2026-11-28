@@ -16,11 +16,13 @@ import {
 } from "@/components/ui/table"
 import {
   RiCalendar2Line,
+  RiDownload2Line,
   RiLoader4Line,
   RiLoginCircleLine,
   RiLogoutCircleLine,
   RiTimeLine,
 } from "@remixicon/react"
+import { downloadCsvFile } from "@/lib/csv-download"
 import type {
   AttendanceLog,
   Department,
@@ -31,6 +33,7 @@ import type {
 import {
   clockInEmployeeAction,
   clockOutEmployeeAction,
+  exportAttendanceCsvAction,
   getAttendanceLogsAction,
   getTeamRosterAction,
 } from "../server/employees-actions"
@@ -271,16 +274,58 @@ export function TeamRosterView({
 
       {/* Attendance Clock-In / Clock-Out */}
       <Card className="border border-border/50 bg-card min-w-0 overflow-hidden">
-        <CardHeader>
-          <CardTitle className="font-heading text-base flex items-center gap-2">
-            <RiTimeLine className="size-4 text-primary" />
-            Attendance Clock-In / Clock-Out
-          </CardTitle>
-          <CardDescription className="font-mono text-xs">
-            Record shift check-ins and check-outs for Clinic or POS staff.
-          </CardDescription>
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <CardTitle className="font-heading text-base flex items-center gap-2">
+              <RiTimeLine className="size-4 text-primary" />
+              Attendance Clock-In / Clock-Out
+            </CardTitle>
+            <CardDescription className="font-mono text-xs">
+              Tracks shift check-ins, late arrival minutes, worked hours, and CSV timesheet export.
+            </CardDescription>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="font-mono text-xs self-start sm:self-center"
+            onClick={async () => {
+              const res = await exportAttendanceCsvAction()
+              if (res.success && res.data) {
+                downloadCsvFile(res.data.filename, res.data.csv)
+              }
+            }}
+          >
+            <RiDownload2Line className="mr-1.5 size-4" /> Export Timesheet CSV
+          </Button>
         </CardHeader>
         <CardContent className="space-y-4 min-w-0">
+          {attendance.length > 0 && (() => {
+            const onTime = attendance.filter((a) => a.status !== "LATE").length
+            const late = attendance.filter((a) => a.status === "LATE").length
+            const totalMin = attendance.reduce((sum, a) => sum + (a.workedMinutes || 0), 0)
+            const totalHrs = (totalMin / 60).toFixed(1)
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-xs">
+                <div className="rounded-md border border-border/50 bg-muted/20 p-2.5">
+                  <div className="text-[10px] text-muted-foreground uppercase">Logs</div>
+                  <div className="font-heading text-base font-bold">{attendance.length}</div>
+                </div>
+                <div className="rounded-md border border-border/50 bg-muted/20 p-2.5">
+                  <div className="text-[10px] text-muted-foreground uppercase">On Time</div>
+                  <div className="font-heading text-base font-bold text-emerald-500">{onTime}</div>
+                </div>
+                <div className="rounded-md border border-border/50 bg-muted/20 p-2.5">
+                  <div className="text-[10px] text-muted-foreground uppercase">Late</div>
+                  <div className="font-heading text-base font-bold text-amber-500">{late}</div>
+                </div>
+                <div className="rounded-md border border-border/50 bg-muted/20 p-2.5">
+                  <div className="text-[10px] text-muted-foreground uppercase">Hours Worked</div>
+                  <div className="font-heading text-base font-bold text-primary">{totalHrs}h</div>
+                </div>
+              </div>
+            )
+          })()}
           {feedback && (
             <div
               className={`font-mono text-xs p-2.5 rounded-md border ${
@@ -342,6 +387,8 @@ export function TeamRosterView({
                     <TableHead className="font-mono text-xs">Employee</TableHead>
                     <TableHead className="font-mono text-xs">Clock In</TableHead>
                     <TableHead className="font-mono text-xs">Clock Out</TableHead>
+                    <TableHead className="font-mono text-xs">Status</TableHead>
+                    <TableHead className="font-mono text-xs">Worked</TableHead>
                     <TableHead className="font-mono text-xs">Source</TableHead>
                     <TableHead className="font-mono text-xs">Notes</TableHead>
                   </TableRow>
@@ -366,6 +413,22 @@ export function TeamRosterView({
                             ON SHIFT
                           </Badge>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        {log.status === "LATE" ? (
+                          <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/40">
+                            LATE +{log.lateMinutes ?? 0}m
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] text-emerald-500 border-emerald-500/40">
+                            ON TIME
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {typeof log.workedMinutes === "number"
+                          ? `${Math.floor(log.workedMinutes / 60)}h ${log.workedMinutes % 60}m`
+                          : "—"}
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary" className="text-[10px]">

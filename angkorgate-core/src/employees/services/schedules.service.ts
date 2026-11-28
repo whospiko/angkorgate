@@ -10,6 +10,7 @@ import { UpdateScheduleDto } from '../dto/update-schedule.dto';
 import { CreateScheduleOverrideDto } from '../dto/create-schedule-override.dto';
 import { EmployeesService } from './employees.service';
 import { AuditService } from '../../audit/services/audit.service';
+import { buildCsv } from '../../common/utils/csv.util';
 
 @Injectable()
 export class SchedulesService {
@@ -355,12 +356,45 @@ export class SchedulesService {
             throw new ConflictException('Employee is already clocked in');
         }
 
+        const now = new Date();
+        const todayStr = now.toISOString().slice(0, 10);
+        const dayOfWeek = now.getUTCDay();
+        const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+
+        let expectedStartMinutes: number | null = null;
+        if (this.overrideRepo) {
+            const ov = await this.overrideRepo.findOne({ where: { employeeId, date: todayStr } });
+            if (ov?.isAvailable && ov.startTime) {
+                const [h, m] = ov.startTime.split(':').map(Number);
+                expectedStartMinutes = h * 60 + m;
+            }
+        }
+        if (expectedStartMinutes === null) {
+            const sched = await this.repo.findOne({
+                where: { employeeId, dayOfWeek, isActive: true },
+                order: { startTime: 'ASC' },
+            });
+            if (sched?.startTime) {
+                const [h, m] = sched.startTime.split(':').map(Number);
+                expectedStartMinutes = h * 60 + m;
+            }
+        }
+
+        const lateMinutes =
+            expectedStartMinutes !== null && nowMinutes > expectedStartMinutes
+                ? nowMinutes - expectedStartMinutes
+                : 0;
+        const status = lateMinutes > 5 ? 'LATE' : 'ON_TIME';
+
         const saved = await this.attendanceRepo.save(
             this.attendanceRepo.create({
                 employeeId,
-                clockInAt: new Date(),
+                clockInAt: now,
                 clockOutAt: null,
                 source,
+                status,
+                lateMinutes,
+                workedMinutes: null,
                 notes: notes ?? null,
             }),
         );
@@ -394,7 +428,12 @@ export class SchedulesService {
             throw new BadRequestException('Employee is not currently clocked in');
         }
 
-        open.clockOutAt = new Date();
+        const clockOutAt = new Date();
+        open.clockOutAt = clockOutAt;
+        open.workedMinutes = Math.max(
+            0,
+            Math.round((clockOutAt.getTime() - new Date(open.clockInAt).getTime()) / 60_000),
+        );
         if (notes) {
             open.notes = open.notes ? `${open.notes} | ${notes}` : notes;
         }
@@ -411,7 +450,12 @@ export class SchedulesService {
         return saved;
     }
 
-    async listAttendance(employeeId?: string, limit = 50): Promise<AttendanceLog[]> {
+    async listAttendance(
+        employeeId?: string,
+        limit = 50,
+        startDate?: string,
+        endDate?: string,
+    ): Promise<AttendanceLog[]> {
         if (!this.attendanceRepo) return [];
         const qb = this.attendanceRepo
             .createQueryBuilder('a')
@@ -421,9 +465,73 @@ export class SchedulesService {
             .take(Math.min(Math.max(limit, 1), 200));
 
         if (employeeId) {
-            qb.where('a.employeeId = :eid', { eid: employeeId });
+            qb.andWhere('a.employeeId = :eid', { eid: employeeId });
+        }
+        if (startDate) {
+            qb.andWhere('a.clockInAt >= :fromTs', { fromTs: new Date(`${startDate}T00:00:00Z`) });
+        }
+        if (endDate) {
+            qb.andWhere('a.clockInAt <= :toTs', { toTs: new Date(`${endDate}T23:59:59.999Z`) });
         }
         return qb.getMany();
+    }
+
+    async getAttendanceSummary(startDate: string, endDate: string, employeeId?: string) {
+        const logs = await this.listAttendance(employeeId, 200, startDate, endDate);
+        let onTimeCount = 0;
+        let lateCount = 0;
+        let totalLateMinutes = 0;
+        let totalWorkedMinutes = 0;
+
+        for (const log of logs) {
+            if (log.status === 'LATE') lateCount++;
+            else onTimeCount++;
+            totalLateMinutes += log.lateMinutes || 0;
+            totalWorkedMinutes += log.workedMinutes || 0;
+        }
+
+        return {
+            startDate,
+            endDate,
+            totalLogs: logs.length,
+            onTimeCount,
+            lateCount,
+            totalLateMinutes,
+            totalWorkedMinutes,
+            totalWorkedHours: Math.round((totalWorkedMinutes / 60) * 10) / 10,
+        };
+    }
+
+    async exportAttendanceCsv(startDate?: string, endDate?: string, employeeId?: string) {
+        const logs = await this.listAttendance(employeeId, 200, startDate, endDate);
+        const headers = [
+            'employeeCode',
+            'fullName',
+            'clockInAt',
+            'clockOutAt',
+            'status',
+            'lateMinutes',
+            'workedMinutes',
+            'source',
+            'notes',
+        ];
+        const rows = logs.map((l) => [
+            l.employee?.employeeCode ?? '',
+            l.employee?.fullName ?? '',
+            l.clockInAt,
+            l.clockOutAt ?? '',
+            l.status,
+            l.lateMinutes,
+            l.workedMinutes ?? '',
+            l.source,
+            l.notes ?? '',
+        ]);
+        return {
+            filename: 'attendance-export.csv',
+            contentType: 'text/csv',
+            total: logs.length,
+            csv: buildCsv(headers, rows),
+        };
     }
 
     async getTeamRoster(startDate: string, endDate: string, departmentCode?: string) {

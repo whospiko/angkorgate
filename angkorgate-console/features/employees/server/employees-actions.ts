@@ -18,6 +18,7 @@ import type {
   LeavePolicy,
   LeaveType,
   AttendanceLog,
+  AttendanceSummary,
   TeamRosterData,
   EmployeeBulkImportResult,
   CreateDepartmentInput,
@@ -773,6 +774,50 @@ export async function getAttendanceLogsAction(employeeId?: string): Promise<Atte
     return Array.isArray(res) ? res : []
   } catch {
     return []
+  }
+}
+
+export async function getAttendanceSummaryAction(query?: {
+  startDate?: string
+  endDate?: string
+  employeeId?: string
+}): Promise<AttendanceSummary | null> {
+  try {
+    const params = new URLSearchParams()
+    if (query?.startDate) params.set("startDate", query.startDate)
+    if (query?.endDate) params.set("endDate", query.endDate)
+    if (query?.employeeId) params.set("employeeId", query.employeeId)
+    const qs = params.toString() ? `?${params.toString()}` : ""
+    return await apiClient.get<AttendanceSummary>(`/employees/attendance/summary${qs}`)
+  } catch {
+    return null
+  }
+}
+
+export async function exportAttendanceCsvAction(query?: {
+  startDate?: string
+  endDate?: string
+  employeeId?: string
+}): Promise<{
+  success: boolean
+  data?: { filename: string; contentType: string; total: number; csv: string }
+  message?: string
+}> {
+  try {
+    const params = new URLSearchParams()
+    if (query?.startDate) params.set("startDate", query.startDate)
+    if (query?.endDate) params.set("endDate", query.endDate)
+    if (query?.employeeId) params.set("employeeId", query.employeeId)
+    const qs = params.toString() ? `?${params.toString()}` : ""
+    const data = await apiClient.get<{
+      filename: string
+      contentType: string
+      total: number
+      csv: string
+    }>(`/employees/attendance/export${qs}`)
+    return { success: true, data }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to export attendance CSV") }
   }
 }
 

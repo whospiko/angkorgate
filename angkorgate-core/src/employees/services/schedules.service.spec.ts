@@ -110,9 +110,11 @@ describe('SchedulesService', () => {
         const inLog = await service.clockIn('e1', 'Morning shift', 'WEB');
         expect(inLog.employeeId).toBe('e1');
         expect(inLog.clockOutAt).toBeNull();
+        expect(['ON_TIME', 'LATE']).toContain(inLog.status);
 
         const outLog = await service.clockOut('e1', 'Done');
         expect(outLog.clockOutAt).toBeInstanceOf(Date);
+        expect(typeof outLog.workedMinutes).toBe('number');
     });
 
     it('returns unavailable when employee is on approved leave', async () => {

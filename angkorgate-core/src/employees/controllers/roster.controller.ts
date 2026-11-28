@@ -57,11 +57,45 @@ export class RosterController {
     @ApiOperation({ summary: 'List recent attendance clock-in/out logs' })
     @ApiQuery({ name: 'employeeId', required: false })
     @ApiQuery({ name: 'limit', required: false })
+    @ApiQuery({ name: 'startDate', required: false })
+    @ApiQuery({ name: 'endDate', required: false })
     listAttendance(
         @Query('employeeId') employeeId?: string,
         @Query('limit') limit?: string,
+        @Query('startDate') startDate?: string,
+        @Query('endDate') endDate?: string,
     ) {
-        return this.schedules.listAttendance(employeeId, limit ? parseInt(limit, 10) : 50);
+        return this.schedules.listAttendance(
+            employeeId,
+            limit ? parseInt(limit, 10) : 50,
+            startDate,
+            endDate,
+        );
+    }
+
+    @Get('attendance/summary')
+    @Permissions('employee:read')
+    @ApiOperation({ summary: 'Get attendance summary (on-time, late, worked hours) for date range' })
+    getAttendanceSummary(
+        @Query('startDate') startDate?: string,
+        @Query('endDate') endDate?: string,
+        @Query('employeeId') employeeId?: string,
+    ) {
+        const today = new Date();
+        const start = startDate || new Date(today.getTime() - 29 * 86_400_000).toISOString().slice(0, 10);
+        const end = endDate || today.toISOString().slice(0, 10);
+        return this.schedules.getAttendanceSummary(start, end, employeeId);
+    }
+
+    @Get('attendance/export')
+    @Permissions('employee:read')
+    @ApiOperation({ summary: 'Export attendance logs as CSV payload' })
+    exportAttendanceCsv(
+        @Query('startDate') startDate?: string,
+        @Query('endDate') endDate?: string,
+        @Query('employeeId') employeeId?: string,
+    ) {
+        return this.schedules.exportAttendanceCsv(startDate, endDate, employeeId);
     }
 
     @Post(':employeeId/attendance/clock-in')

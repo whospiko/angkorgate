@@ -541,6 +541,50 @@ export function AccountWorkspaceTab({ initialData }: { initialData: MyWorkspaceD
         </Card>
       )}
 
+      {/* My Recent Attendance */}
+      {workspace.attendance && workspace.attendance.length > 0 && (
+        <Card className="border border-border bg-card">
+          <CardHeader>
+            <CardTitle className="font-heading text-base">
+              My Recent Attendance ({workspace.attendance.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {workspace.attendance.slice(0, 5).map((log) => (
+              <div
+                key={log.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 bg-muted/15 px-3 py-2 font-mono text-xs"
+              >
+                <div className="space-y-0.5">
+                  <div>
+                    In: {formatDateTime(log.clockInAt)}
+                    {log.clockOutAt ? ` · Out: ${formatDateTime(log.clockOutAt)}` : ""}
+                  </div>
+                  {log.notes && <div className="text-[11px] text-muted-foreground">{log.notes}</div>}
+                </div>
+                <div className="flex items-center gap-2">
+                  {typeof log.workedMinutes === "number" && (
+                    <span className="text-[11px] text-muted-foreground">
+                      {Math.floor(log.workedMinutes / 60)}h {log.workedMinutes % 60}m
+                    </span>
+                  )}
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] ${
+                      log.status === "LATE"
+                        ? "border-amber-500/40 text-amber-500"
+                        : "border-emerald-500/40 text-emerald-500"
+                    }`}
+                  >
+                    {log.status === "LATE" ? `LATE +${log.lateMinutes ?? 0}m` : "ON TIME"}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* My Leave History */}
       <Card className="border border-border bg-card">
         <CardHeader>

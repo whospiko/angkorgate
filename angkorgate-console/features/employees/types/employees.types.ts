@@ -101,7 +101,21 @@ export interface AttendanceLog {
   clockInAt: string
   clockOutAt?: string | null
   source: "WEB" | "KIOSK" | "API"
+  status?: "ON_TIME" | "LATE"
+  lateMinutes?: number
+  workedMinutes?: number | null
   notes?: string | null
+}
+
+export interface AttendanceSummary {
+  startDate: string
+  endDate: string
+  totalLogs: number
+  onTimeCount: number
+  lateCount: number
+  totalLateMinutes: number
+  totalWorkedMinutes: number
+  totalWorkedHours: number
 }
 
 export interface RosterDayCell {

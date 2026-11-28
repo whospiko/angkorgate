@@ -11,6 +11,7 @@ import {
 import { Employee } from './employee.entity';
 
 export type AttendanceSource = 'WEB' | 'KIOSK' | 'API';
+export type AttendanceStatus = 'ON_TIME' | 'LATE';
 
 @Entity('attendance_logs')
 @Index('idx_attendance_emp', ['employeeId'])
@@ -34,6 +35,15 @@ export class AttendanceLog {
 
     @Column({ type: 'varchar', length: 20, default: 'WEB' })
     source: AttendanceSource;
+
+    @Column({ type: 'varchar', length: 20, default: 'ON_TIME' })
+    status: AttendanceStatus;
+
+    @Column({ name: 'late_minutes', type: 'int', default: 0 })
+    lateMinutes: number;
+
+    @Column({ name: 'worked_minutes', type: 'int', nullable: true })
+    workedMinutes: number | null;
 
     @Column({ type: 'text', nullable: true })
     notes: string | null;

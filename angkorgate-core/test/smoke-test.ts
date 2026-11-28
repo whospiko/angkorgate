@@ -369,6 +369,18 @@ async function runSmokeTest() {
             .send({ notes: 'Shift complete' });
         assert('Self-service clock-out works', clockOutRes.status === 201);
 
+        const attSummaryRes = await request(http)
+            .get('/employees/attendance/summary')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const attSummary = attSummaryRes.body?.data || attSummaryRes.body;
+        assert('GET /employees/attendance/summary returns totals', attSummaryRes.status === 200 && attSummary?.totalLogs >= 1);
+
+        const attExportRes = await request(http)
+            .get('/employees/attendance/export')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const attExport = attExportRes.body?.data || attExportRes.body;
+        assert('GET /employees/attendance/export returns CSV', attExportRes.status === 200 && String(attExport?.csv).includes('employeeCode'));
+
         const rosterRes = await request(http)
             .get('/employees/roster?startDate=2026-12-01&endDate=2026-12-07')
             .set('Authorization', `Bearer ${adminToken}`);
