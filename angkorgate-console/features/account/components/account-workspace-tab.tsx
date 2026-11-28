@@ -14,12 +14,16 @@ import {
   RiCheckLine,
   RiCloseLine,
   RiLoader4Line,
+  RiLoginCircleLine,
+  RiLogoutCircleLine,
   RiTimeLine,
 } from "@remixicon/react"
 import { LeaveAttachmentPreview, type LeaveType } from "@/features/employees"
 import type { MyWorkspaceData } from "../types/account.types"
 import {
   cancelMyLeaveRequestAction,
+  clockInMeAction,
+  clockOutMeAction,
   getMyWorkspaceAction,
   reviewMyTeamLeaveAction,
   submitMyLeaveRequestAction,
@@ -58,6 +62,7 @@ export function AccountWorkspaceTab({ initialData }: { initialData: MyWorkspaceD
   const [submitting, setSubmitting] = useState(false)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [reviewingId, setReviewingId] = useState<string | null>(null)
+  const [clockBusy, setClockBusy] = useState(false)
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(
     null
   )
@@ -170,6 +175,21 @@ export function AccountWorkspaceTab({ initialData }: { initialData: MyWorkspaceD
     }
   }
 
+  const openShift = workspace.attendance?.find((a) => !a.clockOutAt)
+
+  const handleSelfClock = async (mode: "in" | "out") => {
+    setClockBusy(true)
+    setFeedback(null)
+    const res = mode === "in" ? await clockInMeAction() : await clockOutMeAction()
+    setClockBusy(false)
+    if (res.success) {
+      setFeedback({ type: "success", message: res.message || "Attendance updated." })
+      await refreshWorkspace()
+    } else {
+      setFeedback({ type: "error", message: res.message || "Attendance action failed." })
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Employee Summary */}
@@ -186,9 +206,34 @@ export function AccountWorkspaceTab({ initialData }: { initialData: MyWorkspaceD
               {primaryPos?.department?.name ? ` · ${primaryPos.department.name}` : ""}
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2 font-mono text-xs">
+          <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
             <Badge variant="outline">{emp.employmentStatus}</Badge>
             {emp.employmentType && <Badge variant="secondary">{emp.employmentType}</Badge>}
+            {openShift ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={clockBusy}
+                onClick={() => void handleSelfClock("out")}
+                className="h-7 px-2.5 font-mono text-[11px] text-amber-600 border-amber-500/40"
+              >
+                <RiLogoutCircleLine className="mr-1 size-3.5" />
+                Clock Out
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={clockBusy}
+                onClick={() => void handleSelfClock("in")}
+                className="h-7 px-2.5 font-mono text-[11px] text-emerald-600 border-emerald-500/40"
+              >
+                <RiLoginCircleLine className="mr-1 size-3.5" />
+                Clock In
+              </Button>
+            )}
           </div>
         </CardHeader>
       </Card>

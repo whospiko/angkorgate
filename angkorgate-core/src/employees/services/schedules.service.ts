@@ -1,9 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { WorkSchedule } from '../entities/work-schedule.entity';
 import { ScheduleOverride } from '../entities/schedule-override.entity';
 import { LeaveRequest } from '../entities/leave-request.entity';
+import { AttendanceLog, type AttendanceSource } from '../entities/attendance-log.entity';
 import { CreateScheduleDto } from '../dto/create-schedule.dto';
 import { UpdateScheduleDto } from '../dto/update-schedule.dto';
 import { CreateScheduleOverrideDto } from '../dto/create-schedule-override.dto';
@@ -23,6 +24,9 @@ export class SchedulesService {
         @Optional()
         @InjectRepository(LeaveRequest)
         private readonly leaveRepo?: Repository<LeaveRequest>,
+        @Optional()
+        @InjectRepository(AttendanceLog)
+        private readonly attendanceRepo?: Repository<AttendanceLog>,
     ) { }
 
     async create(dto: CreateScheduleDto, actorId?: string): Promise<WorkSchedule> {
@@ -331,5 +335,231 @@ export class SchedulesService {
         if (await qb.getExists()) {
             throw new BadRequestException('Overlapping schedule exists for this day');
         }
+    }
+
+    async clockIn(
+        employeeId: string,
+        notes?: string,
+        source: AttendanceSource = 'WEB',
+        actorId?: string,
+    ): Promise<AttendanceLog> {
+        if (!this.attendanceRepo) {
+            throw new BadRequestException('Attendance repository is not configured');
+        }
+        await this.employees.findByIdOrFail(employeeId);
+
+        const open = await this.attendanceRepo.findOne({
+            where: { employeeId, clockOutAt: IsNull() },
+        });
+        if (open) {
+            throw new ConflictException('Employee is already clocked in');
+        }
+
+        const saved = await this.attendanceRepo.save(
+            this.attendanceRepo.create({
+                employeeId,
+                clockInAt: new Date(),
+                clockOutAt: null,
+                source,
+                notes: notes ?? null,
+            }),
+        );
+
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'employee.attendance.clock_in',
+            entity: 'attendance_log',
+            entityId: saved.id,
+            newValue: { employeeId, source, clockInAt: saved.clockInAt },
+        });
+
+        return saved;
+    }
+
+    async clockOut(
+        employeeId: string,
+        notes?: string,
+        actorId?: string,
+    ): Promise<AttendanceLog> {
+        if (!this.attendanceRepo) {
+            throw new BadRequestException('Attendance repository is not configured');
+        }
+        await this.employees.findByIdOrFail(employeeId);
+
+        const open = await this.attendanceRepo.findOne({
+            where: { employeeId, clockOutAt: IsNull() },
+            order: { clockInAt: 'DESC' },
+        });
+        if (!open) {
+            throw new BadRequestException('Employee is not currently clocked in');
+        }
+
+        open.clockOutAt = new Date();
+        if (notes) {
+            open.notes = open.notes ? `${open.notes} | ${notes}` : notes;
+        }
+        const saved = await this.attendanceRepo.save(open);
+
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'employee.attendance.clock_out',
+            entity: 'attendance_log',
+            entityId: saved.id,
+            newValue: { employeeId, clockOutAt: saved.clockOutAt },
+        });
+
+        return saved;
+    }
+
+    async listAttendance(employeeId?: string, limit = 50): Promise<AttendanceLog[]> {
+        if (!this.attendanceRepo) return [];
+        const qb = this.attendanceRepo
+            .createQueryBuilder('a')
+            .leftJoin('a.employee', 'emp')
+            .addSelect(['emp.id', 'emp.employeeCode', 'emp.fullName'])
+            .orderBy('a.clockInAt', 'DESC')
+            .take(Math.min(Math.max(limit, 1), 200));
+
+        if (employeeId) {
+            qb.where('a.employeeId = :eid', { eid: employeeId });
+        }
+        return qb.getMany();
+    }
+
+    async getTeamRoster(startDate: string, endDate: string, departmentCode?: string) {
+        if (startDate > endDate) {
+            throw new BadRequestException('startDate cannot be after endDate');
+        }
+        const startMs = new Date(`${startDate}T00:00:00Z`).getTime();
+        const endMs = new Date(`${endDate}T00:00:00Z`).getTime();
+        const totalDays = Math.floor((endMs - startMs) / 86_400_000) + 1;
+        if (totalDays > 35) {
+            throw new BadRequestException('Roster date range cannot exceed 35 days');
+        }
+
+        const dates: string[] = [];
+        for (let i = 0; i < totalDays; i++) {
+            dates.push(new Date(startMs + i * 86_400_000).toISOString().slice(0, 10));
+        }
+
+        const { data: allEmployees } = await this.employees.findAll({
+            departmentCode,
+            page: 1,
+            limit: 200,
+        });
+        const activeEmployees = allEmployees.filter((e) => e.employmentStatus !== 'TERMINATED');
+        const empIds = activeEmployees.map((e) => e.id);
+
+        if (empIds.length === 0) {
+            return { startDate, endDate, dates, employees: [] };
+        }
+
+        const schedules = await this.repo
+            .createQueryBuilder('s')
+            .where('s.employeeId IN (:...ids)', { ids: empIds })
+            .andWhere('s.isActive = true')
+            .orderBy('s.startTime', 'ASC')
+            .getMany();
+
+        const overrides = this.overrideRepo
+            ? await this.overrideRepo
+                  .createQueryBuilder('o')
+                  .where('o.employeeId IN (:...ids)', { ids: empIds })
+                  .andWhere('o.date >= :startDate AND o.date <= :endDate', { startDate, endDate })
+                  .getMany()
+            : [];
+
+        const leaves = this.leaveRepo
+            ? await this.leaveRepo
+                  .createQueryBuilder('l')
+                  .where('l.employeeId IN (:...ids)', { ids: empIds })
+                  .andWhere(`l.status = 'APPROVED'`)
+                  .andWhere('l.startDate <= :endDate AND l.endDate >= :startDate', {
+                      startDate,
+                      endDate,
+                  })
+                  .getMany()
+            : [];
+
+        const logs = this.attendanceRepo
+            ? await this.attendanceRepo
+                  .createQueryBuilder('a')
+                  .where('a.employeeId IN (:...ids)', { ids: empIds })
+                  .andWhere('a.clockInAt >= :fromTs AND a.clockInAt <= :toTs', {
+                      fromTs: new Date(`${startDate}T00:00:00Z`),
+                      toTs: new Date(`${endDate}T23:59:59.999Z`),
+                  })
+                  .getMany()
+            : [];
+
+        const employees = activeEmployees.map((emp) => {
+            const empScheds = schedules.filter((s) => s.employeeId === emp.id);
+            const empOvs = overrides.filter((o) => o.employeeId === emp.id);
+            const empLeaves = leaves.filter((l) => l.employeeId === emp.id);
+            const empLogs = logs.filter((a) => a.employeeId === emp.id);
+            const primaryPos = emp.positions?.find((p) => p.isPrimary) ?? emp.positions?.[0];
+
+            const days = dates.map((date) => {
+                const dayOfWeek = new Date(`${date}T00:00:00Z`).getUTCDay();
+                const dayLogs = empLogs
+                    .filter((a) => new Date(a.clockInAt).toISOString().slice(0, 10) === date)
+                    .map((a) => ({
+                        id: a.id,
+                        clockInAt: a.clockInAt,
+                        clockOutAt: a.clockOutAt,
+                    }));
+
+                const ov = empOvs.find((o) => o.date === date);
+                if (ov) {
+                    return {
+                        date,
+                        status: ov.isAvailable ? ('OVERRIDE_SHIFT' as const) : ('OVERRIDE_OFF' as const),
+                        shifts:
+                            ov.isAvailable && ov.startTime && ov.endTime
+                                ? [{ startTime: ov.startTime.slice(0, 5), endTime: ov.endTime.slice(0, 5) }]
+                                : [],
+                        note: ov.reason ?? undefined,
+                        attendance: dayLogs,
+                    };
+                }
+
+                const lv = empLeaves.find((l) => l.startDate <= date && l.endDate >= date);
+                if (lv) {
+                    return {
+                        date,
+                        status: 'ON_LEAVE' as const,
+                        shifts: [],
+                        leaveType: lv.leaveType,
+                        note: lv.reason ?? undefined,
+                        attendance: dayLogs,
+                    };
+                }
+
+                const dayShifts = empScheds
+                    .filter((s) => s.dayOfWeek === dayOfWeek)
+                    .map((s) => ({
+                        startTime: s.startTime.slice(0, 5),
+                        endTime: s.endTime.slice(0, 5),
+                    }));
+
+                return {
+                    date,
+                    status: dayShifts.length > 0 ? ('SHIFT' as const) : ('OFF' as const),
+                    shifts: dayShifts,
+                    attendance: dayLogs,
+                };
+            });
+
+            return {
+                id: emp.id,
+                employeeCode: emp.employeeCode,
+                fullName: emp.fullName,
+                departmentName: primaryPos?.department?.name ?? null,
+                jobTitleName: primaryPos?.jobTitle?.name ?? null,
+                days,
+            };
+        });
+
+        return { startDate, endDate, dates, employees };
     }
 }

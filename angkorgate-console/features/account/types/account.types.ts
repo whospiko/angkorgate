@@ -1,4 +1,5 @@
 import type {
+  AttendanceLog,
   Employee,
   EmployeeSchedule,
   LeaveRequest,
@@ -88,6 +89,7 @@ export interface MyWorkspaceData {
   overrides: ScheduleOverride[]
   leaveRequests: LeaveRequest[]
   teamApprovals: LeaveRequest[]
+  attendance: AttendanceLog[]
   balances: MyLeaveBalanceSummary | null
 }
 

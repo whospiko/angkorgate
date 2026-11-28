@@ -110,6 +110,10 @@ const defaultNavData = {
           url: "/employees",
         },
         {
+          title: "Team Roster",
+          url: "/employees?tab=roster",
+        },
+        {
           title: "Org Chart",
           url: "/employees?tab=org-chart",
         },

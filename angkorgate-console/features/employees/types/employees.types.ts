@@ -81,6 +81,45 @@ export interface ScheduleOverride {
 export type LeaveType = "ANNUAL" | "SICK" | "UNPAID" | "MATERNITY" | "OTHER"
 export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED"
 
+export interface AttendanceLog {
+  id: string
+  employeeId: string
+  employee?: {
+    id: string
+    employeeCode: string
+    fullName: string
+  } | null
+  clockInAt: string
+  clockOutAt?: string | null
+  source: "WEB" | "KIOSK" | "API"
+  notes?: string | null
+}
+
+export interface RosterDayCell {
+  date: string
+  status: "SHIFT" | "OVERRIDE_SHIFT" | "OVERRIDE_OFF" | "ON_LEAVE" | "OFF"
+  shifts: { startTime: string; endTime: string }[]
+  leaveType?: string
+  note?: string
+  attendance?: { id: string; clockInAt: string; clockOutAt?: string | null }[]
+}
+
+export interface RosterEmployeeRow {
+  id: string
+  employeeCode: string
+  fullName: string
+  departmentName?: string | null
+  jobTitleName?: string | null
+  days: RosterDayCell[]
+}
+
+export interface TeamRosterData {
+  startDate: string
+  endDate: string
+  dates: string[]
+  employees: RosterEmployeeRow[]
+}
+
 export interface LeavePolicy {
   id: string
   leaveType: "ANNUAL" | "SICK" | "MATERNITY"

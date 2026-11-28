@@ -1,10 +1,11 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { SchedulesService } from './schedules.service';
 import { WorkSchedule } from '../entities/work-schedule.entity';
 import { ScheduleOverride } from '../entities/schedule-override.entity';
 import { LeaveRequest } from '../entities/leave-request.entity';
+import { AttendanceLog } from '../entities/attendance-log.entity';
 import { EmployeesService } from './employees.service';
 import { AuditService } from '../../audit/services/audit.service';
 import { createMockRepository } from '../../../test/mocks/repository.mock';
@@ -14,13 +15,15 @@ describe('SchedulesService', () => {
     let repo: ReturnType<typeof createMockRepository>;
     let overrideRepo: ReturnType<typeof createMockRepository>;
     let leaveRepo: ReturnType<typeof createMockRepository>;
-    let employees: { findByIdOrFail: jest.Mock };
+    let attendanceRepo: ReturnType<typeof createMockRepository>;
+    let employees: { findByIdOrFail: jest.Mock; findAll?: jest.Mock };
     let audit: { log: jest.Mock };
 
     beforeEach(async () => {
         repo = createMockRepository<WorkSchedule>();
         overrideRepo = createMockRepository<ScheduleOverride>();
         leaveRepo = createMockRepository<LeaveRequest>();
+        attendanceRepo = createMockRepository<AttendanceLog>();
         employees = { findByIdOrFail: jest.fn().mockResolvedValue({ id: 'e1' }) };
         audit = { log: jest.fn().mockResolvedValue(undefined) };
 
@@ -30,6 +33,7 @@ describe('SchedulesService', () => {
                 { provide: getRepositoryToken(WorkSchedule), useValue: repo },
                 { provide: getRepositoryToken(ScheduleOverride), useValue: overrideRepo },
                 { provide: getRepositoryToken(LeaveRequest), useValue: leaveRepo },
+                { provide: getRepositoryToken(AttendanceLog), useValue: attendanceRepo },
                 { provide: EmployeesService, useValue: employees },
                 { provide: AuditService, useValue: audit },
             ],
@@ -89,6 +93,26 @@ describe('SchedulesService', () => {
 
         const res = await service.isEmployeeAvailableOnDate('e1', '2026-12-25', '10:00');
         expect(res).toEqual({ available: false, reason: 'Public Holiday' });
+    });
+
+    it('rejects double clock-in when an open attendance log exists', async () => {
+        attendanceRepo.findOne.mockResolvedValue({ id: 'a1', employeeId: 'e1', clockOutAt: null } as never);
+        await expect(service.clockIn('e1')).rejects.toThrow(ConflictException);
+    });
+
+    it('records clock-in and clock-out cleanly', async () => {
+        attendanceRepo.findOne
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce({ id: 'a1', employeeId: 'e1', clockInAt: new Date(), clockOutAt: null } as never);
+        attendanceRepo.create.mockImplementation((d) => d);
+        attendanceRepo.save.mockImplementation(async (d) => ({ id: 'a1', ...d }));
+
+        const inLog = await service.clockIn('e1', 'Morning shift', 'WEB');
+        expect(inLog.employeeId).toBe('e1');
+        expect(inLog.clockOutAt).toBeNull();
+
+        const outLog = await service.clockOut('e1', 'Done');
+        expect(outLog.clockOutAt).toBeInstanceOf(Date);
     });
 
     it('returns unavailable when employee is on approved leave', async () => {

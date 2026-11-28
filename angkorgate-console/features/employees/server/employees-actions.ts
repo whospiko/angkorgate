@@ -17,6 +17,8 @@ import type {
   LeaveRequest,
   LeavePolicy,
   LeaveType,
+  AttendanceLog,
+  TeamRosterData,
   CreateDepartmentInput,
   UpdateDepartmentInput,
   CreateJobTitleInput,
@@ -742,5 +744,64 @@ export async function updateLeavePolicyAction(
     return { success: true, data: updated }
   } catch (error: unknown) {
     return { success: false, message: getErrorMessage(error, "Failed to update leave policy") }
+  }
+}
+
+export async function getTeamRosterAction(query?: {
+  startDate?: string
+  endDate?: string
+  departmentCode?: string
+}): Promise<TeamRosterData> {
+  try {
+    const params = new URLSearchParams()
+    if (query?.startDate) params.set("startDate", query.startDate)
+    if (query?.endDate) params.set("endDate", query.endDate)
+    if (query?.departmentCode) params.set("departmentCode", query.departmentCode)
+    const qs = params.toString() ? `?${params.toString()}` : ""
+    const res = await apiClient.get<TeamRosterData>(`/employees/roster${qs}`)
+    return res ?? { startDate: "", endDate: "", dates: [], employees: [] }
+  } catch {
+    return { startDate: "", endDate: "", dates: [], employees: [] }
+  }
+}
+
+export async function getAttendanceLogsAction(employeeId?: string): Promise<AttendanceLog[]> {
+  try {
+    const qs = employeeId ? `?employeeId=${encodeURIComponent(employeeId)}` : ""
+    const res = await apiClient.get<AttendanceLog[]>(`/employees/attendance${qs}`)
+    return Array.isArray(res) ? res : []
+  } catch {
+    return []
+  }
+}
+
+export async function clockInEmployeeAction(
+  employeeId: string,
+  notes?: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    await apiClient.post(`/employees/${encodeURIComponent(employeeId)}/attendance/clock-in`, {
+      notes: notes || undefined,
+      source: "WEB",
+    })
+    revalidatePath("/employees")
+    return { success: true }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to clock in") }
+  }
+}
+
+export async function clockOutEmployeeAction(
+  employeeId: string,
+  notes?: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    await apiClient.post(`/employees/${encodeURIComponent(employeeId)}/attendance/clock-out`, {
+      notes: notes || undefined,
+    })
+    revalidatePath("/employees")
+    return { success: true }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to clock out") }
   }
 }

@@ -357,6 +357,24 @@ async function runSmokeTest() {
         const approvalsList = approvalsRes.body?.data || approvalsRes.body || [];
         assert('Leave request routes to manager /employees/me/approvals', approvalsList.some((a: any) => a.id === routedLeaveId));
 
+        const clockInRes = await request(http)
+            .post('/employees/me/attendance/clock-in')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ notes: 'Morning clinic shift' });
+        assert('Self-service clock-in works', clockInRes.status === 201);
+
+        const clockOutRes = await request(http)
+            .post('/employees/me/attendance/clock-out')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ notes: 'Shift complete' });
+        assert('Self-service clock-out works', clockOutRes.status === 201);
+
+        const rosterRes = await request(http)
+            .get('/employees/roster?startDate=2026-12-01&endDate=2026-12-07')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const rosterBody = rosterRes.body?.data || rosterRes.body;
+        assert('GET /employees/roster returns 7-day team calendar', rosterRes.status === 200 && rosterBody?.dates?.length === 7);
+
         // ══════════════════════════════════════════════════════════════════
         logSection('6. MFA (TOTP) Setup & Login Flow');
         // ══════════════════════════════════════════════════════════════════

@@ -13,6 +13,7 @@ import type {
   SubmitMyLeaveInput,
 } from "../types/account.types"
 import type {
+  AttendanceLog,
   Employee,
   EmployeeSchedule,
   LeaveRequest,
@@ -214,11 +215,12 @@ export async function getMyWorkspaceAction(): Promise<MyWorkspaceData> {
         overrides: [],
         leaveRequests: [],
         teamApprovals: [],
+        attendance: [],
         balances: null,
       }
     }
 
-    const [schedRes, leaveRes, approvalsRes] = await Promise.all([
+    const [schedRes, leaveRes, approvalsRes, attendanceRes] = await Promise.all([
       apiClient.get<{ schedules: EmployeeSchedule[]; overrides: ScheduleOverride[] }>(
         "/employees/me/schedules"
       ),
@@ -226,6 +228,7 @@ export async function getMyWorkspaceAction(): Promise<MyWorkspaceData> {
         "/employees/me/leave-requests"
       ),
       apiClient.get<LeaveRequest[]>("/employees/me/approvals").catch(() => []),
+      apiClient.get<AttendanceLog[]>("/employees/me/attendance").catch(() => []),
     ])
 
     return {
@@ -234,6 +237,7 @@ export async function getMyWorkspaceAction(): Promise<MyWorkspaceData> {
       overrides: Array.isArray(schedRes?.overrides) ? schedRes.overrides : [],
       leaveRequests: Array.isArray(leaveRes?.requests) ? leaveRes.requests : [],
       teamApprovals: Array.isArray(approvalsRes) ? approvalsRes : [],
+      attendance: Array.isArray(attendanceRes) ? attendanceRes : [],
       balances: leaveRes?.balances ?? null,
     }
   } catch {
@@ -243,6 +247,7 @@ export async function getMyWorkspaceAction(): Promise<MyWorkspaceData> {
       overrides: [],
       leaveRequests: [],
       teamApprovals: [],
+      attendance: [],
       balances: null,
     }
   }
@@ -298,6 +303,30 @@ export async function reviewMyTeamLeaveAction(
   } catch (error) {
     const message =
       error instanceof ApiError ? error.message : "Failed to review team leave request."
+    return { success: false, message }
+  }
+}
+
+export async function clockInMeAction(notes?: string): Promise<AccountActionResult> {
+  try {
+    await apiClient.post("/employees/me/attendance/clock-in", { notes: notes || undefined })
+    revalidatePath("/account")
+    revalidatePath("/employees")
+    return { success: true, message: "Clocked in successfully." }
+  } catch (error) {
+    const message = error instanceof ApiError ? error.message : "Failed to clock in."
+    return { success: false, message }
+  }
+}
+
+export async function clockOutMeAction(notes?: string): Promise<AccountActionResult> {
+  try {
+    await apiClient.post("/employees/me/attendance/clock-out", { notes: notes || undefined })
+    revalidatePath("/account")
+    revalidatePath("/employees")
+    return { success: true, message: "Clocked out successfully." }
+  } catch (error) {
+    const message = error instanceof ApiError ? error.message : "Failed to clock out."
     return { success: false, message }
   }
 }

@@ -102,4 +102,31 @@ export class EmployeeSelfServiceController {
         const employee = await this.requireLinkedEmployee(userId);
         return this.leaves.reviewForManager(id, employee.id, dto, userId);
     }
+
+    @Get('attendance')
+    @ApiOperation({ summary: 'List own attendance clock-in/out logs' })
+    async getMyAttendance(@CurrentUser('id') userId: string) {
+        const employee = await this.requireLinkedEmployee(userId);
+        return this.schedules.listAttendance(employee.id, 30);
+    }
+
+    @Post('attendance/clock-in')
+    @ApiOperation({ summary: 'Clock in as the linked employee' })
+    async clockInMe(
+        @CurrentUser('id') userId: string,
+        @Body() body: { notes?: string },
+    ) {
+        const employee = await this.requireLinkedEmployee(userId);
+        return this.schedules.clockIn(employee.id, body?.notes, 'WEB', userId);
+    }
+
+    @Post('attendance/clock-out')
+    @ApiOperation({ summary: 'Clock out as the linked employee' })
+    async clockOutMe(
+        @CurrentUser('id') userId: string,
+        @Body() body: { notes?: string },
+    ) {
+        const employee = await this.requireLinkedEmployee(userId);
+        return this.schedules.clockOut(employee.id, body?.notes, userId);
+    }
 }

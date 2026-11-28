@@ -9,6 +9,7 @@ import { WorkSchedule } from "./entities/work-schedule.entity";
 import { ScheduleOverride } from "./entities/schedule-override.entity";
 import { LeaveRequest } from "./entities/leave-request.entity";
 import { LeavePolicy } from "./entities/leave-policy.entity";
+import { AttendanceLog } from "./entities/attendance-log.entity";
 import { User } from "../users/entities/user.entity";
 import { UsersModule } from "../users/users.module";
 import { RbacModule } from "../rbac/rbac.module";
@@ -17,6 +18,7 @@ import { CustomersModule } from "../customers/customers.module";
 import { DepartmentsController } from "./controllers/departments.controller";
 import { JobTitlesController } from "./controllers/job-titles.controller";
 import { EmployeeSelfServiceController } from "./controllers/employee-self-service.controller";
+import { RosterController } from "./controllers/roster.controller";
 import { EmployeesController } from "./controllers/employees.controller";
 import { PositionsController } from "./controllers/positions.controller";
 import { SchedulesController } from "./controllers/schedules.controller";
@@ -40,6 +42,7 @@ import { LeaveRequestsService } from "./services/leave-requests.service";
             ScheduleOverride,
             LeaveRequest,
             LeavePolicy,
+            AttendanceLog,
             User, // ← for FK on employee.userId
         ]),
         UsersModule, // ✅ for UsersService.exists() / getEmail() in employees.service
@@ -51,6 +54,7 @@ import { LeaveRequestsService } from "./services/leave-requests.service";
         DepartmentsController,
         JobTitlesController,
         EmployeeSelfServiceController,
+        RosterController,
         EmployeesController,
         PositionsController,
         SchedulesController,

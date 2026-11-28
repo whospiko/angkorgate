@@ -45,6 +45,8 @@ import type {
   Employee,
   LeaveRequest,
   LeavePolicy,
+  TeamRosterData,
+  AttendanceLog,
 } from "../types/employees.types"
 import {
   deleteEmployeeAction,
@@ -58,6 +60,7 @@ import { EmployeeDetailsDialog } from "./employee-details-dialog"
 import { DepartmentsManager } from "./departments-manager"
 import { JobTitlesManager } from "./job-titles-manager"
 import { OrgChartView } from "./org-chart-view"
+import { TeamRosterView } from "./team-roster-view"
 import { LeaveQueueManager } from "./leave-queue-manager"
 
 interface EmployeesOverviewProps {
@@ -66,6 +69,8 @@ interface EmployeesOverviewProps {
   orgChart?: OrgChartNode[]
   leaveRequests?: LeaveRequest[]
   leavePolicies?: LeavePolicy[]
+  initialRoster?: TeamRosterData
+  initialAttendance?: AttendanceLog[]
   jobTitles: JobTitle[]
   employees: Employee[]
   total?: number
@@ -84,6 +89,8 @@ export function EmployeesOverview({
   orgChart = [],
   leaveRequests = [],
   leavePolicies = [],
+  initialRoster = { startDate: "", endDate: "", dates: [], employees: [] },
+  initialAttendance = [],
   jobTitles,
   employees,
   total = employees.length,
@@ -224,6 +231,7 @@ export function EmployeesOverview({
       <Tabs key={initialTab} defaultValue={initialTab} className="space-y-4">
         <TabsList className="font-mono text-xs">
           <TabsTrigger value="staff">Staff Directory ({total})</TabsTrigger>
+          <TabsTrigger value="roster">Team Roster</TabsTrigger>
           <TabsTrigger value="org-chart">Org Chart</TabsTrigger>
           <TabsTrigger value="leaves">Leave Queue ({leaveRequests.filter((l) => l.status === "PENDING").length})</TabsTrigger>
           <TabsTrigger value="departments">Departments ({departments.length})</TabsTrigger>
@@ -503,7 +511,17 @@ export function EmployeesOverview({
           )}
         </TabsContent>
 
-        {/* Tab 2: Org Chart */}
+        {/* Tab 2: Team Roster & Attendance */}
+        <TabsContent value="roster">
+          <TeamRosterView
+            initialRoster={initialRoster}
+            initialAttendance={initialAttendance}
+            departments={departments}
+            employees={employees}
+          />
+        </TabsContent>
+
+        {/* Tab 3: Org Chart */}
         <TabsContent value="org-chart">
           <OrgChartView orgChart={orgChart} departmentTree={departmentTree} />
         </TabsContent>
