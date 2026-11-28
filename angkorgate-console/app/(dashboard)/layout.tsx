@@ -54,9 +54,9 @@ export default async function DashboardLayout({
       <div className="[--header-height:calc(--spacing(14))] min-h-svh flex flex-col">
         <SidebarProvider className="flex flex-col flex-1">
           <SiteHeader />
-          <div className="flex flex-1">
+          <div className="flex flex-1 min-w-0">
             <AppSidebar currentUser={currentUser} />
-            <SidebarInset className="flex-1 p-6">
+            <SidebarInset className="flex-1 min-w-0 overflow-x-hidden p-6">
               {maintenanceStatus.maintenanceMode && (
                 <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 font-mono text-xs text-amber-500">
                   <span>

@@ -218,7 +218,7 @@ export function TeamRosterView({
               No active employees match the selected filters.
             </div>
           ) : (
-            <div className="w-full max-w-full overflow-x-auto rounded-md border border-border/50">
+            <div className="w-full rounded-md border border-border/50 overflow-hidden">
               <Table className="w-max min-w-full">
                 <TableHeader>
                   <TableRow className="bg-muted/30">
