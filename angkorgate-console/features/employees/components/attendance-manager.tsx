@@ -52,6 +52,7 @@ import type {
   Department,
   Employee,
 } from "../types/employees.types"
+import { GpsMapPicker } from "./gps-map-picker"
 
 interface AttendanceManagerProps {
   initialPolicies: AttendancePolicy[]
@@ -106,6 +107,7 @@ export function AttendanceManager({
   const [officeLatitude, setOfficeLatitude] = React.useState("")
   const [officeLongitude, setOfficeLongitude] = React.useState("")
   const [geofenceRadiusMeters, setGeofenceRadiusMeters] = React.useState(100)
+  const [showMapPicker, setShowMapPicker] = React.useState(false)
   const [sessions, setSessions] = React.useState<AttendanceSessionRule[]>(PRESETS.SPLIT.sessions)
 
   // Live Clock-In / Out State
@@ -137,6 +139,7 @@ export function AttendanceManager({
     setOfficeLatitude("")
     setOfficeLongitude("")
     setGeofenceRadiusMeters(100)
+    setShowMapPicker(false)
     setShowBuilder(true)
   }
 
@@ -158,6 +161,7 @@ export function AttendanceManager({
       typeof policy.officeLongitude === "number" ? String(policy.officeLongitude) : ""
     )
     setGeofenceRadiusMeters(policy.geofenceRadiusMeters ?? 100)
+    setShowMapPicker(policy.requireGeofence ?? false)
     setSessions(
       policy.sessions?.length
         ? policy.sessions.map((s) => ({ ...s }))
@@ -187,6 +191,7 @@ export function AttendanceManager({
         setOfficeLatitude(pos.coords.latitude.toFixed(6))
         setOfficeLongitude(pos.coords.longitude.toFixed(6))
         setRequireGeofence(true)
+        setShowMapPicker(true)
       },
       () => {
         setBanner({ type: "err", text: "Unable to read GPS location. Allow location permission in browser." })
@@ -622,6 +627,15 @@ export function AttendanceManager({
                       type="button"
                       variant="outline"
                       size="sm"
+                      onClick={() => setShowMapPicker((prev) => !prev)}
+                    >
+                      <RiMapPinLine className="mr-1 size-3.5" />
+                      {showMapPicker ? "Hide Map" : "Select GPS on Map"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
                       onClick={handleUseCurrentLocation}
                     >
                       <RiMapPinLine className="mr-1 size-3.5" />
@@ -662,7 +676,11 @@ export function AttendanceManager({
                     <input
                       type="checkbox"
                       checked={requireGeofence}
-                      onChange={(e) => setRequireGeofence(e.target.checked)}
+                      onChange={(e) => {
+                        const checked = e.target.checked
+                        setRequireGeofence(checked)
+                        if (checked) setShowMapPicker(true)
+                      }}
                       className="rounded border-input"
                     />
                     Require GPS Geofence
@@ -707,6 +725,19 @@ export function AttendanceManager({
                     />
                   </div>
                 </div>
+
+                {showMapPicker && (
+                  <GpsMapPicker
+                    latitude={officeLatitude.trim() ? Number(officeLatitude.trim()) : null}
+                    longitude={officeLongitude.trim() ? Number(officeLongitude.trim()) : null}
+                    radiusMeters={Number(geofenceRadiusMeters) || 100}
+                    onChange={(lat, lng) => {
+                      setOfficeLatitude(lat.toFixed(6))
+                      setOfficeLongitude(lng.toFixed(6))
+                      setRequireGeofence(true)
+                    }}
+                  />
+                )}
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3">
