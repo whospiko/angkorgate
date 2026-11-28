@@ -712,12 +712,31 @@ export function AttendanceManager({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[11px] font-mono text-muted-foreground">
-                      Radius (meters)
-                    </label>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[11px] font-mono text-muted-foreground">
+                        Radius (meters)
+                      </label>
+                      <div className="flex items-center gap-1">
+                        {[2, 10, 50, 100].map((r) => (
+                          <button
+                            key={r}
+                            type="button"
+                            disabled={!requireGeofence}
+                            onClick={() => setGeofenceRadiusMeters(r)}
+                            className={`rounded px-1.5 py-0.5 font-mono text-[10px] border transition-colors ${
+                              geofenceRadiusMeters === r
+                                ? "border-primary bg-primary/20 text-primary"
+                                : "border-border/60 text-muted-foreground hover:text-foreground"
+                            } disabled:opacity-40`}
+                          >
+                            {r}m
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <Input
                       type="number"
-                      min={10}
+                      min={1}
                       max={10000}
                       value={geofenceRadiusMeters}
                       onChange={(e) => setGeofenceRadiusMeters(Number(e.target.value))}

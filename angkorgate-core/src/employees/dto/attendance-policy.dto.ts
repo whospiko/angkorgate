@@ -93,7 +93,7 @@ export class CreateAttendancePolicyDto {
 
   @IsOptional()
   @IsInt()
-  @Min(10)
+  @Min(1)
   @Max(10000)
   geofenceRadiusMeters?: number;
 }
@@ -162,7 +162,7 @@ export class UpdateAttendancePolicyDto {
 
   @IsOptional()
   @IsInt()
-  @Min(10)
+  @Min(1)
   @Max(10000)
   geofenceRadiusMeters?: number;
 }

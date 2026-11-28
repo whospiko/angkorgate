@@ -57,7 +57,7 @@ export function GpsMapPicker({
 
       mapInstance = L.map(containerRef.current, {
         center: [initialLat, initialLng],
-        zoom: 16,
+        zoom: (radiusMeters || 100) <= 20 ? 18 : 16,
       })
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
