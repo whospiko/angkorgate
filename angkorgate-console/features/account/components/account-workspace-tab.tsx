@@ -209,30 +209,51 @@ export function AccountWorkspaceTab({ initialData }: { initialData: MyWorkspaceD
     }
   }
 
-  const getCurrentCoords = (): Promise<{ latitude: number; longitude: number } | undefined> =>
+  const getCurrentCoords = (): Promise<{
+    coords?: { latitude: number; longitude: number }
+    geoError?: string
+  }> =>
     new Promise((resolve) => {
       if (typeof navigator === "undefined" || !navigator.geolocation) {
-        resolve(undefined)
+        resolve({ geoError: "Browser geolocation is not supported or requires HTTPS/localhost." })
         return
       }
-      navigator.geolocation.getCurrentPosition(
-        (pos) =>
-          resolve({
-            latitude: Number(pos.coords.latitude.toFixed(6)),
-            longitude: Number(pos.coords.longitude.toFixed(6)),
-          }),
-        () => resolve(undefined),
-        { enableHighAccuracy: true, timeout: 4000, maximumAge: 30_000 }
-      )
+      const readPos = (highAccuracy: boolean) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) =>
+            resolve({
+              coords: {
+                latitude: Number(pos.coords.latitude.toFixed(6)),
+                longitude: Number(pos.coords.longitude.toFixed(6)),
+              },
+            }),
+          (err) => {
+            if (highAccuracy && err.code !== 1) {
+              // Retry without high-accuracy (Wi-Fi/OS location) when laptop GPS times out
+              readPos(false)
+              return
+            }
+            const reason =
+              err.code === 1
+                ? "Browser Location permission was denied. Please allow Location access for this site."
+                : err.code === 3
+                ? "Location lookup timed out. Check macOS/browser Location Services."
+                : "Unable to read your device location."
+            resolve({ geoError: reason })
+          },
+          { enableHighAccuracy: highAccuracy, timeout: 6000, maximumAge: 60_000 }
+        )
+      }
+      readPos(true)
     })
 
   const handleSelfClock = async (mode: "in" | "out", notes?: string) => {
     setClockBusy(true)
     setFeedback(null)
-    const coords = mode === "in" ? await getCurrentCoords() : undefined
+    const geo = mode === "in" ? await getCurrentCoords() : {}
     const res =
       mode === "in"
-        ? await clockInMeAction(notes?.trim() || undefined, coords)
+        ? await clockInMeAction(notes?.trim() || undefined, geo.coords)
         : await clockOutMeAction(notes?.trim() || undefined)
     setClockBusy(false)
     if (res.success) {
@@ -243,7 +264,11 @@ export function AccountWorkspaceTab({ initialData }: { initialData: MyWorkspaceD
       })
       await refreshWorkspace()
     } else {
-      setFeedback({ type: "error", message: res.message || "Attendance action failed." })
+      const msg =
+        !geo.coords && geo.geoError && res.message?.includes("Location (GPS)")
+          ? `${res.message} (${geo.geoError})`
+          : res.message || "Attendance action failed."
+      setFeedback({ type: "error", message: msg })
     }
   }
 
