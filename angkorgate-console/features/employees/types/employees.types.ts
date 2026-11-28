@@ -106,6 +106,8 @@ export interface AttendanceLog {
   workedMinutes?: number | null
   sessionIndex?: number | null
   policyId?: string | null
+  clockInIp?: string | null
+  distanceMeters?: number | null
   notes?: string | null
 }
 
@@ -124,6 +126,12 @@ export interface AttendancePolicy {
   earlyLeaveGraceMinutes: number
   sessions: AttendanceSessionRule[]
   isActive: boolean
+  allowSelfServiceWeb?: boolean
+  allowedIps?: string[] | null
+  requireGeofence?: boolean
+  officeLatitude?: number | null
+  officeLongitude?: number | null
+  geofenceRadiusMeters?: number
   createdAt?: string
   updatedAt?: string
 }
@@ -136,6 +144,12 @@ export interface CreateAttendancePolicyInput {
   earlyLeaveGraceMinutes?: number
   sessions: AttendanceSessionRule[]
   isActive?: boolean
+  allowSelfServiceWeb?: boolean
+  allowedIps?: string[] | null
+  requireGeofence?: boolean
+  officeLatitude?: number | null
+  officeLongitude?: number | null
+  geofenceRadiusMeters?: number
 }
 
 export type UpdateAttendancePolicyInput = Partial<CreateAttendancePolicyInput>

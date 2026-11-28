@@ -6,8 +6,10 @@ import {
     ParseUUIDPipe,
     Post,
     Query,
+    Req,
     UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
@@ -105,8 +107,18 @@ export class RosterController {
         @Param('employeeId', ParseUUIDPipe) employeeId: string,
         @Body() dto: AttendanceClockDto,
         @CurrentUser('id') actorId: string,
+        @Req() req: Request,
     ) {
-        return this.schedules.clockIn(employeeId, dto.notes, dto.source ?? 'WEB', actorId);
+        const forwarded = req.headers['x-forwarded-for'];
+        const rawIp = Array.isArray(forwarded)
+            ? forwarded[0]
+            : typeof forwarded === 'string'
+            ? forwarded.split(',')[0]
+            : req.ip || req.socket?.remoteAddress || null;
+        return this.schedules.clockIn(employeeId, dto.notes, dto.source ?? 'WEB', actorId, {
+            isSelfService: false,
+            clientIp: rawIp?.trim() || null,
+        });
     }
 
     @Post(':employeeId/attendance/clock-out')

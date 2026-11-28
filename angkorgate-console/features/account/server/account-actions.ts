@@ -307,11 +307,19 @@ export async function reviewMyTeamLeaveAction(
   }
 }
 
-export async function clockInMeAction(notes?: string): Promise<AccountActionResult> {
+export async function clockInMeAction(
+  notes?: string,
+  coords?: { latitude: number; longitude: number }
+): Promise<AccountActionResult> {
   try {
-    await apiClient.post("/employees/me/attendance/clock-in", { notes: notes || undefined })
+    await apiClient.post("/employees/me/attendance/clock-in", {
+      notes: notes || undefined,
+      latitude: coords?.latitude,
+      longitude: coords?.longitude,
+    })
     revalidatePath("/account")
     revalidatePath("/employees")
+    revalidatePath("/attendance")
     return { success: true, message: "Clocked in successfully." }
   } catch (error) {
     const message = error instanceof ApiError ? error.message : "Failed to clock in."

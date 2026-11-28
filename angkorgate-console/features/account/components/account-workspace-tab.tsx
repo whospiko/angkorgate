@@ -209,12 +209,30 @@ export function AccountWorkspaceTab({ initialData }: { initialData: MyWorkspaceD
     }
   }
 
+  const getCurrentCoords = (): Promise<{ latitude: number; longitude: number } | undefined> =>
+    new Promise((resolve) => {
+      if (typeof navigator === "undefined" || !navigator.geolocation) {
+        resolve(undefined)
+        return
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) =>
+          resolve({
+            latitude: Number(pos.coords.latitude.toFixed(6)),
+            longitude: Number(pos.coords.longitude.toFixed(6)),
+          }),
+        () => resolve(undefined),
+        { enableHighAccuracy: true, timeout: 4000, maximumAge: 30_000 }
+      )
+    })
+
   const handleSelfClock = async (mode: "in" | "out", notes?: string) => {
     setClockBusy(true)
     setFeedback(null)
+    const coords = mode === "in" ? await getCurrentCoords() : undefined
     const res =
       mode === "in"
-        ? await clockInMeAction(notes?.trim() || undefined)
+        ? await clockInMeAction(notes?.trim() || undefined, coords)
         : await clockOutMeAction(notes?.trim() || undefined)
     setClockBusy(false)
     if (res.success) {

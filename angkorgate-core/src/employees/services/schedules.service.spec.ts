@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { SchedulesService } from './schedules.service';
 import { WorkSchedule } from '../entities/work-schedule.entity';
 import { ScheduleOverride } from '../entities/schedule-override.entity';
@@ -190,5 +190,56 @@ describe('SchedulesService', () => {
 
         attendanceRepo.count.mockResolvedValueOnce(2);
         await expect(service.clockIn('e1', 'Extra in', 'WEB')).rejects.toThrow(BadRequestException);
+    });
+
+    it('blocks self-service check-in from coffee-shop IP or outside GPS geofence and allows office IP + in-radius GPS', async () => {
+        policyRepo.findOne.mockResolvedValue({
+            id: 'pol-office',
+            name: 'Clinic On-Site Only',
+            isDefault: true,
+            isActive: true,
+            graceMinutes: 5,
+            allowSelfServiceWeb: true,
+            allowedIps: ['203.189.132.0/24'],
+            requireGeofence: true,
+            officeLatitude: 11.5564,
+            officeLongitude: 104.9282,
+            geofenceRadiusMeters: 150,
+            sessions: [{ label: 'Full Day', checkInTime: '08:00', checkOutTime: '17:00' }],
+        } as never);
+        attendanceRepo.findOne.mockResolvedValue(null);
+        attendanceRepo.count.mockResolvedValue(0);
+        attendanceRepo.create.mockImplementation((d) => d);
+        attendanceRepo.save.mockImplementation(async (d) => ({ id: 'log-geo', ...d }));
+
+        // Coffee-shop IP rejected
+        await expect(
+            service.clockIn('e1', 'Coffee shop', 'WEB', 'u1', {
+                isSelfService: true,
+                clientIp: '110.74.200.55',
+                latitude: 11.5564,
+                longitude: 104.9282,
+            }),
+        ).rejects.toThrow(ForbiddenException);
+
+        // Office IP but 2km away GPS rejected
+        await expect(
+            service.clockIn('e1', 'Far away', 'WEB', 'u1', {
+                isSelfService: true,
+                clientIp: '203.189.132.45',
+                latitude: 11.5764,
+                longitude: 104.9282,
+            }),
+        ).rejects.toThrow(ForbiddenException);
+
+        // Office IP + in-radius GPS allowed
+        const ok = await service.clockIn('e1', 'At clinic', 'WEB', 'u1', {
+            isSelfService: true,
+            clientIp: '203.189.132.45',
+            latitude: 11.5565,
+            longitude: 104.9283,
+        });
+        expect(ok.clockInIp).toBe('203.189.132.45');
+        expect(ok.distanceMeters).toBeLessThanOrEqual(150);
     });
 });

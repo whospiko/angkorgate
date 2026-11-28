@@ -401,6 +401,36 @@ async function runSmokeTest() {
             .send({ notes: 'Afternoon shift complete' });
         assert('Self-service 2nd session clock-out works', clockOut2Res.status === 201);
 
+        // Anti-spoof: IP allowlist + Geofence check on self-service clock-in
+        const antiSpoofPolicyRes = await request(http)
+            .post('/attendance-policies')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({
+                name: 'Strict Clinic On-Site',
+                isDefault: true,
+                allowSelfServiceWeb: true,
+                allowedIps: ['10.99.88.0/24'],
+                requireGeofence: true,
+                officeLatitude: 11.5564,
+                officeLongitude: 104.9282,
+                geofenceRadiusMeters: 200,
+                sessions: [{ label: 'Full Day', checkInTime: '08:00', checkOutTime: '17:00' }],
+            });
+        const strictPolicy = antiSpoofPolicyRes.body?.data || antiSpoofPolicyRes.body;
+        assert('POST /attendance-policies saves IP allowlist & geofence', antiSpoofPolicyRes.status === 201 && strictPolicy?.requireGeofence === true);
+
+        const blockedCoffeeRes = await request(http)
+            .post('/employees/me/attendance/clock-in')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .set('X-Forwarded-For', '110.74.199.12')
+            .send({ notes: 'Coffee shop attempt', latitude: 11.5564, longitude: 104.9282 });
+        assert('Coffee-shop IP clock-in blocked with 403', blockedCoffeeRes.status === 403);
+
+        // Clean up strict policy so default behavior remains clean
+        await request(http)
+            .delete(`/attendance-policies/${strictPolicy.id}`)
+            .set('Authorization', `Bearer ${adminToken}`);
+
         const attSummaryRes = await request(http)
             .get('/employees/attendance/summary')
             .set('Authorization', `Bearer ${adminToken}`);

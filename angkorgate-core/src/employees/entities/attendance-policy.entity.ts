@@ -42,6 +42,24 @@ export class AttendancePolicy {
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
 
+  @Column({ name: 'allow_self_service_web', type: 'boolean', default: true })
+  allowSelfServiceWeb: boolean;
+
+  @Column({ name: 'allowed_ips', type: 'simple-json', nullable: true })
+  allowedIps: string[] | null;
+
+  @Column({ name: 'require_geofence', type: 'boolean', default: false })
+  requireGeofence: boolean;
+
+  @Column({ name: 'office_latitude', type: 'float', nullable: true })
+  officeLatitude: number | null;
+
+  @Column({ name: 'office_longitude', type: 'float', nullable: true })
+  officeLongitude: number | null;
+
+  @Column({ name: 'geofence_radius_meters', type: 'int', default: 100 })
+  geofenceRadiusMeters: number;
+
   @CreateDateColumn({ name: 'created_at', type: colTimestamptz() })
   createdAt: Date;
 

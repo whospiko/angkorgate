@@ -7,8 +7,10 @@ import {
     ParseUUIDPipe,
     Patch,
     Post,
+    Req,
     UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { UnifiedAuthGuard } from '../../auth/guards/unified-auth.guard';
@@ -114,10 +116,22 @@ export class EmployeeSelfServiceController {
     @ApiOperation({ summary: 'Clock in as the linked employee' })
     async clockInMe(
         @CurrentUser('id') userId: string,
-        @Body() body: { notes?: string },
+        @Body() body: { notes?: string; latitude?: number; longitude?: number },
+        @Req() req: Request,
     ) {
         const employee = await this.requireLinkedEmployee(userId);
-        return this.schedules.clockIn(employee.id, body?.notes, 'WEB', userId);
+        const forwarded = req.headers['x-forwarded-for'];
+        const rawIp = Array.isArray(forwarded)
+            ? forwarded[0]
+            : typeof forwarded === 'string'
+            ? forwarded.split(',')[0]
+            : req.ip || req.socket?.remoteAddress || null;
+        return this.schedules.clockIn(employee.id, body?.notes, 'WEB', userId, {
+            isSelfService: true,
+            clientIp: rawIp?.trim() || null,
+            latitude: typeof body?.latitude === 'number' ? body.latitude : undefined,
+            longitude: typeof body?.longitude === 'number' ? body.longitude : undefined,
+        });
     }
 
     @Post('attendance/clock-out')

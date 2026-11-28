@@ -51,6 +51,18 @@ export class AttendanceLog {
     @Column({ name: 'policy_id', type: 'uuid', nullable: true })
     policyId: string | null;
 
+    @Column({ name: 'clock_in_ip', type: 'varchar', length: 64, nullable: true })
+    clockInIp: string | null;
+
+    @Column({ name: 'clock_in_latitude', type: 'float', nullable: true })
+    clockInLatitude: number | null;
+
+    @Column({ name: 'clock_in_longitude', type: 'float', nullable: true })
+    clockInLongitude: number | null;
+
+    @Column({ name: 'distance_meters', type: 'int', nullable: true })
+    distanceMeters: number | null;
+
     @Column({ type: 'text', nullable: true })
     notes: string | null;
 

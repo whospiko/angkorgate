@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -64,6 +65,37 @@ export class CreateAttendancePolicyDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  allowSelfServiceWeb?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  allowedIps?: string[] | null;
+
+  @IsOptional()
+  @IsBoolean()
+  requireGeofence?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  officeLatitude?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  officeLongitude?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(10)
+  @Max(10000)
+  geofenceRadiusMeters?: number;
 }
 
 export class UpdateAttendancePolicyDto {
@@ -102,4 +134,35 @@ export class UpdateAttendancePolicyDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  allowSelfServiceWeb?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  allowedIps?: string[] | null;
+
+  @IsOptional()
+  @IsBoolean()
+  requireGeofence?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  officeLatitude?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  officeLongitude?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(10)
+  @Max(10000)
+  geofenceRadiusMeters?: number;
 }

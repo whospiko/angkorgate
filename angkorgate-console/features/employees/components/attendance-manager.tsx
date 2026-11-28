@@ -9,7 +9,9 @@ import {
   RiEditLine,
   RiLoginBoxLine,
   RiLogoutBoxLine,
+  RiMapPinLine,
   RiSettings3Line,
+  RiShieldCheckLine,
   RiTimeLine,
 } from "@remixicon/react"
 import { Badge } from "@/components/ui/badge"
@@ -97,6 +99,12 @@ export function AttendanceManager({
   const [earlyLeaveGraceMinutes, setEarlyLeaveGraceMinutes] = React.useState(5)
   const [isDefault, setIsDefault] = React.useState(true)
   const [isActive, setIsActive] = React.useState(true)
+  const [allowSelfServiceWeb, setAllowSelfServiceWeb] = React.useState(true)
+  const [allowedIpsText, setAllowedIpsText] = React.useState("")
+  const [requireGeofence, setRequireGeofence] = React.useState(false)
+  const [officeLatitude, setOfficeLatitude] = React.useState("")
+  const [officeLongitude, setOfficeLongitude] = React.useState("")
+  const [geofenceRadiusMeters, setGeofenceRadiusMeters] = React.useState(100)
   const [sessions, setSessions] = React.useState<AttendanceSessionRule[]>(PRESETS.SPLIT.sessions)
 
   // Live Clock-In / Out State
@@ -122,6 +130,12 @@ export function AttendanceManager({
     setEarlyLeaveGraceMinutes(5)
     setIsDefault(policies.length === 0)
     setIsActive(true)
+    setAllowSelfServiceWeb(true)
+    setAllowedIpsText("")
+    setRequireGeofence(false)
+    setOfficeLatitude("")
+    setOfficeLongitude("")
+    setGeofenceRadiusMeters(100)
     setShowBuilder(true)
   }
 
@@ -133,6 +147,16 @@ export function AttendanceManager({
     setEarlyLeaveGraceMinutes(policy.earlyLeaveGraceMinutes ?? 5)
     setIsDefault(policy.isDefault)
     setIsActive(policy.isActive)
+    setAllowSelfServiceWeb(policy.allowSelfServiceWeb ?? true)
+    setAllowedIpsText((policy.allowedIps || []).join(", "))
+    setRequireGeofence(policy.requireGeofence ?? false)
+    setOfficeLatitude(
+      typeof policy.officeLatitude === "number" ? String(policy.officeLatitude) : ""
+    )
+    setOfficeLongitude(
+      typeof policy.officeLongitude === "number" ? String(policy.officeLongitude) : ""
+    )
+    setGeofenceRadiusMeters(policy.geofenceRadiusMeters ?? 100)
     setSessions(
       policy.sessions?.length
         ? policy.sessions.map((s) => ({ ...s }))
@@ -152,10 +176,35 @@ export function AttendanceManager({
     setSummary(nextSummary)
   }
 
+  const handleUseCurrentLocation = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setBanner({ type: "err", text: "Browser geolocation is not available." })
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setOfficeLatitude(pos.coords.latitude.toFixed(6))
+        setOfficeLongitude(pos.coords.longitude.toFixed(6))
+        setRequireGeofence(true)
+      },
+      () => {
+        setBanner({ type: "err", text: "Unable to read GPS location. Allow location permission in browser." })
+      },
+      { enableHighAccuracy: true, timeout: 6000 }
+    )
+  }
+
   const handleSavePolicy = (e: React.FormEvent) => {
     e.preventDefault()
     setBanner(null)
     startTransition(async () => {
+      const parsedIps = allowedIpsText
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+      const parsedLat = officeLatitude.trim() ? Number(officeLatitude.trim()) : null
+      const parsedLng = officeLongitude.trim() ? Number(officeLongitude.trim()) : null
+
       const payload = {
         name: policyName.trim(),
         departmentId: departmentId || null,
@@ -163,6 +212,12 @@ export function AttendanceManager({
         graceMinutes: Number(graceMinutes) || 0,
         earlyLeaveGraceMinutes: Number(earlyLeaveGraceMinutes) || 0,
         isActive,
+        allowSelfServiceWeb,
+        allowedIps: parsedIps.length > 0 ? parsedIps : null,
+        requireGeofence,
+        officeLatitude: parsedLat,
+        officeLongitude: parsedLng,
+        geofenceRadiusMeters: Number(geofenceRadiusMeters) || 100,
         sessions: sessions.map((s, idx) => ({
           label: s.label.trim() || `Session ${idx + 1}`,
           checkInTime: s.checkInTime,
@@ -525,6 +580,100 @@ export function AttendanceManager({
                 </div>
               </div>
 
+              {/* Anti-Spoof & Location Verification */}
+              <div className="space-y-3 rounded-[0.625rem] border border-border/60 bg-muted/20 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-xs font-mono font-semibold">
+                    <RiShieldCheckLine className="size-4 text-primary" />
+                    Anti-Spoof & Location Verification
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleUseCurrentLocation}
+                  >
+                    <RiMapPinLine className="mr-1 size-3.5" />
+                    Use Current Office GPS
+                  </Button>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-mono text-muted-foreground">
+                      Allowed Office / Clinic Wi-Fi IPs (comma-separated, optional)
+                    </label>
+                    <Input
+                      value={allowedIpsText}
+                      onChange={(e) => setAllowedIpsText(e.target.value)}
+                      placeholder="e.g. 203.189.132.45, 192.168.1.0/24"
+                    />
+                  </div>
+                  <div className="flex items-end pb-1">
+                    <label className="flex items-center gap-2 text-xs font-mono cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={allowSelfServiceWeb}
+                        onChange={(e) => setAllowSelfServiceWeb(e.target.checked)}
+                        className="rounded border-input"
+                      />
+                      Allow remote web self-service clock-in (/account)
+                    </label>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-4 items-end">
+                  <label className="flex items-center gap-2 text-xs font-mono cursor-pointer pb-2">
+                    <input
+                      type="checkbox"
+                      checked={requireGeofence}
+                      onChange={(e) => setRequireGeofence(e.target.checked)}
+                      className="rounded border-input"
+                    />
+                    Require GPS Geofence
+                  </label>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-mono text-muted-foreground">
+                      Office Latitude
+                    </label>
+                    <Input
+                      type="number"
+                      step="0.000001"
+                      value={officeLatitude}
+                      onChange={(e) => setOfficeLatitude(e.target.value)}
+                      placeholder="11.556400"
+                      disabled={!requireGeofence}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-mono text-muted-foreground">
+                      Office Longitude
+                    </label>
+                    <Input
+                      type="number"
+                      step="0.000001"
+                      value={officeLongitude}
+                      onChange={(e) => setOfficeLongitude(e.target.value)}
+                      placeholder="104.928200"
+                      disabled={!requireGeofence}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-mono text-muted-foreground">
+                      Radius (meters)
+                    </label>
+                    <Input
+                      type="number"
+                      min={10}
+                      max={10000}
+                      value={geofenceRadiusMeters}
+                      onChange={(e) => setGeofenceRadiusMeters(Number(e.target.value))}
+                      disabled={!requireGeofence}
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -621,6 +770,21 @@ export function AttendanceManager({
                           #{idx + 1} {s.label}: {s.checkInTime} – {s.checkOutTime}
                         </Badge>
                       ))}
+                      {pol.allowSelfServiceWeb === false && (
+                        <Badge className="bg-amber-500/15 text-amber-300 border-amber-500/30 text-[10px]">
+                          Front-Desk Only
+                        </Badge>
+                      )}
+                      {pol.allowedIps && pol.allowedIps.length > 0 && (
+                        <Badge className="bg-sky-500/15 text-sky-300 border-sky-500/30 text-[10px]">
+                          Wi-Fi IP Lock ({pol.allowedIps.length})
+                        </Badge>
+                      )}
+                      {pol.requireGeofence && (
+                        <Badge className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30 text-[10px]">
+                          GPS ≤ {pol.geofenceRadiusMeters ?? 100}m
+                        </Badge>
+                      )}
                     </div>
                   </div>
 
@@ -750,7 +914,7 @@ export function AttendanceManager({
                   <TableHead>Clock Out</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Worked</TableHead>
-                  <TableHead>Source</TableHead>
+                  <TableHead>Source / IP</TableHead>
                   <TableHead>Notes</TableHead>
                 </TableRow>
               </TableHeader>
@@ -800,7 +964,17 @@ export function AttendanceManager({
                           ? `${(log.workedMinutes / 60).toFixed(1)}h`
                           : "—"}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{log.source}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <div>{log.source}</div>
+                        {(log.clockInIp || typeof log.distanceMeters === "number") && (
+                          <div className="text-[10px] text-muted-foreground">
+                            {log.clockInIp || ""}
+                            {typeof log.distanceMeters === "number"
+                              ? ` (${log.distanceMeters}m)`
+                              : ""}
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">
                         {log.notes || "—"}
                       </TableCell>

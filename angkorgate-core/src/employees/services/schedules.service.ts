@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, IsNull, Repository } from 'typeorm';
 import { WorkSchedule } from '../entities/work-schedule.entity';
@@ -351,6 +351,12 @@ export class SchedulesService {
         notes?: string,
         source: AttendanceSource = 'WEB',
         actorId?: string,
+        context?: {
+            isSelfService?: boolean;
+            clientIp?: string | null;
+            latitude?: number;
+            longitude?: number;
+        },
     ): Promise<AttendanceLog> {
         if (!this.attendanceRepo) {
             throw new BadRequestException('Attendance repository is not configured');
@@ -380,8 +386,68 @@ export class SchedulesService {
         let graceMinutes = 5;
         let sessionIndex: number | null = todayCount;
         let policyId: string | null = null;
+        const normalizedIp = this.normalizeIp(context?.clientIp);
+        let distanceMeters: number | null = null;
 
         const policy = await this.resolveAttendancePolicyForEmployee(employee);
+        if (policy && context?.isSelfService) {
+            if (policy.allowSelfServiceWeb === false) {
+                throw new ForbiddenException(
+                    'Remote web check-in is disabled for your policy. Please check in at the front-desk terminal.',
+                );
+            }
+            if (Array.isArray(policy.allowedIps) && policy.allowedIps.length > 0) {
+                if (!this.isIpAllowed(normalizedIp, policy.allowedIps)) {
+                    throw new ForbiddenException(
+                        `Check-in blocked: network IP (${normalizedIp ?? 'unknown'}) is not on the office/clinic Wi-Fi allowlist.`,
+                    );
+                }
+            }
+            if (
+                policy.requireGeofence &&
+                typeof policy.officeLatitude === 'number' &&
+                typeof policy.officeLongitude === 'number'
+            ) {
+                if (
+                    typeof context.latitude !== 'number' ||
+                    typeof context.longitude !== 'number'
+                ) {
+                    throw new BadRequestException(
+                        'Location (GPS) permission is required to check in under this policy.',
+                    );
+                }
+                distanceMeters = Math.round(
+                    this.haversineMeters(
+                        context.latitude,
+                        context.longitude,
+                        policy.officeLatitude,
+                        policy.officeLongitude,
+                    ),
+                );
+                const maxRadius = policy.geofenceRadiusMeters ?? 100;
+                if (distanceMeters > maxRadius) {
+                    throw new ForbiddenException(
+                        `Check-in blocked: you are ${distanceMeters}m away from the workplace (max allowed: ${maxRadius}m).`,
+                    );
+                }
+            }
+        } else if (
+            policy?.requireGeofence &&
+            typeof policy.officeLatitude === 'number' &&
+            typeof policy.officeLongitude === 'number' &&
+            typeof context?.latitude === 'number' &&
+            typeof context?.longitude === 'number'
+        ) {
+            distanceMeters = Math.round(
+                this.haversineMeters(
+                    context.latitude,
+                    context.longitude,
+                    policy.officeLatitude,
+                    policy.officeLongitude,
+                ),
+            );
+        }
+
         if (policy && Array.isArray(policy.sessions) && policy.sessions.length > 0) {
             const sortedSessions = [...policy.sessions].sort((a, b) =>
                 a.checkInTime.localeCompare(b.checkInTime),
@@ -433,6 +499,10 @@ export class SchedulesService {
                 workedMinutes: null,
                 sessionIndex,
                 policyId,
+                clockInIp: normalizedIp,
+                clockInLatitude: typeof context?.latitude === 'number' ? context.latitude : null,
+                clockInLongitude: typeof context?.longitude === 'number' ? context.longitude : null,
+                distanceMeters,
                 notes: notes ?? null,
             }),
         );
@@ -442,7 +512,15 @@ export class SchedulesService {
             action: 'employee.attendance.clock_in',
             entity: 'attendance_log',
             entityId: saved.id,
-            newValue: { employeeId, source, sessionIndex, policyId, clockInAt: saved.clockInAt },
+            newValue: {
+                employeeId,
+                source,
+                sessionIndex,
+                policyId,
+                clockInIp: normalizedIp,
+                distanceMeters,
+                clockInAt: saved.clockInAt,
+            },
         });
 
         return saved;
@@ -728,6 +806,14 @@ export class SchedulesService {
             throw new BadRequestException('Attendance policy repository is not configured');
         }
         const sessions = this.validateAndSortSessions(dto.sessions);
+        const requireGeofence = dto.requireGeofence ?? false;
+        const officeLatitude = dto.officeLatitude ?? null;
+        const officeLongitude = dto.officeLongitude ?? null;
+        if (requireGeofence && (officeLatitude === null || officeLongitude === null)) {
+            throw new BadRequestException(
+                'officeLatitude and officeLongitude are required when requireGeofence is enabled',
+            );
+        }
         if (dto.isDefault && dto.isActive !== false) {
             await this.clearDefaultPolicies();
         }
@@ -740,6 +826,12 @@ export class SchedulesService {
                 earlyLeaveGraceMinutes: dto.earlyLeaveGraceMinutes ?? 5,
                 sessions,
                 isActive: dto.isActive ?? true,
+                allowSelfServiceWeb: dto.allowSelfServiceWeb ?? true,
+                allowedIps: this.normalizeAllowedIps(dto.allowedIps),
+                requireGeofence,
+                officeLatitude,
+                officeLongitude,
+                geofenceRadiusMeters: dto.geofenceRadiusMeters ?? 100,
             }),
         );
         void this.audit.log({
@@ -770,6 +862,16 @@ export class SchedulesService {
             : existing.sessions;
         const nextActive = dto.isActive ?? existing.isActive;
         const nextDefault = dto.isDefault ?? existing.isDefault;
+        const nextRequireGeofence = dto.requireGeofence ?? existing.requireGeofence ?? false;
+        const nextLat =
+            dto.officeLatitude !== undefined ? dto.officeLatitude : existing.officeLatitude ?? null;
+        const nextLng =
+            dto.officeLongitude !== undefined ? dto.officeLongitude : existing.officeLongitude ?? null;
+        if (nextRequireGeofence && (nextLat === null || nextLng === null)) {
+            throw new BadRequestException(
+                'officeLatitude and officeLongitude are required when requireGeofence is enabled',
+            );
+        }
 
         if (nextDefault && nextActive) {
             await this.clearDefaultPolicies(id);
@@ -786,6 +888,17 @@ export class SchedulesService {
                 dto.earlyLeaveGraceMinutes ?? existing.earlyLeaveGraceMinutes,
             sessions: nextSessions,
             isActive: nextActive,
+            allowSelfServiceWeb:
+                dto.allowSelfServiceWeb ?? existing.allowSelfServiceWeb ?? true,
+            allowedIps:
+                dto.allowedIps !== undefined
+                    ? this.normalizeAllowedIps(dto.allowedIps)
+                    : existing.allowedIps ?? null,
+            requireGeofence: nextRequireGeofence,
+            officeLatitude: nextLat,
+            officeLongitude: nextLng,
+            geofenceRadiusMeters:
+                dto.geofenceRadiusMeters ?? existing.geofenceRadiusMeters ?? 100,
         });
 
         void this.audit.log({
@@ -885,5 +998,75 @@ export class SchedulesService {
                 await this.policyRepo.update(p.id, { isDefault: false });
             }
         }
+    }
+
+    private normalizeAllowedIps(ips?: string[] | null): string[] | null {
+        if (!ips || !Array.isArray(ips)) return null;
+        const cleaned = ips.map((ip) => ip.trim()).filter(Boolean);
+        return cleaned.length > 0 ? cleaned : null;
+    }
+
+    private normalizeIp(ip?: string | null): string | null {
+        if (!ip) return null;
+        const trimmed = ip.trim();
+        if (!trimmed) return null;
+        if (trimmed === '::1') return '127.0.0.1';
+        if (trimmed.startsWith('::ffff:')) return trimmed.slice(7);
+        return trimmed;
+    }
+
+    private isIpAllowed(clientIp: string | null, allowlist: string[]): boolean {
+        if (!clientIp) return false;
+        const normalized = this.normalizeIp(clientIp);
+        if (!normalized) return false;
+
+        for (const rawEntry of allowlist) {
+            const entry = this.normalizeIp(rawEntry);
+            if (!entry) continue;
+            if (entry === normalized) return true;
+            if (entry.includes('/')) {
+                if (this.matchesIpv4Cidr(normalized, entry)) return true;
+            }
+        }
+        return false;
+    }
+
+    private matchesIpv4Cidr(ip: string, cidr: string): boolean {
+        const [range, bitsStr] = cidr.split('/');
+        const bits = Number(bitsStr);
+        if (!Number.isInteger(bits) || bits < 0 || bits > 32) return false;
+        const ipInt = this.ipv4ToInt(ip);
+        const rangeInt = this.ipv4ToInt(range);
+        if (ipInt === null || rangeInt === null) return false;
+        const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
+        return (ipInt & mask) === (rangeInt & mask);
+    }
+
+    private ipv4ToInt(ip: string): number | null {
+        const parts = ip.split('.');
+        if (parts.length !== 4) return null;
+        let num = 0;
+        for (const part of parts) {
+            const octet = Number(part);
+            if (!Number.isInteger(octet) || octet < 0 || octet > 255) return null;
+            num = ((num << 8) | octet) >>> 0;
+        }
+        return num;
+    }
+
+    private haversineMeters(
+        lat1: number,
+        lon1: number,
+        lat2: number,
+        lon2: number,
+    ): number {
+        const R = 6_371_000;
+        const toRad = (deg: number) => (deg * Math.PI) / 180;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a =
+            Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+        return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 }
