@@ -187,21 +187,34 @@ export function AccountPortalShell({
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-8 space-y-6">
+      <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-8 space-y-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold font-serif tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold font-heading tracking-tight">
             Account & Security Settings
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage your personal profile, zero-phishing biometric passkeys, and active sessions.
+            Manage your personal profile, zero-phishing biometric passkeys, active sessions, and staff workspace.
           </p>
         </div>
 
         {/* Tabbed Portal Navigation */}
-        <Tabs defaultValue="profile" className="w-full space-y-6">
+        <Tabs
+          defaultValue={
+            searchParams.get("tab") === "workspace" && initialWorkspace?.employee
+              ? "workspace"
+              : searchParams.get("tab") === "security"
+              ? "security"
+              : searchParams.get("tab") === "sessions"
+              ? "sessions"
+              : "profile"
+          }
+          className="w-full space-y-6"
+        >
           <TabsList
-            className={`grid w-full bg-muted/60 p-1 border border-border rounded-lg ${
-              initialWorkspace?.employee ? "grid-cols-4 max-w-xl" : "grid-cols-3 max-w-md"
+            className={`grid w-full h-auto bg-muted/60 p-1 border border-border rounded-lg ${
+              initialWorkspace?.employee
+                ? "grid-cols-2 sm:grid-cols-4 max-w-2xl"
+                : "grid-cols-3 max-w-md"
             }`}
           >
             <TabsTrigger
