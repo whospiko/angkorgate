@@ -8,6 +8,7 @@ import { EmployeeAttribute } from "./entities/employee-attribute.entity";
 import { WorkSchedule } from "./entities/work-schedule.entity";
 import { ScheduleOverride } from "./entities/schedule-override.entity";
 import { LeaveRequest } from "./entities/leave-request.entity";
+import { LeavePolicy } from "./entities/leave-policy.entity";
 import { User } from "../users/entities/user.entity";
 import { UsersModule } from "../users/users.module";
 import { RbacModule } from "../rbac/rbac.module";
@@ -38,6 +39,7 @@ import { LeaveRequestsService } from "./services/leave-requests.service";
             WorkSchedule,
             ScheduleOverride,
             LeaveRequest,
+            LeavePolicy,
             User, // ← for FK on employee.userId
         ]),
         UsersModule, // ✅ for UsersService.exists() / getEmail() in employees.service

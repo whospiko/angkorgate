@@ -46,6 +46,13 @@ export class LeaveRequest {
     @Column({ type: 'varchar', length: 20, default: 'PENDING' })
     status: LeaveStatus;
 
+    @Column({ name: 'assigned_approver_id', type: 'uuid', nullable: true })
+    assignedApproverId: string | null;
+
+    @ManyToOne(() => Employee, { onDelete: 'SET NULL', nullable: true })
+    @JoinColumn({ name: 'assigned_approver_id' })
+    assignedApprover: Employee | null;
+
     @Column({ name: 'reviewed_by_id', type: 'uuid', nullable: true })
     reviewedById: string | null;
 

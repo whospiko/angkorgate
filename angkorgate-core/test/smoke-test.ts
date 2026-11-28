@@ -312,6 +312,27 @@ async function runSmokeTest() {
             .set('Authorization', `Bearer ${adminToken}`);
         assert('Linked employee /employees/me/leave-requests returns balances', selfLeaveRes.status === 200 && Array.isArray(selfLeaveRes.body?.data?.balances?.items || selfLeaveRes.body?.balances?.items));
 
+        const policiesRes = await request(http)
+            .get('/leave-policies')
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert('GET /leave-policies returns default yearly quotas', policiesRes.status === 200 && (policiesRes.body?.data || policiesRes.body)?.length >= 3);
+
+        const subEmpRes = await request(http)
+            .post('/employees')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ fullName: 'Junior Nurse', managerId: empId, employmentType: 'FULL_TIME' });
+        const subEmpId = subEmpRes.body?.data?.id || subEmpRes.body?.id;
+        const routedLeaveRes = await request(http)
+            .post(`/employees/${subEmpId}/leave-requests`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ leaveType: 'ANNUAL', startDate: '2026-12-22', endDate: '2026-12-23', reason: 'Routed test' });
+        const routedLeaveId = routedLeaveRes.body?.data?.id || routedLeaveRes.body?.id;
+        const approvalsRes = await request(http)
+            .get('/employees/me/approvals')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const approvalsList = approvalsRes.body?.data || approvalsRes.body || [];
+        assert('Leave request routes to manager /employees/me/approvals', approvalsList.some((a: any) => a.id === routedLeaveId));
+
         // ══════════════════════════════════════════════════════════════════
         logSection('6. MFA (TOTP) Setup & Login Flow');
         // ══════════════════════════════════════════════════════════════════

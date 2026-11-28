@@ -1,22 +1,40 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { LeaveRequest } from '../entities/leave-request.entity';
-import { CreateLeaveRequestDto, ReviewLeaveRequestDto } from '../dto/leave-request.dto';
+import { LeavePolicy, type QuotaLeaveType } from '../entities/leave-policy.entity';
+import {
+    CreateLeaveRequestDto,
+    ReviewLeaveRequestDto,
+    UpdateLeavePolicyDto,
+} from '../dto/leave-request.dto';
 import { EmployeesService } from './employees.service';
 import { AuditService } from '../../audit/services/audit.service';
 import { normalizePagination } from '../../common/utils/pagination.util';
+
+const DEFAULT_LEAVE_POLICIES: {
+    leaveType: QuotaLeaveType;
+    annualQuotaDays: number;
+    enforceQuota: boolean;
+}[] = [
+    { leaveType: 'ANNUAL', annualQuotaDays: 18, enforceQuota: true },
+    { leaveType: 'SICK', annualQuotaDays: 10, enforceQuota: true },
+    { leaveType: 'MATERNITY', annualQuotaDays: 90, enforceQuota: true },
+];
 
 @Injectable()
 export class LeaveRequestsService {
     constructor(
         @InjectRepository(LeaveRequest)
         private readonly repo: Repository<LeaveRequest>,
+        @InjectRepository(LeavePolicy)
+        private readonly policyRepo: Repository<LeavePolicy>,
         private readonly employees: EmployeesService,
         private readonly audit: AuditService,
     ) { }
@@ -26,7 +44,7 @@ export class LeaveRequestsService {
         dto: CreateLeaveRequestDto,
         actorId?: string,
     ): Promise<LeaveRequest> {
-        await this.employees.findByIdOrFail(employeeId);
+        const employee = await this.employees.findByIdOrFail(employeeId);
 
         if (dto.startDate > dto.endDate) {
             throw new BadRequestException('Leave startDate cannot be after endDate');
@@ -48,6 +66,33 @@ export class LeaveRequestsService {
             );
         }
 
+        // Enforce yearly quota when configured for ANNUAL / SICK / MATERNITY
+        if (
+            dto.leaveType === 'ANNUAL' ||
+            dto.leaveType === 'SICK' ||
+            dto.leaveType === 'MATERNITY'
+        ) {
+            const policies = await this.getPolicies();
+            const policy = policies.find((p) => p.leaveType === dto.leaveType);
+            if (policy?.enforceQuota) {
+                const year = parseInt(dto.startDate.slice(0, 4), 10);
+                const summary = await this.getBalanceSummary(employeeId, year);
+                const bal = summary.items.find((i) => i.leaveType === dto.leaveType);
+                const requestedDays =
+                    Math.floor(
+                        (new Date(`${dto.endDate}T00:00:00Z`).getTime() -
+                            new Date(`${dto.startDate}T00:00:00Z`).getTime()) /
+                            86_400_000,
+                    ) + 1;
+                const available = Math.max(0, (bal?.remainingDays ?? 0) - (bal?.pendingDays ?? 0));
+                if (requestedDays > available) {
+                    throw new BadRequestException(
+                        `Insufficient ${dto.leaveType} leave balance: requested ${requestedDays} day(s), available ${available} day(s) in ${year}`,
+                    );
+                }
+            }
+        }
+
         const saved = await this.repo.save(
             this.repo.create({
                 employeeId,
@@ -58,6 +103,7 @@ export class LeaveRequestsService {
                 attachmentName: dto.attachmentName ?? null,
                 attachmentMimeType: dto.attachmentMimeType ?? null,
                 attachmentDataUrl: dto.attachmentDataUrl ?? null,
+                assignedApproverId: employee.managerId ?? null,
                 status: 'PENDING',
             }),
         );
@@ -84,6 +130,8 @@ export class LeaveRequestsService {
             .createQueryBuilder('l')
             .leftJoin('l.reviewedBy', 'rev')
             .addSelect(['rev.id', 'rev.email', 'rev.phone'])
+            .leftJoin('l.assignedApprover', 'app')
+            .addSelect(['app.id', 'app.employeeCode', 'app.fullName'])
             .where('l.employeeId = :eid', { eid: employeeId })
             .orderBy('l.startDate', 'DESC')
             .addOrderBy('l.createdAt', 'DESC')
@@ -93,6 +141,7 @@ export class LeaveRequestsService {
     async findAll(params: {
         status?: string;
         employeeId?: string;
+        assignedApproverId?: string;
         page?: number;
         limit?: number;
     }) {
@@ -101,7 +150,9 @@ export class LeaveRequestsService {
             .createQueryBuilder('l')
             .leftJoinAndSelect('l.employee', 'emp')
             .leftJoin('l.reviewedBy', 'rev')
-            .addSelect(['rev.id', 'rev.email', 'rev.phone']);
+            .addSelect(['rev.id', 'rev.email', 'rev.phone'])
+            .leftJoin('l.assignedApprover', 'app')
+            .addSelect(['app.id', 'app.employeeCode', 'app.fullName']);
 
         if (params.status) {
             qb.andWhere('l.status = :status', { status: params.status.toUpperCase() });
@@ -109,11 +160,43 @@ export class LeaveRequestsService {
         if (params.employeeId) {
             qb.andWhere('l.employeeId = :eid', { eid: params.employeeId });
         }
+        if (params.assignedApproverId) {
+            qb.andWhere('l.assignedApproverId = :aid', { aid: params.assignedApproverId });
+        }
 
         qb.orderBy('l.createdAt', 'DESC').skip(skip).take(limit);
 
         const [data, total] = await qb.getManyAndCount();
         return { data, total, page, limit };
+    }
+
+    async findAssignedApprovals(managerEmployeeId: string, status?: string): Promise<LeaveRequest[]> {
+        const qb = this.repo
+            .createQueryBuilder('l')
+            .leftJoinAndSelect('l.employee', 'emp')
+            .leftJoin('l.reviewedBy', 'rev')
+            .addSelect(['rev.id', 'rev.email', 'rev.phone'])
+            .where('l.assignedApproverId = :mid', { mid: managerEmployeeId });
+
+        if (status) {
+            qb.andWhere('l.status = :status', { status: status.toUpperCase() });
+        }
+
+        return qb.orderBy('l.createdAt', 'DESC').getMany();
+    }
+
+    async reviewForManager(
+        id: string,
+        managerEmployeeId: string,
+        dto: ReviewLeaveRequestDto,
+        actorId?: string,
+    ): Promise<LeaveRequest> {
+        const leave = await this.repo.findOne({ where: { id } });
+        if (!leave) throw new NotFoundException(`Leave request ${id} not found`);
+        if (leave.assignedApproverId !== managerEmployeeId) {
+            throw new ForbiddenException('You are not the assigned manager for this leave request');
+        }
+        return this.review(id, dto, actorId);
     }
 
     async review(
@@ -187,25 +270,66 @@ export class LeaveRequestsService {
         return this.cancel(id, actorId);
     }
 
+    async getPolicies(): Promise<LeavePolicy[]> {
+        const existing = await this.policyRepo.find({ order: { leaveType: 'ASC' } });
+        const byType = new Map(existing.map((p) => [p.leaveType, p]));
+        const missing = DEFAULT_LEAVE_POLICIES.filter((d) => !byType.has(d.leaveType));
+        if (missing.length > 0) {
+            for (const def of missing) {
+                const created = await this.policyRepo.save(this.policyRepo.create(def));
+                byType.set(created.leaveType, created);
+            }
+        }
+        return DEFAULT_LEAVE_POLICIES.map((d) => byType.get(d.leaveType)!);
+    }
+
+    async updatePolicy(
+        leaveType: QuotaLeaveType,
+        dto: UpdateLeavePolicyDto,
+        actorId?: string,
+    ): Promise<LeavePolicy> {
+        let policy = await this.policyRepo.findOne({ where: { leaveType } });
+        if (!policy) {
+            policy = this.policyRepo.create({
+                leaveType,
+                annualQuotaDays: dto.annualQuotaDays,
+                enforceQuota: dto.enforceQuota ?? true,
+            });
+        } else {
+            policy.annualQuotaDays = dto.annualQuotaDays;
+            if (dto.enforceQuota !== undefined) {
+                policy.enforceQuota = dto.enforceQuota;
+            }
+        }
+        const saved = await this.policyRepo.save(policy);
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'employee.leave_policy.update',
+            entity: 'leave_policy',
+            entityId: saved.id,
+            newValue: {
+                leaveType: saved.leaveType,
+                annualQuotaDays: saved.annualQuotaDays,
+                enforceQuota: saved.enforceQuota,
+            },
+        });
+        return saved;
+    }
+
     async getBalanceSummary(
         employeeId: string,
         year: number = new Date().getUTCFullYear(),
     ): Promise<{
         year: number;
         items: {
-            leaveType: 'ANNUAL' | 'SICK' | 'MATERNITY';
+            leaveType: QuotaLeaveType;
             allowanceDays: number;
             usedDays: number;
             pendingDays: number;
             remainingDays: number;
         }[];
     }> {
-        const allowances: { leaveType: 'ANNUAL' | 'SICK' | 'MATERNITY'; allowanceDays: number }[] = [
-            { leaveType: 'ANNUAL', allowanceDays: 18 },
-            { leaveType: 'SICK', allowanceDays: 10 },
-            { leaveType: 'MATERNITY', allowanceDays: 90 },
-        ];
-
+        const policies = await this.getPolicies();
         const yearStart = `${year}-01-01`;
         const yearEnd = `${year}-12-31`;
         const requests = await this.findByEmployee(employeeId);
@@ -219,7 +343,7 @@ export class LeaveRequestsService {
             return Math.floor((e - s) / 86_400_000) + 1;
         };
 
-        const items = allowances.map(({ leaveType, allowanceDays }) => {
+        const items = policies.map(({ leaveType, annualQuotaDays }) => {
             let usedDays = 0;
             let pendingDays = 0;
             for (const req of requests) {
@@ -230,10 +354,10 @@ export class LeaveRequestsService {
             }
             return {
                 leaveType,
-                allowanceDays,
+                allowanceDays: annualQuotaDays,
                 usedDays,
                 pendingDays,
-                remainingDays: Math.max(0, allowanceDays - usedDays),
+                remainingDays: Math.max(0, annualQuotaDays - usedDays),
             };
         });
 

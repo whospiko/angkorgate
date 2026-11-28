@@ -44,6 +44,7 @@ import type {
   JobTitle,
   Employee,
   LeaveRequest,
+  LeavePolicy,
 } from "../types/employees.types"
 import {
   deleteEmployeeAction,
@@ -64,6 +65,7 @@ interface EmployeesOverviewProps {
   departmentTree?: DepartmentTreeNode[]
   orgChart?: OrgChartNode[]
   leaveRequests?: LeaveRequest[]
+  leavePolicies?: LeavePolicy[]
   jobTitles: JobTitle[]
   employees: Employee[]
   total?: number
@@ -81,6 +83,7 @@ export function EmployeesOverview({
   departmentTree = [],
   orgChart = [],
   leaveRequests = [],
+  leavePolicies = [],
   jobTitles,
   employees,
   total = employees.length,
@@ -507,7 +510,7 @@ export function EmployeesOverview({
 
         {/* Tab 3: Leave Queue */}
         <TabsContent value="leaves">
-          <LeaveQueueManager leaveRequests={leaveRequests} />
+          <LeaveQueueManager leaveRequests={leaveRequests} leavePolicies={leavePolicies} />
         </TabsContent>
 
         {/* Tab 4: Departments */}

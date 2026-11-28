@@ -11,6 +11,7 @@ import {
   RiBriefcase4Line,
   RiCalendarCheckLine,
   RiCalendarEventLine,
+  RiCheckLine,
   RiCloseLine,
   RiLoader4Line,
   RiTimeLine,
@@ -20,6 +21,7 @@ import type { MyWorkspaceData } from "../types/account.types"
 import {
   cancelMyLeaveRequestAction,
   getMyWorkspaceAction,
+  reviewMyTeamLeaveAction,
   submitMyLeaveRequestAction,
 } from "../server/account-actions"
 
@@ -55,6 +57,7 @@ export function AccountWorkspaceTab({ initialData }: { initialData: MyWorkspaceD
 
   const [submitting, setSubmitting] = useState(false)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [reviewingId, setReviewingId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(
     null
   )
@@ -151,6 +154,19 @@ export function AccountWorkspaceTab({ initialData }: { initialData: MyWorkspaceD
       await refreshWorkspace()
     } else {
       setFeedback({ type: "error", message: res.message || "Failed to cancel leave request." })
+    }
+  }
+
+  const handleReviewTeamLeave = async (id: string, decision: "APPROVED" | "REJECTED") => {
+    setReviewingId(id)
+    setFeedback(null)
+    const res = await reviewMyTeamLeaveAction(id, decision)
+    setReviewingId(null)
+    if (res.success) {
+      setFeedback({ type: "success", message: res.message || `Leave request ${decision.toLowerCase()}.` })
+      await refreshWorkspace()
+    } else {
+      setFeedback({ type: "error", message: res.message || "Failed to review leave request." })
     }
   }
 
@@ -397,6 +413,88 @@ export function AccountWorkspaceTab({ initialData }: { initialData: MyWorkspaceD
           </form>
         </CardContent>
       </Card>
+
+      {/* Team Leave Approvals Routed to Manager */}
+      {workspace.teamApprovals.length > 0 && (
+        <Card className="border border-border bg-card">
+          <CardHeader>
+            <CardTitle className="font-heading text-base">
+              Team Leave Approvals ({workspace.teamApprovals.filter((a) => a.status === "PENDING").length} pending)
+            </CardTitle>
+            <CardDescription className="font-mono text-xs">
+              Direct-report leave requests routed to you as manager.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {workspace.teamApprovals.map((lv) => (
+              <div
+                key={lv.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-md border border-border/50 bg-muted/15 px-3 py-2.5 font-mono text-xs"
+              >
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-sans text-sm font-medium">
+                      {lv.employee?.fullName || lv.employeeId.slice(0, 8)}
+                    </span>
+                    {lv.employee?.employeeCode && (
+                      <span className="text-[11px] text-primary font-semibold">
+                        {lv.employee.employeeCode}
+                      </span>
+                    )}
+                    <Badge variant="secondary" className="text-[10px]">
+                      {lv.leaveType}
+                    </Badge>
+                    <span>
+                      {lv.startDate} &rarr; {lv.endDate}
+                    </span>
+                    <Badge variant="outline" className="text-[10px]">
+                      {lv.status}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                    <span>Requested: {formatDateTime(lv.createdAt)}</span>
+                    {lv.reason && <span>Reason: {lv.reason}</span>}
+                    {lv.attachmentDataUrl && (
+                      <LeaveAttachmentPreview
+                        name={lv.attachmentName}
+                        mimeType={lv.attachmentMimeType}
+                        dataUrl={lv.attachmentDataUrl}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {lv.status === "PENDING" && (
+                  <div className="flex items-center gap-1.5 self-start sm:self-center">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={reviewingId === lv.id}
+                      onClick={() => handleReviewTeamLeave(lv.id, "APPROVED")}
+                      className="h-7 px-2 font-mono text-[11px] text-emerald-600 border-emerald-500/40"
+                    >
+                      <RiCheckLine className="mr-1 size-3" />
+                      Approve
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={reviewingId === lv.id}
+                      onClick={() => handleReviewTeamLeave(lv.id, "REJECTED")}
+                      className="h-7 px-2 font-mono text-[11px] text-destructive border-destructive/40"
+                    >
+                      <RiCloseLine className="mr-1 size-3" />
+                      Reject
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* My Leave History */}
       <Card className="border border-border bg-card">

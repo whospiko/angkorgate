@@ -12,7 +12,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { UnifiedAuthGuard } from '../../auth/guards/unified-auth.guard';
-import { CreateLeaveRequestDto } from '../dto/leave-request.dto';
+import { CreateLeaveRequestDto, ReviewLeaveRequestDto } from '../dto/leave-request.dto';
 import { EmployeesService } from '../services/employees.service';
 import { LeaveRequestsService } from '../services/leave-requests.service';
 import { SchedulesService } from '../services/schedules.service';
@@ -83,5 +83,23 @@ export class EmployeeSelfServiceController {
     ) {
         const employee = await this.requireLinkedEmployee(userId);
         return this.leaves.cancelForEmployee(id, employee.id, userId);
+    }
+
+    @Get('approvals')
+    @ApiOperation({ summary: 'List leave requests routed to the linked employee as manager' })
+    async getMyAssignedApprovals(@CurrentUser('id') userId: string) {
+        const employee = await this.requireLinkedEmployee(userId);
+        return this.leaves.findAssignedApprovals(employee.id);
+    }
+
+    @Patch('approvals/:id/review')
+    @ApiOperation({ summary: 'Approve or reject a direct-report leave request routed to you' })
+    async reviewAssignedApproval(
+        @CurrentUser('id') userId: string,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() dto: ReviewLeaveRequestDto,
+    ) {
+        const employee = await this.requireLinkedEmployee(userId);
+        return this.leaves.reviewForManager(id, employee.id, dto, userId);
     }
 }

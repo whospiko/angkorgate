@@ -22,7 +22,12 @@ import { Permissions } from '../../rbac/decorators/permissions.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { UnifiedAuthGuard } from '../../auth/guards/unified-auth.guard';
 import { LeaveRequestsService } from '../services/leave-requests.service';
-import { CreateLeaveRequestDto, ReviewLeaveRequestDto } from '../dto/leave-request.dto';
+import {
+    CreateLeaveRequestDto,
+    ReviewLeaveRequestDto,
+    UpdateLeavePolicyDto,
+} from '../dto/leave-request.dto';
+import type { QuotaLeaveType } from '../entities/leave-policy.entity';
 
 @ApiTags('Employees')
 @ApiBearerAuth('bearerAuth')
@@ -94,5 +99,23 @@ export class LeaveRequestsController {
         @CurrentUser('id') actorId: string,
     ) {
         return this.leaves.cancel(id, actorId);
+    }
+
+    @Get('leave-policies')
+    @Permissions('employee:read')
+    @ApiOperation({ summary: 'List yearly leave quota policies' })
+    listPolicies() {
+        return this.leaves.getPolicies();
+    }
+
+    @Patch('leave-policies/:leaveType')
+    @Permissions('employee:write')
+    @ApiOperation({ summary: 'Update yearly quota policy for ANNUAL, SICK, or MATERNITY leave' })
+    updatePolicy(
+        @Param('leaveType') leaveType: QuotaLeaveType,
+        @Body() dto: UpdateLeavePolicyDto,
+        @CurrentUser('id') actorId: string,
+    ) {
+        return this.leaves.updatePolicy(leaveType, dto, actorId);
     }
 }

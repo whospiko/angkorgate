@@ -1,5 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import {
+    IsBoolean,
+    IsDateString,
+    IsIn,
+    IsInt,
+    IsOptional,
+    IsString,
+    Matches,
+    Max,
+    MaxLength,
+    Min,
+} from 'class-validator';
 
 export class CreateLeaveRequestDto {
     @ApiProperty({
@@ -60,4 +71,17 @@ export class ReviewLeaveRequestDto {
     @IsOptional()
     @IsString()
     reviewNote?: string;
+}
+
+export class UpdateLeavePolicyDto {
+    @ApiProperty({ description: 'Annual leave quota in days', minimum: 0, maximum: 365 })
+    @IsInt()
+    @Min(0)
+    @Max(365)
+    annualQuotaDays: number;
+
+    @ApiPropertyOptional({ description: 'Reject new requests exceeding available balance', default: true })
+    @IsOptional()
+    @IsBoolean()
+    enforceQuota?: boolean;
 }

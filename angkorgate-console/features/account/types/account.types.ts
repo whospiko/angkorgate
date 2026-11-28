@@ -87,6 +87,7 @@ export interface MyWorkspaceData {
   schedules: EmployeeSchedule[]
   overrides: ScheduleOverride[]
   leaveRequests: LeaveRequest[]
+  teamApprovals: LeaveRequest[]
   balances: MyLeaveBalanceSummary | null
 }
 

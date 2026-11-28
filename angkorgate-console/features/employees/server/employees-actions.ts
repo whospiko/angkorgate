@@ -15,6 +15,7 @@ import type {
   EmployeeSchedule,
   ScheduleOverride,
   LeaveRequest,
+  LeavePolicy,
   LeaveType,
   CreateDepartmentInput,
   UpdateDepartmentInput,
@@ -714,5 +715,32 @@ export async function cancelLeaveRequestAction(
     return { success: true }
   } catch (error: unknown) {
     return { success: false, message: getErrorMessage(error, "Failed to cancel leave request") }
+  }
+}
+
+export async function getLeavePolicies(): Promise<LeavePolicy[]> {
+  try {
+    const res = await apiClient.get<LeavePolicy[]>("/leave-policies")
+    return Array.isArray(res) ? res : []
+  } catch {
+    return []
+  }
+}
+
+export async function updateLeavePolicyAction(
+  leaveType: "ANNUAL" | "SICK" | "MATERNITY",
+  annualQuotaDays: number,
+  enforceQuota = true
+): Promise<{ success: boolean; message?: string; data?: LeavePolicy }> {
+  try {
+    const updated = await apiClient.patch<LeavePolicy>(
+      `/leave-policies/${encodeURIComponent(leaveType)}`,
+      { annualQuotaDays, enforceQuota }
+    )
+    revalidatePath("/employees")
+    revalidatePath("/account")
+    return { success: true, data: updated }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to update leave policy") }
   }
 }

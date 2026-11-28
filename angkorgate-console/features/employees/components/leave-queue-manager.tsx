@@ -18,14 +18,17 @@ import {
   RiCloseLine,
 } from "@remixicon/react"
 import { LeaveAttachmentPreview } from "./leave-attachment-preview"
-import type { LeaveRequest } from "../types/employees.types"
+import { Input } from "@/components/ui/input"
+import type { LeavePolicy, LeaveRequest } from "../types/employees.types"
 import {
   reviewLeaveRequestAction,
   cancelLeaveRequestAction,
+  updateLeavePolicyAction,
 } from "../server/employees-actions"
 
 interface LeaveQueueManagerProps {
   leaveRequests: LeaveRequest[]
+  leavePolicies?: LeavePolicy[]
 }
 
 function formatDateTime(value?: string | null): string {
@@ -41,15 +44,43 @@ function formatDateTime(value?: string | null): string {
   })
 }
 
-export function LeaveQueueManager({ leaveRequests }: LeaveQueueManagerProps) {
+export function LeaveQueueManager({
+  leaveRequests,
+  leavePolicies = [],
+}: LeaveQueueManagerProps) {
   const router = useRouter()
   const [statusFilter, setStatusFilter] = useState("")
+  const [routingFilter, setRoutingFilter] = useState("")
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [savingPolicy, setSavingPolicy] = useState<string | null>(null)
+  const [quotaDrafts, setQuotaDrafts] = useState<Record<string, number>>(() => {
+    const init: Record<string, number> = { ANNUAL: 18, SICK: 10, MATERNITY: 90 }
+    for (const p of leavePolicies) {
+      init[p.leaveType] = p.annualQuotaDays
+    }
+    return init
+  })
   const [error, setError] = useState<string | null>(null)
 
-  const filtered = statusFilter
-    ? leaveRequests.filter((lr) => lr.status === statusFilter)
-    : leaveRequests
+  const filtered = leaveRequests.filter((lr) => {
+    if (statusFilter && lr.status !== statusFilter) return false
+    if (routingFilter === "MANAGER" && !lr.assignedApproverId) return false
+    if (routingFilter === "HR" && lr.assignedApproverId) return false
+    return true
+  })
+
+  const handleSavePolicy = async (leaveType: "ANNUAL" | "SICK" | "MATERNITY") => {
+    setSavingPolicy(leaveType)
+    setError(null)
+    const days = Number(quotaDrafts[leaveType] ?? 0)
+    const res = await updateLeavePolicyAction(leaveType, days, true)
+    setSavingPolicy(null)
+    if (!res.success) {
+      setError(res.message || "Failed to update leave policy")
+    } else {
+      router.refresh()
+    }
+  }
 
   const handleReview = async (id: string, decision: "APPROVED" | "REJECTED") => {
     setBusyId(id)
@@ -85,17 +116,60 @@ export function LeaveQueueManager({ leaveRequests }: LeaveQueueManagerProps) {
           </p>
         </div>
 
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="h-8 rounded-md border border-input bg-background/90 dark:bg-black/25 px-2.5 text-xs font-mono text-foreground outline-none"
-        >
-          <option value="">All Statuses</option>
-          <option value="PENDING">PENDING</option>
-          <option value="APPROVED">APPROVED</option>
-          <option value="REJECTED">REJECTED</option>
-          <option value="CANCELLED">CANCELLED</option>
-        </select>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={routingFilter}
+            onChange={(e) => setRoutingFilter(e.target.value)}
+            className="h-8 rounded-md border border-input bg-background/90 dark:bg-black/25 px-2.5 text-xs font-mono text-foreground outline-none"
+          >
+            <option value="">All Routing</option>
+            <option value="MANAGER">Routed to Manager</option>
+            <option value="HR">HR / Admin Queue</option>
+          </select>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-8 rounded-md border border-input bg-background/90 dark:bg-black/25 px-2.5 text-xs font-mono text-foreground outline-none"
+          >
+            <option value="">All Statuses</option>
+            <option value="PENDING">PENDING</option>
+            <option value="APPROVED">APPROVED</option>
+            <option value="REJECTED">REJECTED</option>
+            <option value="CANCELLED">CANCELLED</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Yearly Leave Quotas Configuration */}
+      <div className="rounded-lg border border-border/50 bg-card p-3 flex flex-wrap items-center gap-4 font-mono text-xs">
+        <span className="text-muted-foreground font-semibold">Yearly Leave Quotas:</span>
+        {(["ANNUAL", "SICK", "MATERNITY"] as const).map((lt) => (
+          <div key={lt} className="flex items-center gap-1.5">
+            <span className="text-[11px]">{lt}:</span>
+            <Input
+              type="number"
+              min={0}
+              max={365}
+              value={quotaDrafts[lt] ?? 0}
+              onChange={(e) =>
+                setQuotaDrafts((prev) => ({ ...prev, [lt]: Number(e.target.value) }))
+              }
+              className="h-7 w-16 px-2 text-xs font-mono"
+            />
+            <span className="text-[11px] text-muted-foreground">d</span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={savingPolicy === lt}
+              onClick={() => handleSavePolicy(lt)}
+              className="h-7 px-2 text-[11px] font-mono"
+            >
+              {savingPolicy === lt ? "..." : "Save"}
+            </Button>
+          </div>
+        ))}
       </div>
 
       {error && (
@@ -122,6 +196,7 @@ export function LeaveQueueManager({ leaveRequests }: LeaveQueueManagerProps) {
                 <TableHead className="font-mono text-xs">Dates</TableHead>
                 <TableHead className="font-mono text-xs">Requested</TableHead>
                 <TableHead className="font-mono text-xs">Reason & File</TableHead>
+                <TableHead className="font-mono text-xs">Assigned Approver</TableHead>
                 <TableHead className="font-mono text-xs">Status</TableHead>
                 <TableHead className="font-mono text-xs">Reviewed By</TableHead>
                 <TableHead className="font-mono text-xs text-right">Actions</TableHead>
@@ -161,6 +236,22 @@ export function LeaveQueueManager({ leaveRequests }: LeaveQueueManagerProps) {
                           dataUrl={lr.attachmentDataUrl}
                         />
                       </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-[11px]">
+                    {lr.assignedApprover ? (
+                      <div>
+                        <div className="font-medium text-foreground">
+                          {lr.assignedApprover.fullName}
+                        </div>
+                        <div className="text-[10px] text-primary">
+                          {lr.assignedApprover.employeeCode}
+                        </div>
+                      </div>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                        HR / Admin
+                      </Badge>
                     )}
                   </TableCell>
                   <TableCell>

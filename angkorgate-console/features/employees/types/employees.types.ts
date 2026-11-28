@@ -81,6 +81,14 @@ export interface ScheduleOverride {
 export type LeaveType = "ANNUAL" | "SICK" | "UNPAID" | "MATERNITY" | "OTHER"
 export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED"
 
+export interface LeavePolicy {
+  id: string
+  leaveType: "ANNUAL" | "SICK" | "MATERNITY"
+  annualQuotaDays: number
+  enforceQuota: boolean
+  updatedAt?: string
+}
+
 export interface LeaveRequest {
   id: string
   employeeId: string
@@ -90,6 +98,12 @@ export interface LeaveRequest {
   endDate: string
   reason?: string | null
   status: LeaveStatus
+  assignedApproverId?: string | null
+  assignedApprover?: {
+    id: string
+    employeeCode: string
+    fullName: string
+  } | null
   reviewedById?: string | null
   reviewedBy?: {
     id: string

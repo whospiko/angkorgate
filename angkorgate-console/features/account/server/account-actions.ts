@@ -213,17 +213,19 @@ export async function getMyWorkspaceAction(): Promise<MyWorkspaceData> {
         schedules: [],
         overrides: [],
         leaveRequests: [],
+        teamApprovals: [],
         balances: null,
       }
     }
 
-    const [schedRes, leaveRes] = await Promise.all([
+    const [schedRes, leaveRes, approvalsRes] = await Promise.all([
       apiClient.get<{ schedules: EmployeeSchedule[]; overrides: ScheduleOverride[] }>(
         "/employees/me/schedules"
       ),
       apiClient.get<{ requests: LeaveRequest[]; balances: MyLeaveBalanceSummary }>(
         "/employees/me/leave-requests"
       ),
+      apiClient.get<LeaveRequest[]>("/employees/me/approvals").catch(() => []),
     ])
 
     return {
@@ -231,6 +233,7 @@ export async function getMyWorkspaceAction(): Promise<MyWorkspaceData> {
       schedules: Array.isArray(schedRes?.schedules) ? schedRes.schedules : [],
       overrides: Array.isArray(schedRes?.overrides) ? schedRes.overrides : [],
       leaveRequests: Array.isArray(leaveRes?.requests) ? leaveRes.requests : [],
+      teamApprovals: Array.isArray(approvalsRes) ? approvalsRes : [],
       balances: leaveRes?.balances ?? null,
     }
   } catch {
@@ -239,6 +242,7 @@ export async function getMyWorkspaceAction(): Promise<MyWorkspaceData> {
       schedules: [],
       overrides: [],
       leaveRequests: [],
+      teamApprovals: [],
       balances: null,
     }
   }
@@ -274,6 +278,26 @@ export async function cancelMyLeaveRequestAction(
   } catch (error) {
     const message =
       error instanceof ApiError ? error.message : "Failed to cancel leave request."
+    return { success: false, message }
+  }
+}
+
+export async function reviewMyTeamLeaveAction(
+  id: string,
+  decision: "APPROVED" | "REJECTED",
+  reviewNote?: string
+): Promise<AccountActionResult> {
+  try {
+    await apiClient.patch(`/employees/me/approvals/${encodeURIComponent(id)}/review`, {
+      decision,
+      reviewNote: reviewNote || undefined,
+    })
+    revalidatePath("/account")
+    revalidatePath("/employees")
+    return { success: true, message: `Leave request ${decision.toLowerCase()}.` }
+  } catch (error) {
+    const message =
+      error instanceof ApiError ? error.message : "Failed to review team leave request."
     return { success: false, message }
   }
 }

@@ -1,8 +1,9 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { LeaveRequestsService } from './leave-requests.service';
 import { LeaveRequest } from '../entities/leave-request.entity';
+import { LeavePolicy } from '../entities/leave-policy.entity';
 import { EmployeesService } from './employees.service';
 import { AuditService } from '../../audit/services/audit.service';
 import { createMockRepository } from '../../../test/mocks/repository.mock';
@@ -10,18 +11,26 @@ import { createMockRepository } from '../../../test/mocks/repository.mock';
 describe('LeaveRequestsService', () => {
     let service: LeaveRequestsService;
     let repo: ReturnType<typeof createMockRepository>;
+    let policyRepo: ReturnType<typeof createMockRepository>;
     let employees: { findByIdOrFail: jest.Mock };
     let audit: { log: jest.Mock };
 
     beforeEach(async () => {
         repo = createMockRepository<LeaveRequest>();
-        employees = { findByIdOrFail: jest.fn().mockResolvedValue({ id: 'e1' }) };
+        policyRepo = createMockRepository<LeavePolicy>();
+        policyRepo.find.mockResolvedValue([
+            { id: 'p1', leaveType: 'ANNUAL', annualQuotaDays: 18, enforceQuota: true },
+            { id: 'p2', leaveType: 'SICK', annualQuotaDays: 10, enforceQuota: true },
+            { id: 'p3', leaveType: 'MATERNITY', annualQuotaDays: 90, enforceQuota: true },
+        ]);
+        employees = { findByIdOrFail: jest.fn().mockResolvedValue({ id: 'e1', managerId: 'mgr-1' }) };
         audit = { log: jest.fn().mockResolvedValue(undefined) };
 
         const module = await Test.createTestingModule({
             providers: [
                 LeaveRequestsService,
                 { provide: getRepositoryToken(LeaveRequest), useValue: repo },
+                { provide: getRepositoryToken(LeavePolicy), useValue: policyRepo },
                 { provide: EmployeesService, useValue: employees },
                 { provide: AuditService, useValue: audit },
             ],
@@ -90,7 +99,12 @@ describe('LeaveRequestsService', () => {
         const qb = {
             where: jest.fn().mockReturnThis(),
             andWhere: jest.fn().mockReturnThis(),
+            leftJoin: jest.fn().mockReturnThis(),
+            addSelect: jest.fn().mockReturnThis(),
+            orderBy: jest.fn().mockReturnThis(),
+            addOrderBy: jest.fn().mockReturnThis(),
             getExists: jest.fn().mockResolvedValue(false),
+            getMany: jest.fn().mockResolvedValue([]),
         };
         repo.createQueryBuilder.mockReturnValue(qb as never);
         repo.create.mockImplementation((d) => d);
@@ -107,6 +121,49 @@ describe('LeaveRequestsService', () => {
 
         expect(res.attachmentName).toBe('medical-note.pdf');
         expect(res.attachmentMimeType).toBe('application/pdf');
+        expect(res.assignedApproverId).toBe('mgr-1');
+    });
+
+    it('rejects leave request exceeding yearly quota when enforceQuota is true', async () => {
+        const qb = {
+            where: jest.fn().mockReturnThis(),
+            andWhere: jest.fn().mockReturnThis(),
+            leftJoin: jest.fn().mockReturnThis(),
+            addSelect: jest.fn().mockReturnThis(),
+            orderBy: jest.fn().mockReturnThis(),
+            addOrderBy: jest.fn().mockReturnThis(),
+            getExists: jest.fn().mockResolvedValue(false),
+            getMany: jest.fn().mockResolvedValue([
+                {
+                    id: 'lr-used',
+                    leaveType: 'SICK',
+                    startDate: '2026-01-01',
+                    endDate: '2026-01-09',
+                    status: 'APPROVED',
+                },
+            ]),
+        };
+        repo.createQueryBuilder.mockReturnValue(qb as never);
+
+        await expect(
+            service.create('e1', {
+                leaveType: 'SICK',
+                startDate: '2026-02-01',
+                endDate: '2026-02-03', // 3 days > 1 day remaining
+            }),
+        ).rejects.toThrow(BadRequestException);
+    });
+
+    it('prevents non-assigned manager from approving in reviewForManager', async () => {
+        repo.findOne.mockResolvedValue({
+            id: 'lr1',
+            assignedApproverId: 'mgr-1',
+            status: 'PENDING',
+        } as never);
+
+        await expect(
+            service.reviewForManager('lr1', 'mgr-other', { decision: 'APPROVED' }),
+        ).rejects.toThrow(ForbiddenException);
     });
 
     it('calculates annual, sick, and maternity leave balances for the year', async () => {
