@@ -6,6 +6,7 @@ import { WorkSchedule } from '../entities/work-schedule.entity';
 import { ScheduleOverride } from '../entities/schedule-override.entity';
 import { LeaveRequest } from '../entities/leave-request.entity';
 import { AttendanceLog } from '../entities/attendance-log.entity';
+import { AttendancePolicy } from '../entities/attendance-policy.entity';
 import { EmployeesService } from './employees.service';
 import { AuditService } from '../../audit/services/audit.service';
 import { createMockRepository } from '../../../test/mocks/repository.mock';
@@ -16,6 +17,7 @@ describe('SchedulesService', () => {
     let overrideRepo: ReturnType<typeof createMockRepository>;
     let leaveRepo: ReturnType<typeof createMockRepository>;
     let attendanceRepo: ReturnType<typeof createMockRepository>;
+    let policyRepo: ReturnType<typeof createMockRepository>;
     let employees: { findByIdOrFail: jest.Mock; findAll?: jest.Mock };
     let audit: { log: jest.Mock };
 
@@ -24,6 +26,7 @@ describe('SchedulesService', () => {
         overrideRepo = createMockRepository<ScheduleOverride>();
         leaveRepo = createMockRepository<LeaveRequest>();
         attendanceRepo = createMockRepository<AttendanceLog>();
+        policyRepo = createMockRepository<AttendancePolicy>();
         employees = { findByIdOrFail: jest.fn().mockResolvedValue({ id: 'e1' }) };
         audit = { log: jest.fn().mockResolvedValue(undefined) };
 
@@ -34,6 +37,7 @@ describe('SchedulesService', () => {
                 { provide: getRepositoryToken(ScheduleOverride), useValue: overrideRepo },
                 { provide: getRepositoryToken(LeaveRequest), useValue: leaveRepo },
                 { provide: getRepositoryToken(AttendanceLog), useValue: attendanceRepo },
+                { provide: getRepositoryToken(AttendancePolicy), useValue: policyRepo },
                 { provide: EmployeesService, useValue: employees },
                 { provide: AuditService, useValue: audit },
             ],
@@ -128,5 +132,63 @@ describe('SchedulesService', () => {
 
         const res = await service.isEmployeeAvailableOnDate('e1', '2026-12-26', '10:00');
         expect(res).toEqual({ available: false, reason: 'On approved ANNUAL leave' });
+    });
+
+    it('creates a 2-session split-shift attendance policy sorted chronologically and rejects overlapping sessions', async () => {
+        policyRepo.find.mockResolvedValue([]);
+        policyRepo.create.mockImplementation((d) => d);
+        policyRepo.save.mockImplementation(async (d) => ({ id: 'pol1', ...d }));
+
+        const created = await service.createAttendancePolicy({
+            name: 'Split Shift 2x',
+            isDefault: true,
+            graceMinutes: 10,
+            sessions: [
+                { label: 'Afternoon', checkInTime: '13:00', checkOutTime: '17:00' },
+                { label: 'Morning', checkInTime: '08:00', checkOutTime: '11:00' },
+            ],
+        });
+
+        expect(created.sessions[0].label).toBe('Morning');
+        expect(created.sessions[1].label).toBe('Afternoon');
+
+        await expect(
+            service.createAttendancePolicy({
+                name: 'Bad Overlap',
+                sessions: [
+                    { label: 'S1', checkInTime: '08:00', checkOutTime: '12:00' },
+                    { label: 'S2', checkInTime: '11:30', checkOutTime: '15:00' },
+                ],
+            }),
+        ).rejects.toThrow(BadRequestException);
+    });
+
+    it('tracks sessionIndex against active multi-session policy and blocks extra check-ins beyond max sessions', async () => {
+        policyRepo.findOne.mockResolvedValue({
+            id: 'pol-split',
+            name: '2x Shift',
+            isDefault: true,
+            isActive: true,
+            graceMinutes: 10,
+            sessions: [
+                { label: 'Morning', checkInTime: '08:00', checkOutTime: '11:00' },
+                { label: 'Afternoon', checkInTime: '13:00', checkOutTime: '17:00' },
+            ],
+        } as never);
+        attendanceRepo.findOne.mockResolvedValue(null);
+        attendanceRepo.create.mockImplementation((d) => d);
+        attendanceRepo.save.mockImplementation(async (d) => ({ id: 'log1', ...d }));
+
+        attendanceRepo.count.mockResolvedValueOnce(0);
+        const first = await service.clockIn('e1', 'Morning in', 'WEB');
+        expect(first.sessionIndex).toBe(0);
+        expect(first.policyId).toBe('pol-split');
+
+        attendanceRepo.count.mockResolvedValueOnce(1);
+        const second = await service.clockIn('e1', 'Afternoon in', 'WEB');
+        expect(second.sessionIndex).toBe(1);
+
+        attendanceRepo.count.mockResolvedValueOnce(2);
+        await expect(service.clockIn('e1', 'Extra in', 'WEB')).rejects.toThrow(BadRequestException);
     });
 });

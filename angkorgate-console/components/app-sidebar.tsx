@@ -114,6 +114,10 @@ const defaultNavData = {
           url: "/employees?tab=roster",
         },
         {
+          title: "Attendance & Policies",
+          url: "/attendance",
+        },
+        {
           title: "Org Chart",
           url: "/employees?tab=org-chart",
         },

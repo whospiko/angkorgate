@@ -357,17 +357,49 @@ async function runSmokeTest() {
         const approvalsList = approvalsRes.body?.data || approvalsRes.body || [];
         assert('Leave request routes to manager /employees/me/approvals', approvalsList.some((a: any) => a.id === routedLeaveId));
 
+        const policyRes = await request(http)
+            .post('/attendance-policies')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({
+                name: 'Clinic Split Shift (2x)',
+                isDefault: true,
+                graceMinutes: 10,
+                sessions: [
+                    { label: 'Morning', checkInTime: '08:00', checkOutTime: '11:00' },
+                    { label: 'Afternoon', checkInTime: '13:00', checkOutTime: '17:00' },
+                ],
+            });
+        const createdPolicy = policyRes.body?.data || policyRes.body;
+        assert(
+            'POST /attendance-policies creates 2-session policy',
+            policyRes.status === 201 && createdPolicy?.sessions?.length === 2,
+        );
+
         const clockInRes = await request(http)
             .post('/employees/me/attendance/clock-in')
             .set('Authorization', `Bearer ${adminToken}`)
             .send({ notes: 'Morning clinic shift' });
-        assert('Self-service clock-in works', clockInRes.status === 201);
+        const clockIn1 = clockInRes.body?.data || clockInRes.body;
+        assert('Self-service clock-in works (session 1)', clockInRes.status === 201 && clockIn1?.sessionIndex === 0);
 
         const clockOutRes = await request(http)
             .post('/employees/me/attendance/clock-out')
             .set('Authorization', `Bearer ${adminToken}`)
-            .send({ notes: 'Shift complete' });
-        assert('Self-service clock-out works', clockOutRes.status === 201);
+            .send({ notes: 'Morning shift complete' });
+        assert('Self-service clock-out works (session 1)', clockOutRes.status === 201);
+
+        const clockIn2Res = await request(http)
+            .post('/employees/me/attendance/clock-in')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ notes: 'Afternoon clinic shift' });
+        const clockIn2 = clockIn2Res.body?.data || clockIn2Res.body;
+        assert('Self-service 2nd session clock-in works (session 2)', clockIn2Res.status === 201 && clockIn2?.sessionIndex === 1);
+
+        const clockOut2Res = await request(http)
+            .post('/employees/me/attendance/clock-out')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ notes: 'Afternoon shift complete' });
+        assert('Self-service 2nd session clock-out works', clockOut2Res.status === 201);
 
         const attSummaryRes = await request(http)
             .get('/employees/attendance/summary')

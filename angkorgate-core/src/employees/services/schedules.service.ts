@@ -1,13 +1,18 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { Between, IsNull, Repository } from 'typeorm';
 import { WorkSchedule } from '../entities/work-schedule.entity';
 import { ScheduleOverride } from '../entities/schedule-override.entity';
 import { LeaveRequest } from '../entities/leave-request.entity';
 import { AttendanceLog, type AttendanceSource } from '../entities/attendance-log.entity';
+import { AttendancePolicy, type AttendanceSessionRule } from '../entities/attendance-policy.entity';
 import { CreateScheduleDto } from '../dto/create-schedule.dto';
 import { UpdateScheduleDto } from '../dto/update-schedule.dto';
 import { CreateScheduleOverrideDto } from '../dto/create-schedule-override.dto';
+import {
+    CreateAttendancePolicyDto,
+    UpdateAttendancePolicyDto,
+} from '../dto/attendance-policy.dto';
 import { EmployeesService } from './employees.service';
 import { AuditService } from '../../audit/services/audit.service';
 import { buildCsv } from '../../common/utils/csv.util';
@@ -28,6 +33,9 @@ export class SchedulesService {
         @Optional()
         @InjectRepository(AttendanceLog)
         private readonly attendanceRepo?: Repository<AttendanceLog>,
+        @Optional()
+        @InjectRepository(AttendancePolicy)
+        private readonly policyRepo?: Repository<AttendancePolicy>,
     ) { }
 
     async create(dto: CreateScheduleDto, actorId?: string): Promise<WorkSchedule> {
@@ -347,7 +355,7 @@ export class SchedulesService {
         if (!this.attendanceRepo) {
             throw new BadRequestException('Attendance repository is not configured');
         }
-        await this.employees.findByIdOrFail(employeeId);
+        const employee = await this.employees.findByIdOrFail(employeeId);
 
         const open = await this.attendanceRepo.findOne({
             where: { employeeId, clockOutAt: IsNull() },
@@ -358,25 +366,53 @@ export class SchedulesService {
 
         const now = new Date();
         const todayStr = now.toISOString().slice(0, 10);
+        const dayStart = new Date(`${todayStr}T00:00:00.000Z`);
+        const dayEnd = new Date(`${todayStr}T23:59:59.999Z`);
+        const todayCount =
+            (await this.attendanceRepo.count({
+                where: { employeeId, clockInAt: Between(dayStart, dayEnd) },
+            })) ?? 0;
+
         const dayOfWeek = now.getUTCDay();
         const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
 
         let expectedStartMinutes: number | null = null;
-        if (this.overrideRepo) {
-            const ov = await this.overrideRepo.findOne({ where: { employeeId, date: todayStr } });
-            if (ov?.isAvailable && ov.startTime) {
-                const [h, m] = ov.startTime.split(':').map(Number);
-                expectedStartMinutes = h * 60 + m;
+        let graceMinutes = 5;
+        let sessionIndex: number | null = todayCount;
+        let policyId: string | null = null;
+
+        const policy = await this.resolveAttendancePolicyForEmployee(employee);
+        if (policy && Array.isArray(policy.sessions) && policy.sessions.length > 0) {
+            const sortedSessions = [...policy.sessions].sort((a, b) =>
+                a.checkInTime.localeCompare(b.checkInTime),
+            );
+            if (todayCount >= sortedSessions.length) {
+                throw new BadRequestException(
+                    `All ${sortedSessions.length} configured check-in session(s) for today are already recorded`,
+                );
             }
-        }
-        if (expectedStartMinutes === null) {
-            const sched = await this.repo.findOne({
-                where: { employeeId, dayOfWeek, isActive: true },
-                order: { startTime: 'ASC' },
-            });
-            if (sched?.startTime) {
-                const [h, m] = sched.startTime.split(':').map(Number);
-                expectedStartMinutes = h * 60 + m;
+            const targetSession = sortedSessions[todayCount];
+            const [h, m] = targetSession.checkInTime.split(':').map(Number);
+            expectedStartMinutes = h * 60 + m;
+            graceMinutes = policy.graceMinutes ?? 5;
+            policyId = policy.id;
+        } else {
+            if (this.overrideRepo) {
+                const ov = await this.overrideRepo.findOne({ where: { employeeId, date: todayStr } });
+                if (ov?.isAvailable && ov.startTime) {
+                    const [h, m] = ov.startTime.split(':').map(Number);
+                    expectedStartMinutes = h * 60 + m;
+                }
+            }
+            if (expectedStartMinutes === null) {
+                const sched = await this.repo.findOne({
+                    where: { employeeId, dayOfWeek, isActive: true },
+                    order: { startTime: 'ASC' },
+                });
+                if (sched?.startTime) {
+                    const [h, m] = sched.startTime.split(':').map(Number);
+                    expectedStartMinutes = h * 60 + m;
+                }
             }
         }
 
@@ -384,7 +420,7 @@ export class SchedulesService {
             expectedStartMinutes !== null && nowMinutes > expectedStartMinutes
                 ? nowMinutes - expectedStartMinutes
                 : 0;
-        const status = lateMinutes > 5 ? 'LATE' : 'ON_TIME';
+        const status = lateMinutes > graceMinutes ? 'LATE' : 'ON_TIME';
 
         const saved = await this.attendanceRepo.save(
             this.attendanceRepo.create({
@@ -395,6 +431,8 @@ export class SchedulesService {
                 status,
                 lateMinutes,
                 workedMinutes: null,
+                sessionIndex,
+                policyId,
                 notes: notes ?? null,
             }),
         );
@@ -404,7 +442,7 @@ export class SchedulesService {
             action: 'employee.attendance.clock_in',
             entity: 'attendance_log',
             entityId: saved.id,
-            newValue: { employeeId, source, clockInAt: saved.clockInAt },
+            newValue: { employeeId, source, sessionIndex, policyId, clockInAt: saved.clockInAt },
         });
 
         return saved;
@@ -669,5 +707,183 @@ export class SchedulesService {
         });
 
         return { startDate, endDate, dates, employees };
+    }
+
+    // ─── Dynamic Attendance Policies ───────────────────────────────────────────
+
+    async listAttendancePolicies(): Promise<AttendancePolicy[]> {
+        if (!this.policyRepo) {
+            return [];
+        }
+        return this.policyRepo.find({
+            order: { isDefault: 'DESC', createdAt: 'ASC' },
+        });
+    }
+
+    async createAttendancePolicy(
+        dto: CreateAttendancePolicyDto,
+        actorId?: string,
+    ): Promise<AttendancePolicy> {
+        if (!this.policyRepo) {
+            throw new BadRequestException('Attendance policy repository is not configured');
+        }
+        const sessions = this.validateAndSortSessions(dto.sessions);
+        if (dto.isDefault && dto.isActive !== false) {
+            await this.clearDefaultPolicies();
+        }
+        const saved = await this.policyRepo.save(
+            this.policyRepo.create({
+                name: dto.name.trim(),
+                departmentId: dto.departmentId ?? null,
+                isDefault: dto.isDefault ?? false,
+                graceMinutes: dto.graceMinutes ?? 5,
+                earlyLeaveGraceMinutes: dto.earlyLeaveGraceMinutes ?? 5,
+                sessions,
+                isActive: dto.isActive ?? true,
+            }),
+        );
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'employee.attendance_policy.create',
+            entity: 'attendance_policy',
+            entityId: saved.id,
+            newValue: { ...saved } as unknown as Record<string, unknown>,
+        });
+        return saved;
+    }
+
+    async updateAttendancePolicy(
+        id: string,
+        dto: UpdateAttendancePolicyDto,
+        actorId?: string,
+    ): Promise<AttendancePolicy> {
+        if (!this.policyRepo) {
+            throw new BadRequestException('Attendance policy repository is not configured');
+        }
+        const existing = await this.policyRepo.findOne({ where: { id } });
+        if (!existing) {
+            throw new NotFoundException(`Attendance policy "${id}" not found`);
+        }
+
+        const nextSessions = dto.sessions
+            ? this.validateAndSortSessions(dto.sessions)
+            : existing.sessions;
+        const nextActive = dto.isActive ?? existing.isActive;
+        const nextDefault = dto.isDefault ?? existing.isDefault;
+
+        if (nextDefault && nextActive) {
+            await this.clearDefaultPolicies(id);
+        }
+
+        const saved = await this.policyRepo.save({
+            ...existing,
+            name: dto.name !== undefined ? dto.name.trim() : existing.name,
+            departmentId:
+                dto.departmentId !== undefined ? dto.departmentId : existing.departmentId,
+            isDefault: nextDefault,
+            graceMinutes: dto.graceMinutes ?? existing.graceMinutes,
+            earlyLeaveGraceMinutes:
+                dto.earlyLeaveGraceMinutes ?? existing.earlyLeaveGraceMinutes,
+            sessions: nextSessions,
+            isActive: nextActive,
+        });
+
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'employee.attendance_policy.update',
+            entity: 'attendance_policy',
+            entityId: saved.id,
+            oldValue: { ...existing } as unknown as Record<string, unknown>,
+            newValue: { ...saved } as unknown as Record<string, unknown>,
+        });
+        return saved;
+    }
+
+    async deleteAttendancePolicy(id: string, actorId?: string): Promise<{ deleted: true }> {
+        if (!this.policyRepo) {
+            throw new BadRequestException('Attendance policy repository is not configured');
+        }
+        const existing = await this.policyRepo.findOne({ where: { id } });
+        if (!existing) {
+            throw new NotFoundException(`Attendance policy "${id}" not found`);
+        }
+        await this.policyRepo.delete(id);
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'employee.attendance_policy.delete',
+            entity: 'attendance_policy',
+            entityId: id,
+            oldValue: { ...existing } as unknown as Record<string, unknown>,
+        });
+        return { deleted: true };
+    }
+
+    async resolveAttendancePolicyForEmployee(employee: {
+        primaryDepartmentId?: string | null;
+        positions?: Array<{ isPrimary?: boolean; departmentId?: string | null }>;
+    }): Promise<AttendancePolicy | null> {
+        if (!this.policyRepo) {
+            return null;
+        }
+        const deptId =
+            employee.primaryDepartmentId ??
+            employee.positions?.find((p) => p.isPrimary)?.departmentId ??
+            null;
+
+        if (deptId) {
+            const deptPolicy = await this.policyRepo.findOne({
+                where: { departmentId: deptId, isActive: true },
+                order: { updatedAt: 'DESC' },
+            });
+            if (deptPolicy) {
+                return deptPolicy;
+            }
+        }
+
+        const defaultPolicy = await this.policyRepo.findOne({
+            where: { isDefault: true, isActive: true },
+            order: { updatedAt: 'DESC' },
+        });
+        return defaultPolicy ?? null;
+    }
+
+    private validateAndSortSessions(
+        sessions: AttendanceSessionRule[],
+    ): AttendanceSessionRule[] {
+        if (!Array.isArray(sessions) || sessions.length === 0) {
+            throw new BadRequestException('At least one check-in/check-out session is required');
+        }
+        const sorted = [...sessions]
+            .map((s, idx) => ({
+                label: (s.label || `Session ${idx + 1}`).trim(),
+                checkInTime: s.checkInTime,
+                checkOutTime: s.checkOutTime,
+            }))
+            .sort((a, b) => a.checkInTime.localeCompare(b.checkInTime));
+
+        for (let i = 0; i < sorted.length; i++) {
+            const cur = sorted[i];
+            if (cur.checkInTime >= cur.checkOutTime) {
+                throw new BadRequestException(
+                    `Session "${cur.label}": checkInTime (${cur.checkInTime}) must be earlier than checkOutTime (${cur.checkOutTime})`,
+                );
+            }
+            if (i > 0 && cur.checkInTime < sorted[i - 1].checkOutTime) {
+                throw new BadRequestException(
+                    `Session "${cur.label}" (${cur.checkInTime}-${cur.checkOutTime}) overlaps with "${sorted[i - 1].label}" (${sorted[i - 1].checkInTime}-${sorted[i - 1].checkOutTime})`,
+                );
+            }
+        }
+        return sorted;
+    }
+
+    private async clearDefaultPolicies(exceptId?: string): Promise<void> {
+        if (!this.policyRepo) return;
+        const defaults = await this.policyRepo.find({ where: { isDefault: true } });
+        for (const p of defaults) {
+            if (p.id !== exceptId) {
+                await this.policyRepo.update(p.id, { isDefault: false });
+            }
+        }
     }
 }

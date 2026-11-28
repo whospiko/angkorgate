@@ -18,7 +18,10 @@ import type {
   LeavePolicy,
   LeaveType,
   AttendanceLog,
+  AttendancePolicy,
   AttendanceSummary,
+  CreateAttendancePolicyInput,
+  UpdateAttendancePolicyInput,
   TeamRosterData,
   EmployeeBulkImportResult,
   CreateDepartmentInput,
@@ -831,6 +834,7 @@ export async function clockInEmployeeAction(
       source: "WEB",
     })
     revalidatePath("/employees")
+    revalidatePath("/attendance")
     return { success: true }
   } catch (error: unknown) {
     return { success: false, message: getErrorMessage(error, "Failed to clock in") }
@@ -846,9 +850,59 @@ export async function clockOutEmployeeAction(
       notes: notes || undefined,
     })
     revalidatePath("/employees")
+    revalidatePath("/attendance")
     return { success: true }
   } catch (error: unknown) {
     return { success: false, message: getErrorMessage(error, "Failed to clock out") }
+  }
+}
+
+export async function getAttendancePoliciesAction(): Promise<AttendancePolicy[]> {
+  try {
+    const res = await apiClient.get<AttendancePolicy[]>("/attendance-policies")
+    return Array.isArray(res) ? res : []
+  } catch {
+    return []
+  }
+}
+
+export async function createAttendancePolicyAction(
+  input: CreateAttendancePolicyInput
+): Promise<{ success: boolean; data?: AttendancePolicy; message?: string }> {
+  try {
+    const data = await apiClient.post<AttendancePolicy>("/attendance-policies", input)
+    revalidatePath("/attendance")
+    return { success: true, data }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to create attendance policy") }
+  }
+}
+
+export async function updateAttendancePolicyAction(
+  id: string,
+  input: UpdateAttendancePolicyInput
+): Promise<{ success: boolean; data?: AttendancePolicy; message?: string }> {
+  try {
+    const data = await apiClient.patch<AttendancePolicy>(
+      `/attendance-policies/${encodeURIComponent(id)}`,
+      input
+    )
+    revalidatePath("/attendance")
+    return { success: true, data }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to update attendance policy") }
+  }
+}
+
+export async function deleteAttendancePolicyAction(
+  id: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    await apiClient.delete(`/attendance-policies/${encodeURIComponent(id)}`)
+    revalidatePath("/attendance")
+    return { success: true }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to delete attendance policy") }
   }
 }
 

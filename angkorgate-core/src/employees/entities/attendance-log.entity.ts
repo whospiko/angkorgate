@@ -45,6 +45,12 @@ export class AttendanceLog {
     @Column({ name: 'worked_minutes', type: 'int', nullable: true })
     workedMinutes: number | null;
 
+    @Column({ name: 'session_index', type: 'int', nullable: true })
+    sessionIndex: number | null;
+
+    @Column({ name: 'policy_id', type: 'uuid', nullable: true })
+    policyId: string | null;
+
     @Column({ type: 'text', nullable: true })
     notes: string | null;
 

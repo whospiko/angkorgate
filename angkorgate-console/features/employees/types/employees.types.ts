@@ -104,8 +104,41 @@ export interface AttendanceLog {
   status?: "ON_TIME" | "LATE"
   lateMinutes?: number
   workedMinutes?: number | null
+  sessionIndex?: number | null
+  policyId?: string | null
   notes?: string | null
 }
+
+export interface AttendanceSessionRule {
+  label: string
+  checkInTime: string
+  checkOutTime: string
+}
+
+export interface AttendancePolicy {
+  id: string
+  name: string
+  departmentId?: string | null
+  isDefault: boolean
+  graceMinutes: number
+  earlyLeaveGraceMinutes: number
+  sessions: AttendanceSessionRule[]
+  isActive: boolean
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface CreateAttendancePolicyInput {
+  name: string
+  departmentId?: string | null
+  isDefault?: boolean
+  graceMinutes?: number
+  earlyLeaveGraceMinutes?: number
+  sessions: AttendanceSessionRule[]
+  isActive?: boolean
+}
+
+export type UpdateAttendancePolicyInput = Partial<CreateAttendancePolicyInput>
 
 export interface AttendanceSummary {
   startDate: string
