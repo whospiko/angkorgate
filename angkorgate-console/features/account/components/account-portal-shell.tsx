@@ -19,6 +19,7 @@ import {
   RiUserLine,
   RiShieldKeyholeLine,
   RiMacbookLine,
+  RiBriefcase4Line,
   RiArrowLeftLine,
   RiLogoutBoxLine,
   RiSunLine,
@@ -27,14 +28,16 @@ import {
   RiExternalLinkLine,
 } from "@remixicon/react"
 import { BrandLogo } from "@/features/system"
-import type { UserProfile } from "../types/account.types"
+import type { MyWorkspaceData, UserProfile } from "../types/account.types"
 import { AccountProfileTab } from "./account-profile-tab"
 import { AccountSecurityTab } from "./account-security-tab"
 import { AccountSessionsTab } from "./account-sessions-tab"
+import { AccountWorkspaceTab } from "./account-workspace-tab"
 import { logoutAction } from "@/features/auth"
 
 interface AccountPortalShellProps {
   initialProfile: UserProfile
+  initialWorkspace?: MyWorkspaceData
   appName?: string
   logoUrl?: string
   canAccessDashboard?: boolean
@@ -42,6 +45,7 @@ interface AccountPortalShellProps {
 
 export function AccountPortalShell({
   initialProfile,
+  initialWorkspace,
   appName = "AngkorGate Identity",
   logoUrl,
   canAccessDashboard = false,
@@ -195,7 +199,11 @@ export function AccountPortalShell({
 
         {/* Tabbed Portal Navigation */}
         <Tabs defaultValue="profile" className="w-full space-y-6">
-          <TabsList className="grid grid-cols-3 w-full max-w-md bg-muted/60 p-1 border border-border rounded-lg">
+          <TabsList
+            className={`grid w-full bg-muted/60 p-1 border border-border rounded-lg ${
+              initialWorkspace?.employee ? "grid-cols-4 max-w-xl" : "grid-cols-3 max-w-md"
+            }`}
+          >
             <TabsTrigger
               value="profile"
               className="gap-2 text-xs sm:text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-foreground"
@@ -217,6 +225,15 @@ export function AccountPortalShell({
               <RiMacbookLine className="h-4 w-4" />
               Sessions
             </TabsTrigger>
+            {initialWorkspace?.employee && (
+              <TabsTrigger
+                value="workspace"
+                className="gap-2 text-xs sm:text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-foreground"
+              >
+                <RiBriefcase4Line className="h-4 w-4" />
+                My Workspace
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Profile Tab */}
@@ -236,6 +253,13 @@ export function AccountPortalShell({
           <TabsContent value="sessions" className="outline-none focus:outline-none">
             <AccountSessionsTab />
           </TabsContent>
+
+          {/* Employee Self-Service Workspace Tab */}
+          {initialWorkspace?.employee && (
+            <TabsContent value="workspace" className="outline-none focus:outline-none">
+              <AccountWorkspaceTab initialData={initialWorkspace} />
+            </TabsContent>
+          )}
         </Tabs>
       </main>
     </div>

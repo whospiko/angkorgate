@@ -295,6 +295,23 @@ async function runSmokeTest() {
         const approvedLeave = leaveItems.find((l: any) => l.id === leaveId);
         assert('Leave queue returns attachment and reviewer email', Boolean(approvedLeave?.attachmentName === 'ticket.pdf' && approvedLeave?.reviewedBy?.email));
 
+        const unlinkedMeRes = await request(http)
+            .get('/employees/me')
+            .set('Authorization', `Bearer ${custToken}`);
+        assert('Unlinked user /employees/me returns 200', unlinkedMeRes.status === 200);
+
+        const meUserId = (await request(http)
+            .get('/auth/me')
+            .set('Authorization', `Bearer ${adminToken}`)).body?.data?.id;
+        await request(http)
+            .patch(`/employees/${empId}/user`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ userId: meUserId });
+        const selfLeaveRes = await request(http)
+            .get('/employees/me/leave-requests')
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert('Linked employee /employees/me/leave-requests returns balances', selfLeaveRes.status === 200 && Array.isArray(selfLeaveRes.body?.data?.balances?.items || selfLeaveRes.body?.balances?.items));
+
         // ══════════════════════════════════════════════════════════════════
         logSection('6. MFA (TOTP) Setup & Login Flow');
         // ══════════════════════════════════════════════════════════════════

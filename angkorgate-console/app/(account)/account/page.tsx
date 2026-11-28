@@ -1,18 +1,20 @@
 import { redirect } from "next/navigation"
-import { getMyProfile } from "@/features/account"
+import { getMyProfile, getMyWorkspaceAction } from "@/features/account"
 import { getBranding } from "@/features/system"
 import { AccountPortalShell } from "@/features/account/components/account-portal-shell"
 
 export const dynamic = "force-dynamic"
 
 export default async function AccountPage() {
-  const profile = await getMyProfile()
+  const [profile, workspace, branding] = await Promise.all([
+    getMyProfile(),
+    getMyWorkspaceAction(),
+    getBranding(),
+  ])
 
   if (!profile) {
     redirect("/auth/sso?redirect=/account")
   }
-
-  const branding = await getBranding()
   const allowedRoles =
     branding?.allowedDashboardRoles && branding.allowedDashboardRoles.length > 0
       ? branding.allowedDashboardRoles
@@ -26,6 +28,7 @@ export default async function AccountPage() {
   return (
     <AccountPortalShell
       initialProfile={profile}
+      initialWorkspace={workspace}
       appName={branding?.appName || "AngkorGate Identity"}
       logoUrl={branding?.logoUrl ?? undefined}
       canAccessDashboard={canAccessDashboard}

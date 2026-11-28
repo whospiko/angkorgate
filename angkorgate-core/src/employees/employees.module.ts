@@ -15,6 +15,7 @@ import { ApiKeysModule } from "../api-keys/api-keys.module";
 import { CustomersModule } from "../customers/customers.module";
 import { DepartmentsController } from "./controllers/departments.controller";
 import { JobTitlesController } from "./controllers/job-titles.controller";
+import { EmployeeSelfServiceController } from "./controllers/employee-self-service.controller";
 import { EmployeesController } from "./controllers/employees.controller";
 import { PositionsController } from "./controllers/positions.controller";
 import { SchedulesController } from "./controllers/schedules.controller";
@@ -47,6 +48,7 @@ import { LeaveRequestsService } from "./services/leave-requests.service";
     controllers: [
         DepartmentsController,
         JobTitlesController,
+        EmployeeSelfServiceController,
         EmployeesController,
         PositionsController,
         SchedulesController,

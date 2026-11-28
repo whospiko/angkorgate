@@ -174,4 +174,69 @@ export class LeaveRequestsService {
 
         return saved;
     }
+
+    async cancelForEmployee(
+        id: string,
+        employeeId: string,
+        actorId?: string,
+    ): Promise<LeaveRequest> {
+        const leave = await this.repo.findOne({ where: { id, employeeId } });
+        if (!leave) {
+            throw new NotFoundException(`Leave request ${id} not found for this employee`);
+        }
+        return this.cancel(id, actorId);
+    }
+
+    async getBalanceSummary(
+        employeeId: string,
+        year: number = new Date().getUTCFullYear(),
+    ): Promise<{
+        year: number;
+        items: {
+            leaveType: 'ANNUAL' | 'SICK' | 'MATERNITY';
+            allowanceDays: number;
+            usedDays: number;
+            pendingDays: number;
+            remainingDays: number;
+        }[];
+    }> {
+        const allowances: { leaveType: 'ANNUAL' | 'SICK' | 'MATERNITY'; allowanceDays: number }[] = [
+            { leaveType: 'ANNUAL', allowanceDays: 18 },
+            { leaveType: 'SICK', allowanceDays: 10 },
+            { leaveType: 'MATERNITY', allowanceDays: 90 },
+        ];
+
+        const yearStart = `${year}-01-01`;
+        const yearEnd = `${year}-12-31`;
+        const requests = await this.findByEmployee(employeeId);
+
+        const countDaysInYear = (start: string, end: string): number => {
+            const clampedStart = start < yearStart ? yearStart : start;
+            const clampedEnd = end > yearEnd ? yearEnd : end;
+            if (clampedStart > clampedEnd) return 0;
+            const s = new Date(`${clampedStart}T00:00:00Z`).getTime();
+            const e = new Date(`${clampedEnd}T00:00:00Z`).getTime();
+            return Math.floor((e - s) / 86_400_000) + 1;
+        };
+
+        const items = allowances.map(({ leaveType, allowanceDays }) => {
+            let usedDays = 0;
+            let pendingDays = 0;
+            for (const req of requests) {
+                if (req.leaveType !== leaveType) continue;
+                const days = countDaysInYear(req.startDate, req.endDate);
+                if (req.status === 'APPROVED') usedDays += days;
+                else if (req.status === 'PENDING') pendingDays += days;
+            }
+            return {
+                leaveType,
+                allowanceDays,
+                usedDays,
+                pendingDays,
+                remainingDays: Math.max(0, allowanceDays - usedDays),
+            };
+        });
+
+        return { year, items };
+    }
 }

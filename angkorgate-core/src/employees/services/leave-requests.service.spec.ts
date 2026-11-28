@@ -108,4 +108,45 @@ describe('LeaveRequestsService', () => {
         expect(res.attachmentName).toBe('medical-note.pdf');
         expect(res.attachmentMimeType).toBe('application/pdf');
     });
+
+    it('calculates annual, sick, and maternity leave balances for the year', async () => {
+        const qb = {
+            leftJoin: jest.fn().mockReturnThis(),
+            addSelect: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            orderBy: jest.fn().mockReturnThis(),
+            addOrderBy: jest.fn().mockReturnThis(),
+            getMany: jest.fn().mockResolvedValue([
+                {
+                    id: 'lr1',
+                    leaveType: 'ANNUAL',
+                    startDate: '2026-12-10',
+                    endDate: '2026-12-12',
+                    status: 'APPROVED',
+                },
+                {
+                    id: 'lr2',
+                    leaveType: 'ANNUAL',
+                    startDate: '2026-12-20',
+                    endDate: '2026-12-21',
+                    status: 'PENDING',
+                },
+            ]),
+        };
+        repo.createQueryBuilder.mockReturnValue(qb as never);
+
+        const summary = await service.getBalanceSummary('e1', 2026);
+        const annual = summary.items.find((i) => i.leaveType === 'ANNUAL')!;
+        expect(annual.allowanceDays).toBe(18);
+        expect(annual.usedDays).toBe(3);
+        expect(annual.pendingDays).toBe(2);
+        expect(annual.remainingDays).toBe(15);
+    });
+
+    it('prevents cancelling another employee leave request in cancelForEmployee', async () => {
+        repo.findOne.mockResolvedValue(null);
+        await expect(
+            service.cancelForEmployee('lr1', 'other-emp', 'u-other'),
+        ).rejects.toThrow(NotFoundException);
+    });
 });

@@ -8,7 +8,16 @@ import type {
   UpdateProfileInput,
   AccountSession,
   AccountActionResult,
+  MyWorkspaceData,
+  MyLeaveBalanceSummary,
+  SubmitMyLeaveInput,
 } from "../types/account.types"
+import type {
+  Employee,
+  EmployeeSchedule,
+  LeaveRequest,
+  ScheduleOverride,
+} from "@/features/employees"
 
 /**
  * Fetch authenticated user's self profile
@@ -191,6 +200,80 @@ export async function logoutAllSessionsAction(): Promise<AccountActionResult> {
       error instanceof ApiError
         ? error.message
         : "Failed to log out of all sessions."
+    return { success: false, message }
+  }
+}
+
+export async function getMyWorkspaceAction(): Promise<MyWorkspaceData> {
+  try {
+    const employee = await apiClient.get<Employee | null>("/employees/me")
+    if (!employee) {
+      return {
+        employee: null,
+        schedules: [],
+        overrides: [],
+        leaveRequests: [],
+        balances: null,
+      }
+    }
+
+    const [schedRes, leaveRes] = await Promise.all([
+      apiClient.get<{ schedules: EmployeeSchedule[]; overrides: ScheduleOverride[] }>(
+        "/employees/me/schedules"
+      ),
+      apiClient.get<{ requests: LeaveRequest[]; balances: MyLeaveBalanceSummary }>(
+        "/employees/me/leave-requests"
+      ),
+    ])
+
+    return {
+      employee,
+      schedules: Array.isArray(schedRes?.schedules) ? schedRes.schedules : [],
+      overrides: Array.isArray(schedRes?.overrides) ? schedRes.overrides : [],
+      leaveRequests: Array.isArray(leaveRes?.requests) ? leaveRes.requests : [],
+      balances: leaveRes?.balances ?? null,
+    }
+  } catch {
+    return {
+      employee: null,
+      schedules: [],
+      overrides: [],
+      leaveRequests: [],
+      balances: null,
+    }
+  }
+}
+
+export async function submitMyLeaveRequestAction(
+  input: SubmitMyLeaveInput
+): Promise<AccountActionResult<LeaveRequest>> {
+  try {
+    const created = await apiClient.post<LeaveRequest>("/employees/me/leave-requests", input)
+    revalidatePath("/account")
+    revalidatePath("/employees")
+    return {
+      success: true,
+      message: "Leave request submitted successfully.",
+      data: created,
+    }
+  } catch (error) {
+    const message =
+      error instanceof ApiError ? error.message : "Failed to submit leave request."
+    return { success: false, message }
+  }
+}
+
+export async function cancelMyLeaveRequestAction(
+  id: string
+): Promise<AccountActionResult> {
+  try {
+    await apiClient.patch(`/employees/me/leave-requests/${encodeURIComponent(id)}/cancel`, {})
+    revalidatePath("/account")
+    revalidatePath("/employees")
+    return { success: true, message: "Leave request cancelled." }
+  } catch (error) {
+    const message =
+      error instanceof ApiError ? error.message : "Failed to cancel leave request."
     return { success: false, message }
   }
 }
