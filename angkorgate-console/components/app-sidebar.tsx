@@ -129,6 +129,10 @@ const defaultNavData = {
           title: "Departments & Roles",
           url: "/employees?tab=departments",
         },
+        {
+          title: "Job Titles",
+          url: "/employees?tab=job-titles",
+        },
       ],
     },
     {
