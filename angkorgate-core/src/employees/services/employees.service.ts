@@ -147,7 +147,8 @@ export class EmployeesService {
             .createQueryBuilder('e')
             .leftJoinAndSelect('e.positions', 'pos')
             .leftJoinAndSelect('pos.jobTitle', 'jt')
-            .leftJoinAndSelect('pos.department', 'd');
+            .leftJoinAndSelect('pos.department', 'd')
+            .leftJoinAndSelect('e.schedules', 'sched');
 
         if (params.status) {
             qb.andWhere('e.employmentStatus = :status', {
@@ -438,6 +439,75 @@ export class EmployeesService {
             contentType: 'text/csv',
             total: data.length,
             csv: buildCsv(headers, rows),
+        };
+    }
+
+    /** Bulk-imports employee rows with optional duplicate detection by employeeCode or phone. */
+    async importBulk(
+        rows: CreateEmployeeDto[],
+        skipDuplicates = true,
+        actorId?: string,
+    ): Promise<{
+        createdCount: number;
+        skippedCount: number;
+        errorCount: number;
+        createdCodes: string[];
+        skipped: { rowIndex: number; fullName: string; reason: string; existingCode: string }[];
+        errors: { rowIndex: number; fullName: string; message: string }[];
+    }> {
+        const createdCodes: string[] = [];
+        const skipped: {
+            rowIndex: number;
+            fullName: string;
+            reason: string;
+            existingCode: string;
+        }[] = [];
+        const errors: { rowIndex: number; fullName: string; message: string }[] = [];
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            if (skipDuplicates) {
+                let existing: Employee | null = null;
+                if (row.employeeCode?.trim()) {
+                    existing = await this.repo.findOne({
+                        where: { employeeCode: row.employeeCode.trim() },
+                    });
+                }
+                if (!existing && row.phone?.trim()) {
+                    existing = await this.repo.findOne({
+                        where: { phone: row.phone.trim() },
+                    });
+                }
+                if (existing) {
+                    skipped.push({
+                        rowIndex: i,
+                        fullName: row.fullName,
+                        reason: 'Duplicate employeeCode or phone',
+                        existingCode: existing.employeeCode,
+                    });
+                    continue;
+                }
+            }
+
+            try {
+                const created = await this.create(row, actorId);
+                createdCodes.push(created.employeeCode);
+            } catch (err) {
+                errors.push({
+                    rowIndex: i,
+                    fullName: row.fullName,
+                    message: err instanceof Error ? err.message : 'Failed to import row',
+                });
+            }
+        }
+
+        return {
+            createdCount: createdCodes.length,
+            skippedCount: skipped.length,
+            errorCount: errors.length,
+            createdCodes,
+            skipped,
+            errors,
         };
     }
 

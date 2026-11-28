@@ -31,6 +31,7 @@ import { CreateEmployeeDto } from '../dto/create-employee.dto';
 import { UpdateEmployeeDto } from '../dto/update-employee.dto';
 import { EmployeeResponseDto } from '../dto/employee-response.dto';
 import { LinkEmployeeUserDto } from '../dto/link-employee-user.dto';
+import { BulkImportEmployeesDto } from '../dto/bulk-import-employees.dto';
 
 @ApiTags('Employees')
 @ApiBearerAuth('bearerAuth')
@@ -103,6 +104,16 @@ export class EmployeesController {
         @Query('employmentType') employmentType?: string,
     ) {
         return this.employees.exportCsv({ search, status, departmentId, employmentType });
+    }
+
+    @Post('import')
+    @Permissions('employee:write')
+    @ApiOperation({ summary: 'Bulk import employees with optional duplicate skipping' })
+    importBulk(
+        @Body() dto: BulkImportEmployeesDto,
+        @CurrentUser('id') actorId?: string,
+    ) {
+        return this.employees.importBulk(dto.rows, dto.skipDuplicates ?? true, actorId);
     }
 
     @Get('by-user/:userId')

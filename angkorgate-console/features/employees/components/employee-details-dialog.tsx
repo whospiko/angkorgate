@@ -478,6 +478,45 @@ export function EmployeeDetailsDialog({
         )}
 
         <div className="space-y-5 py-2 font-mono text-xs">
+          {/* Onboarding Checklist */}
+          {(() => {
+            const hasUser = Boolean(linkedUserId)
+            const hasPrimaryPos = positions.some((p) => p.isPrimary) || positions.length > 0
+            const hasSchedule = schedules.some((s) => s.isActive)
+            const doneCount = [hasUser, hasPrimaryPos, hasSchedule].filter(Boolean).length
+            return (
+              <div className="rounded-lg border border-border/50 bg-muted/20 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-heading text-xs font-semibold">Onboarding Checklist</span>
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] ${
+                      doneCount === 3
+                        ? "border-emerald-500/40 text-emerald-500"
+                        : "border-amber-500/40 text-amber-500"
+                    }`}
+                  >
+                    {doneCount}/3 {doneCount === 3 ? "Ready" : "Incomplete"}
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                  <div className={`flex items-center gap-1.5 ${hasUser ? "text-emerald-500" : "text-muted-foreground"}`}>
+                    {hasUser ? <RiCheckLine className="size-3.5 shrink-0" /> : <span className="size-3.5 inline-flex items-center justify-center">○</span>}
+                    <span>User Account Linked</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${hasPrimaryPos ? "text-emerald-500" : "text-muted-foreground"}`}>
+                    {hasPrimaryPos ? <RiCheckLine className="size-3.5 shrink-0" /> : <span className="size-3.5 inline-flex items-center justify-center">○</span>}
+                    <span>Primary Position</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${hasSchedule ? "text-emerald-500" : "text-muted-foreground"}`}>
+                    {hasSchedule ? <RiCheckLine className="size-3.5 shrink-0" /> : <span className="size-3.5 inline-flex items-center justify-center">○</span>}
+                    <span>Work Schedule</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Status & User Link Bar */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-muted/20">

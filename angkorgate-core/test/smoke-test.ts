@@ -375,6 +375,18 @@ async function runSmokeTest() {
         const rosterBody = rosterRes.body?.data || rosterRes.body;
         assert('GET /employees/roster returns 7-day team calendar', rosterRes.status === 200 && rosterBody?.dates?.length === 7);
 
+        const bulkEmpRes = await request(http)
+            .post('/employees/import')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({
+                skipDuplicates: true,
+                rows: [
+                    { fullName: 'Bulk Nurse One', employmentType: 'FULL_TIME', phone: '+85512999001' },
+                ],
+            });
+        const bulkEmpBody = bulkEmpRes.body?.data || bulkEmpRes.body;
+        assert('POST /employees/import creates bulk employees', bulkEmpRes.status === 201 && bulkEmpBody?.createdCount === 1);
+
         const whCreateRes = await request(http)
             .post('/webhooks')
             .set('Authorization', `Bearer ${adminToken}`)

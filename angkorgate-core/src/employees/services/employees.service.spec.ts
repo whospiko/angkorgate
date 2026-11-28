@@ -206,4 +206,27 @@ describe('EmployeesService', () => {
         expect(exported.csv).toContain('EMP-0001');
         expect(exported.csv).toContain('Cardiology');
     });
+
+    it('skips duplicates during employee bulk import when skipDuplicates is true', async () => {
+        repo.findOne.mockResolvedValue({
+            id: 'e1',
+            employeeCode: 'EMP-0001',
+            phone: '+85512345678',
+        } as never);
+
+        const res = await service.importBulk(
+            [
+                {
+                    employeeCode: 'EMP-0001',
+                    fullName: 'Duplicate Staff',
+                },
+            ],
+            true,
+            'admin1',
+        );
+
+        expect(res.createdCount).toBe(0);
+        expect(res.skippedCount).toBe(1);
+        expect(res.skipped[0].existingCode).toBe('EMP-0001');
+    });
 });

@@ -55,6 +55,7 @@ import {
 import { downloadCsvFile } from "@/lib/csv-download"
 import { RiDownload2Line } from "@remixicon/react"
 import { CreateEmployeeDialog } from "./create-employee-dialog"
+import { BulkImportEmployeesDialog } from "./bulk-import-employees-dialog"
 import { EditEmployeeDialog } from "./edit-employee-dialog"
 import { EmployeeDetailsDialog } from "./employee-details-dialog"
 import { DepartmentsManager } from "./departments-manager"
@@ -264,6 +265,7 @@ export function EmployeesOverview({
             >
               <RiDownload2Line className="mr-1.5 size-4" /> Export CSV
             </Button>
+            <BulkImportEmployeesDialog />
             <CreateEmployeeDialog employees={employees} />
           </div>
 
@@ -378,6 +380,7 @@ export function EmployeesOverview({
                     <TableHead className="font-mono text-xs">Status</TableHead>
                     <TableHead className="font-mono text-xs">Contact</TableHead>
                     <TableHead className="font-mono text-xs">Account</TableHead>
+                    <TableHead className="font-mono text-xs">Onboarding</TableHead>
                     <TableHead className="font-mono text-xs">Hired</TableHead>
                     <TableHead className="font-mono text-xs text-right">Actions</TableHead>
                   </TableRow>
@@ -440,6 +443,26 @@ export function EmployeesOverview({
                           ) : (
                             <span className="text-muted-foreground">Unlinked</span>
                           )}
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const hasUser = Boolean(emp.userId)
+                            const hasPos = Boolean(emp.positions && emp.positions.length > 0)
+                            const hasSched = Boolean(emp.schedules?.some((s) => s.isActive))
+                            const done = [hasUser, hasPos, hasSched].filter(Boolean).length
+                            return (
+                              <Badge
+                                variant="outline"
+                                className={`font-mono text-[10px] ${
+                                  done === 3
+                                    ? "border-emerald-500/40 text-emerald-500"
+                                    : "border-amber-500/40 text-amber-500"
+                                }`}
+                              >
+                                {done}/3 {done === 3 ? "Ready" : "Setup"}
+                              </Badge>
+                            )
+                          })()}
                         </TableCell>
                         <TableCell className="text-muted-foreground text-[11px]">
                           {emp.hireDate ? emp.hireDate.split("T")[0] : "—"}

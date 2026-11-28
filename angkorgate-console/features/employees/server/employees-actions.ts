@@ -19,6 +19,7 @@ import type {
   LeaveType,
   AttendanceLog,
   TeamRosterData,
+  EmployeeBulkImportResult,
   CreateDepartmentInput,
   UpdateDepartmentInput,
   CreateJobTitleInput,
@@ -45,7 +46,7 @@ import {
   CreateScheduleOverrideSchema,
 } from "../types/employees.schemas"
 
-function cleanOptionalStrings<T extends Record<string, unknown>>(obj: T): T {
+function cleanOptionalStrings<T extends object>(obj: T): T {
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(obj)) {
     if (v !== undefined && v !== "") {
@@ -803,5 +804,23 @@ export async function clockOutEmployeeAction(
     return { success: true }
   } catch (error: unknown) {
     return { success: false, message: getErrorMessage(error, "Failed to clock out") }
+  }
+}
+
+export async function importEmployeesBulkAction(
+  rows: CreateEmployeeInput[],
+  skipDuplicates = true
+): Promise<{ success: boolean; data?: EmployeeBulkImportResult; message?: string }> {
+  try {
+    const cleanedRows = rows.map((row) => cleanOptionalStrings(row))
+    const data = await apiClient.post<EmployeeBulkImportResult>("/employees/import", {
+      rows: cleanedRows,
+      skipDuplicates,
+    })
+    revalidatePath("/employees")
+    revalidatePath("/dashboard")
+    return { success: true, data }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to import employees") }
   }
 }

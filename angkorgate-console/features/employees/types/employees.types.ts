@@ -81,6 +81,15 @@ export interface ScheduleOverride {
 export type LeaveType = "ANNUAL" | "SICK" | "UNPAID" | "MATERNITY" | "OTHER"
 export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED"
 
+export interface EmployeeBulkImportResult {
+  createdCount: number
+  skippedCount: number
+  errorCount: number
+  createdCodes: string[]
+  skipped: { rowIndex: number; fullName: string; reason: string; existingCode: string }[]
+  errors: { rowIndex: number; fullName: string; message: string }[]
+}
+
 export interface AttendanceLog {
   id: string
   employeeId: string
