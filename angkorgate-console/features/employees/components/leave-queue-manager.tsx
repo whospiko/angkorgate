@@ -28,6 +28,19 @@ interface LeaveQueueManagerProps {
   leaveRequests: LeaveRequest[]
 }
 
+function formatDateTime(value?: string | null): string {
+  if (!value) return "—"
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return value
+  return d.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
 export function LeaveQueueManager({ leaveRequests }: LeaveQueueManagerProps) {
   const router = useRouter()
   const [statusFilter, setStatusFilter] = useState("")
@@ -107,6 +120,7 @@ export function LeaveQueueManager({ leaveRequests }: LeaveQueueManagerProps) {
                 <TableHead className="font-mono text-xs">Employee</TableHead>
                 <TableHead className="font-mono text-xs">Type</TableHead>
                 <TableHead className="font-mono text-xs">Dates</TableHead>
+                <TableHead className="font-mono text-xs">Requested</TableHead>
                 <TableHead className="font-mono text-xs">Reason & File</TableHead>
                 <TableHead className="font-mono text-xs">Status</TableHead>
                 <TableHead className="font-mono text-xs">Reviewed By</TableHead>
@@ -133,6 +147,9 @@ export function LeaveQueueManager({ leaveRequests }: LeaveQueueManagerProps) {
                   </TableCell>
                   <TableCell className="text-[11px]">
                     {lr.startDate} &rarr; {lr.endDate}
+                  </TableCell>
+                  <TableCell className="text-[11px] text-muted-foreground whitespace-nowrap">
+                    {formatDateTime(lr.createdAt)}
                   </TableCell>
                   <TableCell className="text-muted-foreground max-w-[220px]">
                     <div className="truncate">{lr.reason || "—"}</div>
@@ -167,8 +184,8 @@ export function LeaveQueueManager({ leaveRequests }: LeaveQueueManagerProps) {
                           {lr.reviewedBy.fullName || lr.reviewedBy.email || lr.reviewedBy.id}
                         </div>
                         {lr.reviewedAt && (
-                          <div className="text-[10px] text-muted-foreground">
-                            {new Date(lr.reviewedAt).toLocaleDateString()}
+                          <div className="text-[10px] text-muted-foreground whitespace-nowrap">
+                            {formatDateTime(lr.reviewedAt)}
                           </div>
                         )}
                       </div>

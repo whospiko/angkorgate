@@ -937,6 +937,18 @@ export function EmployeeDetailsDialog({
                       <span>
                         {lv.startDate} &rarr; {lv.endDate}
                       </span>
+                      {lv.createdAt && (
+                        <span className="text-[10px] text-muted-foreground">
+                          Requested{" "}
+                          {new Date(lv.createdAt).toLocaleString(undefined, {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      )}
                       {lv.reason && <span className="text-muted-foreground truncate max-w-[160px]">{lv.reason}</span>}
                       {lv.attachmentDataUrl && (
                         <LeaveAttachmentPreview
@@ -950,6 +962,15 @@ export function EmployeeDetailsDialog({
                       {lv.reviewedBy && (
                         <span className="text-[10px] text-muted-foreground">
                           by {lv.reviewedBy.fullName || lv.reviewedBy.email}
+                          {lv.reviewedAt
+                            ? ` · ${new Date(lv.reviewedAt).toLocaleString(undefined, {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}`
+                            : ""}
                         </span>
                       )}
                       <Badge variant="outline" className="text-[10px]">
