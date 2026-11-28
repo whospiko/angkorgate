@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import {
   Table,
   TableBody,
@@ -46,22 +46,31 @@ export function JobTitlesManager({ jobTitles }: JobTitlesManagerProps) {
   const [createOpen, setCreateOpen] = useState(false)
   const [createCode, setCreateCode] = useState("")
   const [createName, setCreateName] = useState("")
-  const [createCategory, setCreateCategory] = useState("CLINIC")
+  const [createCategory, setCreateCategory] = useState("")
   const [createDesc, setCreateDesc] = useState("")
   const [createLoading, setCreateLoading] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
   const [editJt, setEditJt] = useState<JobTitle | null>(null)
   const [editName, setEditName] = useState("")
-  const [editCategory, setEditCategory] = useState("CLINIC")
+  const [editCategory, setEditCategory] = useState("")
   const [editDesc, setEditDesc] = useState("")
   const [editLoading, setEditLoading] = useState(false)
 
   const [deletingCode, setDeletingCode] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
+  const availableCategories = useMemo(() => {
+    const set = new Set<string>()
+    for (const jt of jobTitles) {
+      const cat = jt.category?.trim().toUpperCase()
+      if (cat) set.add(cat)
+    }
+    return Array.from(set).sort()
+  }, [jobTitles])
+
   const filteredJobTitles = categoryFilter
-    ? jobTitles.filter((jt) => (jt.category || "GENERAL") === categoryFilter)
+    ? jobTitles.filter((jt) => (jt.category || "GENERAL").toUpperCase() === categoryFilter)
     : jobTitles
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -72,7 +81,7 @@ export function JobTitlesManager({ jobTitles }: JobTitlesManagerProps) {
     const res = await createJobTitleAction({
       code: createCode.trim().toUpperCase(),
       name: createName.trim(),
-      category: createCategory,
+      category: createCategory.trim().toUpperCase() || undefined,
       description: createDesc.trim() || undefined,
     })
 
@@ -81,6 +90,7 @@ export function JobTitlesManager({ jobTitles }: JobTitlesManagerProps) {
       setCreateOpen(false)
       setCreateCode("")
       setCreateName("")
+      setCreateCategory("")
       setCreateDesc("")
     } else {
       setCreateError(res.message || "Failed to create job title")
@@ -95,7 +105,7 @@ export function JobTitlesManager({ jobTitles }: JobTitlesManagerProps) {
 
     const res = await updateJobTitleAction(editJt.code, {
       name: editName.trim(),
-      category: editCategory,
+      category: editCategory.trim().toUpperCase() || undefined,
       description: editDesc.trim() || undefined,
     })
 
@@ -132,16 +142,22 @@ export function JobTitlesManager({ jobTitles }: JobTitlesManagerProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          <datalist id="jt-category-options">
+            {availableCategories.map((cat) => (
+              <option key={cat} value={cat} />
+            ))}
+          </datalist>
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="h-8 rounded-md border border-input bg-background/90 dark:bg-black/25 px-2.5 text-xs font-mono text-foreground outline-none"
           >
             <option value="">All Categories</option>
-            <option value="CLINIC">CLINIC</option>
-            <option value="HOTEL">HOTEL</option>
-            <option value="POS">POS</option>
-            <option value="GENERAL">GENERAL</option>
+            {availableCategories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
           </select>
 
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -181,18 +197,14 @@ export function JobTitlesManager({ jobTitles }: JobTitlesManagerProps) {
                     </div>
 
                     <div className="grid gap-1.5">
-                      <Label htmlFor="jt-category">Category</Label>
-                      <select
+                      <Label htmlFor="jt-category">Category (pick or type new)</Label>
+                      <Input
                         id="jt-category"
+                        list="jt-category-options"
+                        placeholder="e.g. MEDICAL, FINANCE, HR"
                         value={createCategory}
                         onChange={(e) => setCreateCategory(e.target.value)}
-                        className="flex h-9 w-full min-w-0 rounded-md border border-input bg-background/90 dark:bg-black/25 px-3 py-1.5 text-xs font-mono text-foreground transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 outline-none"
-                      >
-                        <option value="CLINIC">CLINIC</option>
-                        <option value="HOTEL">HOTEL</option>
-                        <option value="POS">POS</option>
-                        <option value="GENERAL">GENERAL</option>
-                      </select>
+                      />
                     </div>
                   </div>
 
@@ -292,7 +304,7 @@ export function JobTitlesManager({ jobTitles }: JobTitlesManagerProps) {
                         onClick={() => {
                           setEditJt(jt)
                           setEditName(jt.name)
-                          setEditCategory(jt.category || "CLINIC")
+                          setEditCategory(jt.category || "")
                           setEditDesc(jt.description || "")
                         }}
                       >
@@ -340,18 +352,14 @@ export function JobTitlesManager({ jobTitles }: JobTitlesManagerProps) {
                 </div>
 
                 <div className="grid gap-1.5">
-                  <Label htmlFor="edit-jt-cat">Category</Label>
-                  <select
+                  <Label htmlFor="edit-jt-cat">Category (pick or type new)</Label>
+                  <Input
                     id="edit-jt-cat"
+                    list="jt-category-options"
+                    placeholder="e.g. MEDICAL, FINANCE, HR"
                     value={editCategory}
                     onChange={(e) => setEditCategory(e.target.value)}
-                    className="flex h-9 w-full min-w-0 rounded-md border border-input bg-background/90 dark:bg-black/25 px-3 py-1.5 text-xs font-mono text-foreground transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 outline-none"
-                  >
-                    <option value="CLINIC">CLINIC</option>
-                    <option value="HOTEL">HOTEL</option>
-                    <option value="POS">POS</option>
-                    <option value="GENERAL">GENERAL</option>
-                  </select>
+                  />
                 </div>
 
                 <div className="grid gap-1.5">
