@@ -4,6 +4,7 @@ import {
     ForbiddenException,
     Injectable,
     NotFoundException,
+    Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -16,6 +17,7 @@ import {
 } from '../dto/leave-request.dto';
 import { EmployeesService } from './employees.service';
 import { AuditService } from '../../audit/services/audit.service';
+import { WebhooksService } from '../../webhooks/webhooks.service';
 import { normalizePagination } from '../../common/utils/pagination.util';
 
 const DEFAULT_LEAVE_POLICIES: {
@@ -37,6 +39,8 @@ export class LeaveRequestsService {
         private readonly policyRepo: Repository<LeavePolicy>,
         private readonly employees: EmployeesService,
         private readonly audit: AuditService,
+        @Optional()
+        private readonly webhooks?: WebhooksService,
     ) { }
 
     async create(
@@ -228,6 +232,17 @@ export class LeaveRequestsService {
             oldValue: { status: 'PENDING' },
             newValue: { status: saved.status, reviewNote: saved.reviewNote },
         });
+
+        if (saved.status === 'APPROVED') {
+            void this.webhooks?.emitEvent('leave.approved', {
+                id: saved.id,
+                employeeId: saved.employeeId,
+                leaveType: saved.leaveType,
+                startDate: saved.startDate,
+                endDate: saved.endDate,
+                reviewedById: saved.reviewedById,
+            });
+        }
 
         return saved;
     }

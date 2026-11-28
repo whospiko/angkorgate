@@ -137,6 +137,10 @@ const defaultNavData = {
           url: "/api-keys",
         },
         {
+          title: "HR & ERP Webhooks",
+          url: "/webhooks",
+        },
+        {
           title: "Documentation",
           url: "/docs",
         },

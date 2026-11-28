@@ -19,6 +19,7 @@ import { AppsModule } from './apps/apps.module';
 import { ScopesModule } from './scopes/scopes.module';
 import { OidcModule } from './oidc/oidc.module';
 import { CacheModule } from './cache/cache.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 import { SystemModule } from './system/system.module';
 import { RuntimeConfigModule } from './system/runtime-config.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
@@ -77,6 +78,7 @@ import { MaintenanceMiddleware } from './system/middleware/maintenance.middlewar
     ScopesModule,
     OidcModule,
     CacheModule,
+    WebhooksModule,
     RuntimeConfigModule,
     SystemModule,
     ApiKeysModule,

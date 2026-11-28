@@ -3,6 +3,7 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
@@ -12,6 +13,7 @@ import { UpdateEmployeeDto } from '../dto/update-employee.dto';
 import { EmployeeResponseDto } from '../dto/employee-response.dto';
 import { UsersService } from '../../users/services/users.service';
 import { AuditService } from '../../audit/services/audit.service';
+import { WebhooksService } from '../../webhooks/webhooks.service';
 import { normalizePagination } from '../../common/utils/pagination.util';
 import { isSqlite } from '../../common/utils/db-types.util';
 import { buildCsv } from '../../common/utils/csv.util';
@@ -46,6 +48,8 @@ export class EmployeesService {
         private readonly repo: Repository<Employee>,
         private readonly users: UsersService,
         private readonly audit: AuditService,
+        @Optional()
+        private readonly webhooks?: WebhooksService,
     ) { }
 
     async create(dto: CreateEmployeeDto, actorId?: string): Promise<EmployeeResponseDto> {
@@ -83,6 +87,14 @@ export class EmployeesService {
             entity: 'employee',
             entityId: saved.id,
             newValue: { employeeCode: saved.employeeCode, fullName: saved.fullName },
+        });
+
+        void this.webhooks?.emitEvent('employee.onboarded', {
+            id: saved.id,
+            employeeCode: saved.employeeCode,
+            fullName: saved.fullName,
+            employmentType: saved.employmentType,
+            managerId: saved.managerId,
         });
 
         return EmployeeResponseDto.fromEntity(saved);

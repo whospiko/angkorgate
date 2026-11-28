@@ -375,6 +375,32 @@ async function runSmokeTest() {
         const rosterBody = rosterRes.body?.data || rosterRes.body;
         assert('GET /employees/roster returns 7-day team calendar', rosterRes.status === 200 && rosterBody?.dates?.length === 7);
 
+        const whCreateRes = await request(http)
+            .post('/webhooks')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({
+                name: 'Clinic HIS Outbox',
+                url: 'http://127.0.0.1:9/webhook-sink',
+                events: ['customer.created', 'employee.onboarded', 'leave.approved'],
+            });
+        const whId = whCreateRes.body?.data?.id || whCreateRes.body?.id;
+        assert('POST /webhooks creates signed webhook endpoint', whCreateRes.status === 201 && Boolean(whId));
+
+        await request(http).post('/customers').set('Authorization', `Bearer ${adminToken}`).send({
+            type: 'PATIENT',
+            fullName: 'Webhook Patient',
+            dateOfBirth: '1993-03-03',
+        });
+        await new Promise((r) => setTimeout(r, 100));
+        const whDeliveriesRes = await request(http)
+            .get(`/webhooks/${whId}/deliveries`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        const whDeliveries = whDeliveriesRes.body?.data || whDeliveriesRes.body || [];
+        assert(
+            'Webhook outbox records signed customer.created delivery',
+            whDeliveriesRes.status === 200 && whDeliveries.some((d: any) => d.event === 'customer.created' && String(d.signature).startsWith('sha256=')),
+        );
+
         // ══════════════════════════════════════════════════════════════════
         logSection('6. MFA (TOTP) Setup & Login Flow');
         // ══════════════════════════════════════════════════════════════════

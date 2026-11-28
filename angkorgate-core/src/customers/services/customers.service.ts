@@ -16,6 +16,7 @@ import { CustomerResponseDto } from '../dto/customer-response.dto';
 import { UsersService } from '../../users/services/users.service';
 import { AuditService } from '../../audit/services/audit.service';
 import { AttributeSchemasService } from './attribute-schemas.service';
+import { WebhooksService } from '../../webhooks/webhooks.service';
 import {
     CUSTOMER_TYPE_PREFIX,
     formatCustomerCode,
@@ -41,6 +42,7 @@ export class CustomersService {
         private readonly users: UsersService,
         private readonly audit: AuditService,
         @Optional() private readonly attributeSchemas?: AttributeSchemasService,
+        @Optional() private readonly webhooks?: WebhooksService,
     ) { }
 
     async create(
@@ -72,6 +74,15 @@ export class CustomersService {
                 fullName: saved.fullName,
                 type: saved.type,
             },
+        });
+
+        void this.webhooks?.emitEvent('customer.created', {
+            id: saved.id,
+            customerCode: saved.customerCode,
+            type: saved.type,
+            fullName: saved.fullName,
+            email: saved.email,
+            phone: saved.phone,
         });
 
         return CustomerResponseDto.fromEntity(saved);
