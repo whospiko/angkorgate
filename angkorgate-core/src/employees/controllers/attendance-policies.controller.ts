@@ -7,8 +7,10 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { UnifiedAuthGuard } from '../../auth/guards/unified-auth.guard';
@@ -26,6 +28,26 @@ import { SchedulesService } from '../services/schedules.service';
 @Controller('attendance-policies')
 export class AttendancePoliciesController {
   constructor(private readonly schedules: SchedulesService) {}
+
+  @Get('client-ip')
+  @Permissions('employee:read')
+  @ApiOperation({ summary: 'Detect caller IP as seen by backend for Wi-Fi allowlist setup' })
+  getClientIp(@Req() req: Request) {
+    const forwarded = req.headers['x-forwarded-for'];
+    const rawIp = Array.isArray(forwarded)
+      ? forwarded[0]
+      : typeof forwarded === 'string'
+      ? forwarded.split(',')[0]
+      : req.ip || req.socket?.remoteAddress || null;
+    const trimmed = rawIp?.trim() || null;
+    const ip =
+      trimmed === '::1'
+        ? '127.0.0.1'
+        : trimmed?.startsWith('::ffff:')
+        ? trimmed.slice(7)
+        : trimmed;
+    return { ip };
+  }
 
   @Get()
   @Permissions('employee:read')

@@ -38,6 +38,7 @@ import {
   createAttendancePolicyAction,
   deleteAttendancePolicyAction,
   exportAttendanceCsvAction,
+  getAttendanceClientIpAction,
   getAttendanceLogsAction,
   getAttendancePoliciesAction,
   getAttendanceSummaryAction,
@@ -192,6 +193,25 @@ export function AttendanceManager({
       },
       { enableHighAccuracy: true, timeout: 6000 }
     )
+  }
+
+  const handleDetectCurrentIp = () => {
+    setBanner(null)
+    startTransition(async () => {
+      const ip = await getAttendanceClientIpAction()
+      if (!ip) {
+        setBanner({ type: "err", text: "Unable to detect server-seen IP." })
+        return
+      }
+      const existing = allowedIpsText
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+      if (!existing.includes(ip)) {
+        setAllowedIpsText([...existing, ip].join(", "))
+      }
+      setBanner({ type: "ok", text: `Detected server-seen IP: ${ip}` })
+    })
   }
 
   const handleSavePolicy = (e: React.FormEvent) => {
@@ -587,15 +607,27 @@ export function AttendanceManager({
                     <RiShieldCheckLine className="size-4 text-primary" />
                     Anti-Spoof & Location Verification
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleUseCurrentLocation}
-                  >
-                    <RiMapPinLine className="mr-1 size-3.5" />
-                    Use Current Office GPS
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={handleDetectCurrentIp}
+                    >
+                      <RiShieldCheckLine className="mr-1 size-3.5" />
+                      Detect Current IP
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleUseCurrentLocation}
+                    >
+                      <RiMapPinLine className="mr-1 size-3.5" />
+                      Use Current Office GPS
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
@@ -608,6 +640,9 @@ export function AttendanceManager({
                       onChange={(e) => setAllowedIpsText(e.target.value)}
                       placeholder="e.g. 203.189.132.45, 192.168.1.0/24"
                     />
+                    <p className="text-[10px] font-mono text-muted-foreground">
+                      Note: On localhost dev, the server sees 127.0.0.1. In production behind a proxy, it sees your clinic&apos;s public/LAN IP.
+                    </p>
                   </div>
                   <div className="flex items-end pb-1">
                     <label className="flex items-center gap-2 text-xs font-mono cursor-pointer">

@@ -857,6 +857,15 @@ export async function clockOutEmployeeAction(
   }
 }
 
+export async function getAttendanceClientIpAction(): Promise<string | null> {
+  try {
+    const res = await apiClient.get<{ ip: string | null }>("/attendance-policies/client-ip")
+    return res?.ip ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function getAttendancePoliciesAction(): Promise<AttendancePolicy[]> {
   try {
     const res = await apiClient.get<AttendancePolicy[]>("/attendance-policies")
