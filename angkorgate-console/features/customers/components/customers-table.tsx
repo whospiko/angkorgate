@@ -41,6 +41,7 @@ import {
 import { downloadCsvFile } from "@/lib/csv-download"
 import { RiDownload2Line } from "@remixicon/react"
 import { BulkImportCustomersDialog } from "./bulk-import-customers-dialog"
+import { MergeCustomersDialog } from "./merge-customers-dialog"
 import { CustomerDetailsDialog } from "./customer-details-dialog"
 import { EditCustomerDialog } from "./edit-customer-dialog"
 
@@ -221,6 +222,7 @@ export function CustomersTable({
           <RiDownload2Line className="mr-1.5 size-4" /> Export CSV
         </Button>
         <BulkImportCustomersDialog />
+        <MergeCustomersDialog customers={customers} />
       </div>
 
       {actionError && (

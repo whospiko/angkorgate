@@ -34,6 +34,7 @@ import { SetAttributeDto } from '../dto/set-attribute.dto';
 import { CustomerResponseDto } from '../dto/customer-response.dto';
 import { LinkCustomerUserDto } from '../dto/link-customer-user.dto';
 import { BulkImportCustomersDto } from '../dto/bulk-import-customers.dto';
+import { MergeCustomersDto } from '../dto/merge-customers.dto';
 import { ATTRIBUTE_SCHEMAS } from '../seed/attribute-schemas';
 
 @ApiTags('Customers')
@@ -115,6 +116,20 @@ export class CustomersController {
         @CurrentUser('id') actorId?: string,
     ) {
         return this.customers.importBulk(dto.rows, dto.skipDuplicates ?? true, actorId);
+    }
+
+    @Post('merge')
+    @Permissions('customer:write')
+    @ApiOperation({ summary: 'Merge a duplicate customer into a primary customer and archive the duplicate' })
+    merge(
+        @Body() dto: MergeCustomersDto,
+        @CurrentUser('id') actorId?: string,
+    ) {
+        return this.customers.mergeCustomers(
+            dto.primaryCustomerId,
+            dto.duplicateCustomerId,
+            actorId,
+        );
     }
 
     @Get('attribute-schemas')

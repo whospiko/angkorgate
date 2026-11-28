@@ -14,6 +14,7 @@ import type {
   AttributeSchemaRule,
   CsvExportPayload,
   BulkImportResult,
+  MergeCustomersResult,
 } from "../types/customers.types"
 import {
   CreateCustomerSchema,
@@ -202,6 +203,23 @@ export async function importCustomersBulkAction(
     return { success: true, data }
   } catch (error: unknown) {
     return { success: false, message: getErrorMessage(error, "Failed to import customers") }
+  }
+}
+
+export async function mergeCustomersAction(
+  primaryCustomerId: string,
+  duplicateCustomerId: string
+): Promise<{ success: boolean; data?: MergeCustomersResult; message?: string }> {
+  try {
+    const data = await apiClient.post<MergeCustomersResult>("/customers/merge", {
+      primaryCustomerId,
+      duplicateCustomerId,
+    })
+    revalidatePath("/customers")
+    revalidatePath("/dashboard")
+    return { success: true, data }
+  } catch (error: unknown) {
+    return { success: false, message: getErrorMessage(error, "Failed to merge customers") }
   }
 }
 

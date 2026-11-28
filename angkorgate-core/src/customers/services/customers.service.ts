@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { Customer, CustomerStatus, CustomerType } from '../entities/customer.entity';
 import { CustomerAttribute } from '../entities/customer-attribute.entity';
+import { CustomerContact } from '../entities/customer-contact.entity';
 import { CreateCustomerDto } from '../dto/create-customer.dto';
 import { UpdateCustomerDto } from '../dto/update-customer.dto';
 import { CustomerResponseDto } from '../dto/customer-response.dto';
@@ -466,6 +467,144 @@ export class CustomersService {
             skipped,
             errors,
         };
+    }
+
+    /** Atomically merges a duplicate customer into a primary customer and archives the duplicate. */
+    async mergeCustomers(
+        primaryCustomerId: string,
+        duplicateCustomerId: string,
+        actorId?: string,
+    ): Promise<{
+        primary: CustomerResponseDto;
+        archivedDuplicateId: string;
+        archivedDuplicateCode: string;
+        movedContacts: number;
+        movedAttributes: number;
+        transferredUserId: string | null;
+    }> {
+        if (primaryCustomerId === duplicateCustomerId) {
+            throw new BadRequestException('Cannot merge a customer into itself');
+        }
+
+        const result = await this.repo.manager.transaction(async (em: EntityManager) => {
+            const custRepo = em.getRepository(Customer);
+            const contactRepo = em.getRepository(CustomerContact);
+            const attrRepo = em.getRepository(CustomerAttribute);
+
+            const primary = await custRepo.findOne({ where: { id: primaryCustomerId } });
+            if (!primary) {
+                throw new NotFoundException(`Primary customer ${primaryCustomerId} not found`);
+            }
+            const duplicate = await custRepo.findOne({ where: { id: duplicateCustomerId } });
+            if (!duplicate) {
+                throw new NotFoundException(`Duplicate customer ${duplicateCustomerId} not found`);
+            }
+            if (duplicate.status === 'ARCHIVED') {
+                throw new BadRequestException(
+                    `Duplicate customer ${duplicate.customerCode} is already archived`,
+                );
+            }
+
+            // Fill missing scalar fields on primary without overwriting existing values
+            if (!primary.phone && duplicate.phone) primary.phone = duplicate.phone;
+            if (!primary.email && duplicate.email) primary.email = duplicate.email;
+            if (!primary.nationalId && duplicate.nationalId) primary.nationalId = duplicate.nationalId;
+            if (!primary.address && duplicate.address) primary.address = duplicate.address;
+            if (!primary.gender && duplicate.gender) primary.gender = duplicate.gender;
+            if (!primary.avatarUrl && duplicate.avatarUrl) primary.avatarUrl = duplicate.avatarUrl;
+
+            let transferredUserId: string | null = null;
+            if (!primary.userId && duplicate.userId) {
+                transferredUserId = duplicate.userId;
+            }
+
+            // Unlink & archive duplicate first so unique userId constraint is never violated
+            duplicate.userId = null;
+            duplicate.status = 'ARCHIVED';
+            await custRepo.save(duplicate);
+
+            if (transferredUserId) {
+                primary.userId = transferredUserId;
+            }
+            await custRepo.save(primary);
+
+            // Re-point non-colliding contacts
+            const [primaryContacts, dupContacts] = await Promise.all([
+                contactRepo.find({ where: { customerId: primary.id } }),
+                contactRepo.find({ where: { customerId: duplicate.id } }),
+            ]);
+            const existingPhones = new Set(
+                primaryContacts.map((c) => c.phone).filter((p): p is string => Boolean(p)),
+            );
+            const hasPrimaryContact = primaryContacts.some((c) => c.isPrimary);
+
+            let movedContacts = 0;
+            for (const contact of dupContacts) {
+                if (contact.phone && existingPhones.has(contact.phone)) {
+                    await contactRepo.delete(contact.id);
+                    continue;
+                }
+                contact.customerId = primary.id;
+                if (hasPrimaryContact && contact.isPrimary) {
+                    contact.isPrimary = false;
+                }
+                await contactRepo.save(contact);
+                if (contact.phone) existingPhones.add(contact.phone);
+                movedContacts++;
+            }
+
+            // Re-point non-colliding attributes
+            const [primaryAttrs, dupAttrs] = await Promise.all([
+                attrRepo.find({ where: { customerId: primary.id } }),
+                attrRepo.find({ where: { customerId: duplicate.id } }),
+            ]);
+            const existingKeys = new Set(primaryAttrs.map((a) => a.key));
+
+            let movedAttributes = 0;
+            for (const attr of dupAttrs) {
+                if (existingKeys.has(attr.key)) {
+                    await attrRepo.delete(attr.id);
+                    continue;
+                }
+                attr.customerId = primary.id;
+                await attrRepo.save(attr);
+                existingKeys.add(attr.key);
+                movedAttributes++;
+            }
+
+            const reloaded = await custRepo.findOne({
+                where: { id: primary.id },
+                relations: { contacts: true, attributes: true },
+            });
+
+            return {
+                primary: CustomerResponseDto.fromEntity(reloaded ?? primary),
+                archivedDuplicateId: duplicate.id,
+                archivedDuplicateCode: duplicate.customerCode,
+                movedContacts,
+                movedAttributes,
+                transferredUserId,
+            };
+        });
+
+        void this.audit.log({
+            actorId: actorId ?? null,
+            action: 'customer.merge',
+            entity: 'customer',
+            entityId: primaryCustomerId,
+            oldValue: {
+                duplicateCustomerId,
+                duplicateCode: result.archivedDuplicateCode,
+            },
+            newValue: {
+                primaryCode: result.primary.customerCode,
+                movedContacts: result.movedContacts,
+                movedAttributes: result.movedAttributes,
+                transferredUserId: result.transferredUserId,
+            },
+        });
+
+        return result;
     }
 
     /** Generates PAT-0001 / GST-0001 / CUS-0001 atomically using a transaction. */

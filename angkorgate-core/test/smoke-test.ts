@@ -189,6 +189,30 @@ async function runSmokeTest() {
             .set('Authorization', `Bearer ${adminToken}`);
         assert('Valid customer status ARCHIVED accepted', archiveCustRes.status === 204);
 
+        const dupCustRes = await request(http)
+            .post('/customers')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({
+                type: 'PATIENT',
+                fullName: 'Duplicate Patient',
+                dateOfBirth: '1990-01-01',
+                phone: '+85599777666',
+            });
+        const dupCustId = dupCustRes.body?.data?.id || dupCustRes.body?.id;
+        await request(http)
+            .put(`/customers/${dupCustId}/attributes/insurance_code`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ value: 'INS-777' });
+        const mergeRes = await request(http)
+            .post('/customers/merge')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ primaryCustomerId: patientId, duplicateCustomerId: dupCustId });
+        const mergeBody = mergeRes.body?.data || mergeRes.body;
+        assert(
+            'Merge duplicate customer moves attributes and archives duplicate',
+            mergeRes.status === 201 && mergeBody?.movedAttributes === 1 && mergeBody?.archivedDuplicateId === dupCustId,
+        );
+
         // ══════════════════════════════════════════════════════════════════
         logSection('5. Employees Module (Clinic / Hotel / POS)');
         // ══════════════════════════════════════════════════════════════════

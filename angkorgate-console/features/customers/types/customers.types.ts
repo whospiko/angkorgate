@@ -105,3 +105,12 @@ export interface BulkImportResult {
   skipped: { rowIndex: number; fullName: string; reason: string; existingCode: string }[]
   errors: { rowIndex: number; fullName: string; message: string }[]
 }
+
+export interface MergeCustomersResult {
+  primary: Customer
+  archivedDuplicateId: string
+  archivedDuplicateCode: string
+  movedContacts: number
+  movedAttributes: number
+  transferredUserId: string | null
+}

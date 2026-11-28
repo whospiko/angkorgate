@@ -342,5 +342,77 @@ describe('CustomersService', () => {
             expect(res.skippedCount).toBe(1);
             expect(res.skipped[0].existingCode).toBe('CUS-0001');
         });
+
+        it('rejects merging a customer into itself', async () => {
+            await expect(service.mergeCustomers('c1', 'c1')).rejects.toThrow(
+                BadRequestException,
+            );
+        });
+
+        it('merges duplicate contacts, attributes, and userId into primary and archives duplicate', async () => {
+            const primary = {
+                id: 'c1',
+                customerCode: 'PAT-0001',
+                fullName: 'Vanna Pich',
+                type: 'PATIENT',
+                status: 'ACTIVE',
+                dateOfBirth: '1988-04-12',
+                userId: null,
+                phone: null,
+            };
+            const duplicate = {
+                id: 'c2',
+                customerCode: 'PAT-0002',
+                fullName: 'Vanna P.',
+                type: 'PATIENT',
+                status: 'ACTIVE',
+                dateOfBirth: '1988-04-12',
+                userId: 'u-1',
+                phone: '+85512888999',
+            };
+
+            const custRepo = {
+                findOne: jest
+                    .fn()
+                    .mockResolvedValueOnce(primary)
+                    .mockResolvedValueOnce(duplicate)
+                    .mockResolvedValueOnce({ ...primary, userId: 'u-1', phone: '+85512888999', contacts: [], attributes: [] }),
+                save: jest.fn().mockImplementation(async (d) => d),
+            };
+            const contactRepo = {
+                find: jest
+                    .fn()
+                    .mockResolvedValueOnce([])
+                    .mockResolvedValueOnce([{ id: 'ct-1', customerId: 'c2', phone: '+85511000222', isPrimary: true }]),
+                save: jest.fn().mockImplementation(async (d) => d),
+                delete: jest.fn(),
+            };
+            const dupAttrRepo = {
+                find: jest
+                    .fn()
+                    .mockResolvedValueOnce([])
+                    .mockResolvedValueOnce([{ id: 'at-1', customerId: 'c2', key: 'blood_type', value: 'O+' }]),
+                save: jest.fn().mockImplementation(async (d) => d),
+                delete: jest.fn(),
+            };
+
+            repo.manager.transaction = jest.fn(async (cb: (em: any) => Promise<any>) =>
+                cb({
+                    getRepository: jest.fn((entity: any) => {
+                        if (entity === Customer) return custRepo;
+                        if (entity?.name === 'CustomerContact') return contactRepo;
+                        return dupAttrRepo;
+                    }),
+                }),
+            ) as never;
+
+            const merged = await service.mergeCustomers('c1', 'c2', 'admin1');
+            expect(merged.archivedDuplicateCode).toBe('PAT-0002');
+            expect(merged.movedContacts).toBe(1);
+            expect(merged.movedAttributes).toBe(1);
+            expect(merged.transferredUserId).toBe('u-1');
+            expect(duplicate.status).toBe('ARCHIVED');
+            expect(duplicate.userId).toBeNull();
+        });
     });
 });
