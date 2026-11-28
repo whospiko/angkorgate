@@ -228,8 +228,8 @@ export function EmployeesOverview({
       </div>
 
       {/* Main Tabs Navigation */}
-      <Tabs key={initialTab} defaultValue={initialTab} className="space-y-4">
-        <TabsList className="font-mono text-xs">
+      <Tabs key={initialTab} defaultValue={initialTab} className="space-y-4 min-w-0 w-full">
+        <TabsList className="font-mono text-xs flex-wrap h-auto max-w-full">
           <TabsTrigger value="staff">Staff Directory ({total})</TabsTrigger>
           <TabsTrigger value="roster">Team Roster</TabsTrigger>
           <TabsTrigger value="org-chart">Org Chart</TabsTrigger>
@@ -512,7 +512,7 @@ export function EmployeesOverview({
         </TabsContent>
 
         {/* Tab 2: Team Roster & Attendance */}
-        <TabsContent value="roster">
+        <TabsContent value="roster" className="min-w-0">
           <TeamRosterView
             initialRoster={initialRoster}
             initialAttendance={initialAttendance}

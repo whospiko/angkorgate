@@ -151,20 +151,20 @@ export function TeamRosterView({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 w-full">
       {/* Calendar Controls */}
-      <Card className="border border-border/50 bg-card">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
+      <Card className="border border-border/50 bg-card min-w-0 overflow-hidden">
+        <CardHeader className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div className="min-w-0">
             <CardTitle className="font-heading text-base flex items-center gap-2">
-              <RiCalendar2Line className="size-4 text-primary" />
+              <RiCalendar2Line className="size-4 text-primary shrink-0" />
               Team Shift Roster Calendar
             </CardTitle>
             <CardDescription className="font-mono text-xs">
               Unified view of weekly shifts, schedule overrides, approved leave, and clock-in logs.
             </CardDescription>
           </div>
-          <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+          <div className="flex flex-wrap items-center gap-2 font-mono text-xs shrink-0">
             <Input
               type="date"
               value={startDate}
@@ -212,14 +212,14 @@ export function TeamRosterView({
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="min-w-0">
           {roster.employees.length === 0 ? (
             <div className="rounded-md border border-dashed border-border p-8 text-center font-mono text-xs text-muted-foreground">
               No active employees match the selected filters.
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-md border border-border/50">
-              <Table>
+            <div className="w-full max-w-full overflow-x-auto rounded-md border border-border/50">
+              <Table className="w-max min-w-full">
                 <TableHeader>
                   <TableRow className="bg-muted/30">
                     <TableHead className="font-mono text-xs sticky left-0 bg-card z-10 min-w-[170px]">
@@ -270,7 +270,7 @@ export function TeamRosterView({
       </Card>
 
       {/* Attendance Clock-In / Clock-Out */}
-      <Card className="border border-border/50 bg-card">
+      <Card className="border border-border/50 bg-card min-w-0 overflow-hidden">
         <CardHeader>
           <CardTitle className="font-heading text-base flex items-center gap-2">
             <RiTimeLine className="size-4 text-primary" />
@@ -280,7 +280,7 @@ export function TeamRosterView({
             Record shift check-ins and check-outs for Clinic or POS staff.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 min-w-0">
           {feedback && (
             <div
               className={`font-mono text-xs p-2.5 rounded-md border ${
@@ -335,7 +335,7 @@ export function TeamRosterView({
           </div>
 
           {attendance.length > 0 && (
-            <div className="rounded-md border border-border/50 overflow-hidden">
+            <div className="w-full max-w-full overflow-x-auto rounded-md border border-border/50">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/30">

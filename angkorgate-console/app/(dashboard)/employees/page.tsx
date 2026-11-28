@@ -50,7 +50,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
   ])
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
+    <div className="flex flex-1 flex-col gap-6 min-w-0">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
